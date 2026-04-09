@@ -1,0 +1,74 @@
+<!-- コードレビュー結果テンプレート -->
+<!-- base.html の {{SUMMARY_CARDS}} と {{MAIN_CONTENT}} を置き換えて使用 -->
+
+<!-- ACCENT_COLOR: #1d4ed8 -->
+<!-- ACCENT_LIGHT: #dbeafe -->
+<!-- BADGE_LABEL: CODE REVIEW -->
+
+<!-- SUMMARY_CARDS の中身 -->
+<!--
+<div class="summary-grid">
+  <div class="summary-card">
+    <div class="label">対象PR / ブランチ</div>
+    <div class="value">{{PR_ID}}</div>
+    <div class="sub">{{BRANCH_NAME}}</div>
+  </div>
+  <div class="summary-card">
+    <div class="label">指摘件数</div>
+    <div class="value">{{ISSUE_COUNT}}</div>
+    <div class="sub">重大: {{CRITICAL_COUNT}} / 軽微: {{MINOR_COUNT}}</div>
+  </div>
+  <div class="summary-card">
+    <div class="label">総合評価</div>
+    <div class="value">{{OVERALL_RATING}}</div>
+    <div class="sub">{{RATING_LABEL}}</div>
+  </div>
+</div>
+-->
+
+<!-- MAIN_CONTENT の中身 -->
+<!--
+<div class="section">
+  <div class="section-header">📋 レビュー概要</div>
+  <div class="section-body content">{{OVERVIEW}}</div>
+</div>
+
+<div class="section">
+  <div class="section-header">🔴 重大な指摘</div>
+  <div class="section-body">
+    <table>
+      <thead>
+        <tr><th>場所</th><th>問題</th><th>推奨対応</th></tr>
+      </thead>
+      <tbody>
+        {{CRITICAL_ROWS}}
+        <!-- 例: <tr><td><code>src/auth.rs:42</code></td><td>SQLインジェクションの可能性</td><td>パラメータ化クエリを使用する</td></tr> -->
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">🟡 改善提案</div>
+  <div class="section-body">
+    <table>
+      <thead>
+        <tr><th>場所</th><th>内容</th><th>優先度</th></tr>
+      </thead>
+      <tbody>
+        {{SUGGESTION_ROWS}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">✅ 良い点</div>
+  <div class="section-body content">{{POSITIVES}}</div>
+</div>
+
+<div class="section">
+  <div class="section-header">📝 まとめ・次のアクション</div>
+  <div class="section-body content">{{SUMMARY}}</div>
+</div>
+-->

@@ -1,0 +1,64 @@
+<!-- 調査結果テンプレート（コード調査・バグ調査・リサーチ共通） -->
+<!-- base.html の {{SUMMARY_CARDS}} と {{MAIN_CONTENT}} を置き換えて使用 -->
+
+<!-- ACCENT_COLOR: #7c3aed  (バグ: #dc2626, リサーチ: #0891b2) -->
+<!-- ACCENT_LIGHT: #ede9fe  (バグ: #fee2e2, リサーチ: #cffafe) -->
+<!-- BADGE_LABEL: INVESTIGATION / BUG ANALYSIS / RESEARCH -->
+
+<!-- SUMMARY_CARDS の中身 -->
+<!--
+<div class="summary-grid">
+  <div class="summary-card">
+    <div class="label">調査対象</div>
+    <div class="value" style="font-size:1rem">{{TARGET}}</div>
+    <div class="sub">{{TARGET_SUB}}</div>
+  </div>
+  <div class="summary-card">
+    <div class="label">ステータス</div>
+    <div class="value">{{STATUS}}</div>
+    <div class="sub">{{STATUS_SUB}}</div>
+  </div>
+  <div class="summary-card">
+    <div class="label">影響範囲</div>
+    <div class="value">{{IMPACT}}</div>
+    <div class="sub">{{IMPACT_SUB}}</div>
+  </div>
+</div>
+-->
+
+<!-- MAIN_CONTENT の中身 -->
+<!--
+<div class="section">
+  <div class="section-header">🔍 調査の背景・目的</div>
+  <div class="section-body content">{{BACKGROUND}}</div>
+</div>
+
+<div class="section">
+  <div class="section-header">📊 調査結果</div>
+  <div class="section-body content">{{FINDINGS}}</div>
+</div>
+
+<div class="section">
+  <div class="section-header">🧩 原因分析</div>
+  <div class="section-body content">{{ROOT_CAUSE}}</div>
+</div>
+
+<div class="section">
+  <div class="section-header">💡 推奨対応・解決策</div>
+  <div class="section-body">
+    <table>
+      <thead>
+        <tr><th>対応内容</th><th>優先度</th><th>備考</th></tr>
+      </thead>
+      <tbody>
+        {{ACTION_ROWS}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">📝 まとめ</div>
+  <div class="section-body content">{{SUMMARY}}</div>
+</div>
+-->

@@ -1,0 +1,22 @@
+# save-report 出力設定
+# このファイルを編集して保存先や番号の管理方法を設定してください
+
+[output]
+# レポートの保存先ディレクトリ（絶対パスで指定）
+base_dir = "~/reports"
+
+# 種別ごとのサブディレクトリ（省略時はbase_dirに直接保存）
+[output.subdirs]
+review      = "reviews"      # コードレビュー結果 → base_dir/reviews/
+investigation = "investigations" # 調査結果 → base_dir/investigations/
+bug         = "bugs"         # バグ調査結果 → base_dir/bugs/
+research    = "research"     # リサーチ結果 → base_dir/research/
+security    = "security"     # セキュリティ監査 → base_dir/security/
+
+# ファイル名のプレフィックス（種別ごと）
+[output.prefixes]
+review        = "PR"
+investigation = "investigation"
+bug           = "bug"
+research      = "research"
+security      = "security"
