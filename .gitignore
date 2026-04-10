@@ -1,0 +1,45 @@
+# Claude Code local settings (personal overrides, not shared)
+.claude/settings.local.json
+
+# Generated settings (built from template by install.ps1)
+# Do NOT ignore settings.template.json - that IS the source of truth
+claude/settings.json
+
+# Skill distribution packages
+*.skill
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Editor
+.vscode/settings.json
+.vscode/*.code-workspace
+.idea/
+*.suo
+*.user
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+dist/
+*.egg-info/
+
+# Temporary
+*.tmp
+*.bak
+*.swp
