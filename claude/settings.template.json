@@ -94,6 +94,17 @@
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -ExecutionPolicy Bypass -File \"{{CLAUDE_DIR}}\\hooks\\compact-context-reinject.ps1\""
+          }
+        ]
+      }
+    ],
     "Notification": [
       {
         "hooks": [
@@ -113,12 +124,36 @@
             "command": "powershell.exe -ExecutionPolicy Bypass -File \"{{CLAUDE_DIR}}\\dangerous-command-guard.ps1\""
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -ExecutionPolicy Bypass -File \"{{CLAUDE_DIR}}\\hooks\\protect-files.ps1\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -ExecutionPolicy Bypass -File \"{{CLAUDE_DIR}}\\hooks\\audit-log.ps1\"",
+            "async": true
+          }
+        ]
       }
     ]
   },
   "statusLine": {
     "type": "command",
-    "command": "powershell.exe -ExecutionPolicy Bypass -File \"{{CLAUDE_DIR}}\\statusline.ps1\""
+    "command": "npx -y ccstatusline@latest",
+    "padding": 0
+  },
+  "env": {
+    "CLAUDE_IDLE_OUTPUT_DIR": "{{IDLE_OUTPUT_DIR}}"
   },
   "language": "Japanese",
   "alwaysThinkingEnabled": true
