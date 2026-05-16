@@ -1,12 +1,11 @@
 <#
 .HOOK
 {
-  "event": "SessionStart",
-  "matcher": "compact"
+  "event": "PostCompact"
 }
 #>
 # compact-context-reinject.ps1
-# Compact発生後にCLAUDE.mdの再読み込みを指示するhook
+# コンテキスト圧縮後にCLAUDE.mdの再読み込みを指示するhook（PostCompact）
 
 $cwd = ""
 try {

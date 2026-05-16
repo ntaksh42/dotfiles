@@ -1,7 +1,8 @@
 <#
 .HOOK
 {
-  "event": "PostToolUse"
+  "event": "PostToolUse",
+  "async": true
 }
 #>
 # audit-log.ps1
