@@ -2,7 +2,8 @@
 .HOOK
 {
   "event": "Notification",
-  "matcher": "idle_prompt"
+  "matcher": "idle_prompt",
+  "async": true
 }
 #>
 # idle-snapshot.ps1
