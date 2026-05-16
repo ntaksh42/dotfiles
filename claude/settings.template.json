@@ -162,7 +162,7 @@
           {
             "type": "command",
             "shell": "powershell",
-            "command": "$i = [Console]::In.ReadToEnd() | ConvertFrom-Json; if ($i.transcript_path -and (Test-Path $i.transcript_path) -and -not (Select-String -Path $i.transcript_path -Pattern '\"name\":\"advisor\"' -SimpleMatch -Quiet)) { Write-Output '{\"decision\":\"block\",\"reason\":\"完了前にadvisor()を呼んでセルフレビューを依頼してください\"}' }"
+            "command": "$i = [Console]::In.ReadToEnd() | ConvertFrom-Json; if ($i.transcript_path -and (Test-Path $i.transcript_path) -and -not (Select-String -Path $i.transcript_path -Pattern '\"name\":\"advisor\",\"input\"' -SimpleMatch -Quiet)) { Write-Output '{\"decision\":\"block\",\"reason\":\"完了前にadvisor()を呼んでセルフレビューを依頼してください\"}' }"
           }
         ]
       }
