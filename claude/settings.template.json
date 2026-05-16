@@ -94,9 +94,8 @@
     ]
   },
   "hooks": {
-    "SessionStart": [
+    "PostCompact": [
       {
-        "matcher": "compact",
         "hooks": [
           {
             "type": "command",
@@ -121,7 +120,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -ExecutionPolicy Bypass -File \"{{CLAUDE_DIR}}\\dangerous-command-guard.ps1\""
+            "command": "powershell.exe -ExecutionPolicy Bypass -File \"{{CLAUDE_DIR}}\\hooks\\dangerous-command-guard.ps1\""
           }
         ]
       },

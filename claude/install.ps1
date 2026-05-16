@@ -49,11 +49,14 @@ foreach ($file in (Get-ChildItem -Path $HooksSourceDir -Filter "*.ps1")) {
         try {
             $meta = $Matches[1] | ConvertFrom-Json
             $HookRegistrations += [PSCustomObject]@{
-                file    = $file.Name
-                event   = $meta.event
-                matcher = if ($meta.PSObject.Properties.Name -contains "matcher") { $meta.matcher } else { $null }
+                file        = $file.Name
+                event       = $meta.event
+                matcher     = if ($meta.PSObject.Properties.Name -contains "matcher")     { $meta.matcher }     else { $null }
+                async       = if ($meta.PSObject.Properties.Name -contains "async")       { $meta.async }       else { $null }
+                asyncRewake = if ($meta.PSObject.Properties.Name -contains "asyncRewake") { $meta.asyncRewake } else { $null }
             }
-            Write-Host "    -> event=$($meta.event)$(if ($meta.matcher) { ", matcher=$($meta.matcher)" })" -ForegroundColor DarkGray
+            $asyncLabel = if ($meta.PSObject.Properties.Name -contains "async" -and $meta.async) { ", async=true" } else { "" }
+            Write-Host "    -> event=$($meta.event)$(if ($meta.matcher) { ", matcher=$($meta.matcher)" })$asyncLabel" -ForegroundColor DarkGray
         } catch {
             Write-Host "    -> WARNING: Failed to parse .HOOK metadata" -ForegroundColor Yellow
         }
@@ -105,11 +108,11 @@ if ($HookRegistrations.Count -gt 0) {
 
     foreach ($reg in $HookRegistrations) {
         $cmd = "powershell.exe -ExecutionPolicy Bypass -File `"%USERPROFILE%\\.claude\\hooks\\$($reg.file)`""
-        $hookEntry = [PSCustomObject]@{
-            hooks = @(
-                [PSCustomObject]@{ type = "command"; command = $cmd }
-            )
-        }
+        $cmdEntry = [PSCustomObject]@{ type = "command"; command = $cmd }
+        if ($null -ne $reg.async)       { $cmdEntry | Add-Member -MemberType NoteProperty -Name "async"       -Value $reg.async }
+        if ($null -ne $reg.asyncRewake) { $cmdEntry | Add-Member -MemberType NoteProperty -Name "asyncRewake" -Value $reg.asyncRewake }
+
+        $hookEntry = [PSCustomObject]@{ hooks = @($cmdEntry) }
         if ($reg.matcher) {
             $hookEntry | Add-Member -MemberType NoteProperty -Name "matcher" -Value $reg.matcher
         }
