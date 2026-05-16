@@ -166,6 +166,6 @@ $gitHtml
 </html>
 "@
 
-$fileName   = "idle-$sessionId.html"
+$fileName   = "${pcName}_$(Get-Date -Format 'yyyyMMdd-HHmmss').html"
 $outputFile = Join-Path $outputDir $fileName
 $html | Set-Content -Path $outputFile -Encoding UTF8

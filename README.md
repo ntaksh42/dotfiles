@@ -1,149 +1,100 @@
-# Agents for C#/C++ Development
+# env - Claude Code 環境設定
 
-C#およびC++のPCアプリケーション開発を支援するAIエージェントのコレクションです。
+Windows 環境の Claude Code dotfiles（hooks・skills・settings）を一元管理するリポジトリ。
 
-## 📋 概要
-
-このリポジトリは、デスクトップアプリケーション開発における様々な課題を解決するための専門的なAIエージェントを提供します。各エージェントは特定の開発タスクに特化しており、開発効率の向上とコード品質の改善を目指しています。
-
-## 🎯 対象開発者
-
-- **C#開発者**: WPF、WinForms、.NET Core/5+ アプリケーション
-- **C++開発者**: Windows デスクトップアプリ、クロスプラットフォームアプリ
-- **ハイブリッド開発者**: C#とC++を組み合わせたアプリケーション
-
-## 🤖 利用可能なエージェント
-
-### 優先度：高
-
-#### 1. Memory Safety Analyzer
-C++のメモリ関連問題を検出・修正するエージェント
-- メモリリーク検出
-- ダングリングポインタの識別
-- バッファオーバーフロー防止
-- スマートポインタ使用の推奨
-- RAII パターンの適用支援
-
-**状態**: 🚧 開発予定
-
-#### 2. Interop Expert
-C#とC++の相互運用を支援するエージェント
-- P/Invoke コード生成
-- C++/CLI インターフェース作成
-- マーシャリング最適化
-- 型変換の自動化
-- パフォーマンス最適化提案
-
-**状態**: 🚧 開発予定
-
-#### 3. Build System Helper
-ビルドシステムの構築・最適化を支援するエージェント
-- CMake 設定生成・最適化
-- MSBuild プロジェクト管理
-- vcpkg パッケージ管理
-- クロスプラットフォームビルド設定
-- ビルドエラーのトラブルシューティング
-
-**状態**: 🚧 開発予定
-
-### 優先度：中
-
-#### 4. Windows Desktop Expert
-Windows デスクトップUI開発支援エージェント
-- WPF XAML コード生成
-- WinForms デザイン支援
-- Win32 API 活用ガイド
-- MVVMパターン実装支援
-- UI/UXベストプラクティス
-
-**状態**: 🚧 開発予定
-
-#### 5. Performance Profiler Assistant
-パフォーマンス最適化支援エージェント
-- ボトルネック分析
-- アルゴリズム最適化提案
-- SIMD最適化
-- 並列処理の提案
-- メモリ使用量削減
-
-**状態**: 🚧 開発予定
-
-#### 6. Unit Test Generator
-単体テストコード自動生成エージェント
-- C# テスト生成（xUnit, NUnit, MSTest）
-- C++ テスト生成（Google Test, Catch2）
-- モックオブジェクト作成
-- テストカバレッジ向上支援
-
-**状態**: 🚧 開発予定
-
-### 優先度：低（将来計画）
-
-7. **Legacy Code Modernizer** - レガシーコードの現代化
-8. **API Documentation Generator** - API ドキュメント自動生成
-9. **Cross-Platform Compatibility Checker** - クロスプラットフォーム互換性チェック
-10. **Dependency Analyzer** - 依存関係分析・最適化
-
-## 📁 リポジトリ構造
+## リポジトリ構成
 
 ```
-agents/
-├── README.md                    # このファイル
-├── docs/                        # ドキュメント
-│   ├── setup.md                # セットアップガイド
-│   └── agent-development-guide.md  # Agent開発ガイド
-├── agents/                      # Agentディレクトリ
-│   ├── memory-safety/          # Memory Safety Analyzer
-│   ├── interop-expert/         # Interop Expert
-│   ├── build-helper/           # Build System Helper
-│   ├── windows-desktop/        # Windows Desktop Expert
-│   ├── performance/            # Performance Profiler Assistant
-│   └── test-generator/         # Unit Test Generator
-├── templates/                   # 再利用可能なテンプレート
-│   ├── cmake/                  # CMake テンプレート
-│   ├── csharp-project/         # C# プロジェクトテンプレート
-│   └── cpp-project/            # C++ プロジェクトテンプレート
-└── examples/                    # 使用例
-    └── sample-projects/        # サンプルプロジェクト
+claude/
+  install.ps1              インストーラ（hooks・skills・settings を ~/.claude に展開）
+  settings.template.json   settings.json のテンプレート
+  hooks/                   Claude Code フック用スクリプト
+  skills/                  Claude Code スキル
+app-settings/              アプリ設定ファイルのバックアップ
+tools/                     汎用 PowerShell ユーティリティ
+docs/                      ドキュメント・設計資料
 ```
 
-## 🚀 クイックスタート
+## セットアップ手順
 
-### 前提条件
+### 1. リポジトリをクローン
 
-- Claude Code CLI またはClaude Agent SDK
-- （エージェントによって）C#開発環境、C++開発環境
-
-### 使用方法
-
-各エージェントのディレクトリに移動し、READMEの指示に従ってください。
-
-```bash
-# 例: Memory Safety Analyzer の使用
-cd agents/memory-safety
-# エージェントのREADMEを参照
+```powershell
+git clone https://github.com/ntaksh42/env.git
+cd env
 ```
 
-詳細は [セットアップガイド](docs/setup.md) を参照してください。
+### 2. アイドル通知の出力先フォルダを設定
 
-## 📖 ドキュメント
+`idle-snapshot.ps1` はアイドル時に HTML ファイルを生成します。  
+出力先は環境変数 `CLAUDE_IDLE_OUTPUT_DIR` で指定します（未設定時は `~/claude-idle-snapshots`）。
 
-- [セットアップガイド](docs/setup.md) - 環境構築手順
-- [LSP 環境構築ガイド](docs/lsp-setup-guide.md) - Claude Code での LSP 設定
-- [Agent開発ガイド](docs/agent-development-guide.md) - 新しいAgentの作成方法
+Power Automate など外部サービスで監視するフォルダを指定してください：
 
-## 🤝 貢献
+```powershell
+[Environment]::SetEnvironmentVariable("CLAUDE_IDLE_OUTPUT_DIR", "C:\path\to\your\folder", "User")
+```
 
-このリポジトリは個人的なAgentコレクションとして管理されていますが、アイデアや改善提案は歓迎します。
+### 3. インストーラを実行
 
-## 📝 ライセンス
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File claude\install.ps1
+```
 
-MIT License
+インストーラが行うこと：
+- `claude/hooks/*.ps1` を `~/.claude/hooks/` にコピー
+- `claude/skills/` を `~/.claude/skills/` にコピー
+- `settings.template.json` からパスを解決して `~/.claude/settings.json` を生成
+- 各フックスクリプト先頭の `.HOOK` メタデータを読み取り、settings.json に自動登録
 
-## 🔄 更新履歴
+### 4. Claude Code を再起動
 
-- 2025-11-22: リポジトリ初期化、基本構造作成
+設定を反映するために Claude Code を再起動してください。
 
 ---
 
-**開発者ノート**: C#/C++のPCアプリケーション開発における実際の課題解決を目的として構築されています。
+## アイドル通知機能（idle-snapshot）
+
+Claude Code がアイドル状態になったとき（`idle_prompt` 通知）に HTML ファイルを生成する機能です。
+
+### 生成されるファイル
+
+ファイル名形式：`{PC名}_{yyyyMMdd-HHmmss}.html`  
+例：`DESKTOP-PC01_20260516-143210.html`
+
+内容：
+- セッション情報（PC名・時刻・セッションID・作業ディレクトリ）
+- Git のブランチ・変更ファイル一覧（git リポジトリ内の場合）
+- 直近の会話メッセージ（最大3件）
+
+### Power Automate との連携例
+
+1. Power Automate で「ファイルが作成されたとき」トリガーを設定
+2. 監視フォルダに `CLAUDE_IDLE_OUTPUT_DIR` と同じパスを指定
+3. メール送信やチーム通知などのアクションを追加
+
+---
+
+## フックの仕組み
+
+各フックスクリプトは先頭に `.HOOK` メタデータブロックを持ちます：
+
+```powershell
+<#
+.HOOK
+{
+  "event": "Notification",
+  "matcher": "idle_prompt"
+}
+#>
+```
+
+`install.ps1` がこのブロックを解析して `settings.json` の `hooks` セクションに自動登録します。  
+新しいフックを追加する場合は、スクリプト先頭にこのブロックを含めるだけで自動的に反映されます。
+
+## ユーティリティ
+
+```powershell
+# 複数 git リポジトリを一括 pull
+powershell.exe -File tools\Update-GitRepositories.ps1 -Path "C:\Projects"
+```
