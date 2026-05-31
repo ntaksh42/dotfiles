@@ -53,6 +53,16 @@ powershell.exe -ExecutionPolicy Bypass -File claude\install.ps1
 
 ---
 
+## AI 向け CLI ツール
+
+`%LOCALAPPDATA%\Microsoft\WinGet\Links\` に以下のツールをインストール済みです。
+
+- `jq` v1.8.1: JSON プロセッサ。API レスポンスや設定ファイルの前処理でトークン消費を大きく抑えられます。
+- `rg` (ripgrep) v15.1.0: `.gitignore` を自動除外する高速 grep。`--json` 出力に対応し、多くの AI エージェントと相性が良いです。
+- `yq` v4.53.2: YAML / TOML / XML プロセッサ。jq 風構文で K8s や CI 設定を処理できます。
+
+---
+
 ## アイドル通知機能（idle-snapshot）
 
 Claude Code がアイドル状態になったとき（`idle_prompt` 通知）に HTML ファイルを生成する機能です。
