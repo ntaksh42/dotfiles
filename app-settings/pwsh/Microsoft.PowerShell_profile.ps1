@@ -587,3 +587,92 @@ if ($host.Name -eq 'ConsoleHost') {
         Set-PSReadLineKeyHandler -Key Ctrl+r -ScriptBlock { Invoke-FzfHistory }
     }
 }
+
+# ---------------------------------------------------------------------------
+# §8 Help - list the commands this profile provides
+# ---------------------------------------------------------------------------
+
+# Catalog of commands defined above (data-driven; keep in sync when adding commands)
+$script:ProfileHelp = [ordered]@{
+    'Navigation & files' = @(
+        @{ Cmd='mkcd <path>';      Desc='ディレクトリを作成して移動' }
+        @{ Cmd='size [path]';      Desc='ファイル/フォルダのサイズ一覧 (MB, 降順)' }
+        @{ Cmd='.. / ... / ....';  Desc='1/2/3 階層上へ移動' }
+        @{ Cmd='up [n]';           Desc='n 階層上へ移動 (既定 1)' }
+        @{ Cmd='repos';            Desc='~/source/repos へジャンプ' }
+        @{ Cmd='ll / la / lt';     Desc='一覧表示 (eza があればアイコン/git 付き)' }
+        @{ Cmd='ff';               Desc='fzf でファイルを絞り込んで開く' }
+        @{ Cmd='fcd';              Desc='fzf でディレクトリを絞り込んで cd' }
+        @{ Cmd='touch <path>';     Desc='ファイル作成 / タイムスタンプ更新' }
+        @{ Cmd='reload';           Desc='プロファイルを再読込' }
+        @{ Cmd='profile';          Desc='プロファイルを編集 (code/notepad)' }
+    )
+    'Git / GitHub' = @(
+        @{ Cmd='gs';               Desc='git status -sb' }
+        @{ Cmd='gl';               Desc='git log をグラフ表示 (直近 20)' }
+        @{ Cmd='git-undo';         Desc='直前コミットを取り消し (staging へ戻す)' }
+        @{ Cmd='ga / gaa';         Desc='git add / git add -A' }
+        @{ Cmd='gb';               Desc='git branch' }
+        @{ Cmd='gd / gds';         Desc='git diff / git diff --staged' }
+        @{ Cmd='gp / gpl / gf';    Desc='git push / pull / fetch --all --prune' }
+        @{ Cmd='gcm <msg>';        Desc='git commit -m' }
+        @{ Cmd='gco [branch]';     Desc='checkout (引数なしは fzf で選択)' }
+        @{ Cmd='lg';               Desc='lazygit (あれば)' }
+        @{ Cmd='prc/prv/prl/prs';  Desc='gh pr create/view/list/status (あれば)' }
+        @{ Cmd='groot';            Desc='リポジトリのルートへ cd' }
+        @{ Cmd='gclone <url>';     Desc='clone して cd' }
+        @{ Cmd='glog';             Desc='fzf でコミット閲覧 (delta プレビュー)' }
+    )
+    'Visual Studio / build' = @(
+        @{ Cmd='vsdev';            Desc='現セッションを VS Developer 環境化' }
+        @{ Cmd='sln';              Desc='最寄りの .sln を VS で開く' }
+        @{ Cmd='vs [path]';        Desc='指定パスを VS で開く' }
+        @{ Cmd='db / dr / dt';     Desc='dotnet build / run / test' }
+        @{ Cmd='msb';              Desc='msbuild' }
+    )
+    'Tools & system' = @(
+        @{ Cmd='cat <file>';       Desc='bat 連携 (あれば)' }
+        @{ Cmd='sudo <cmd>';       Desc='gsudo 連携 (あれば)' }
+        @{ Cmd='z / zi';           Desc='zoxide スマート cd (あれば)' }
+        @{ Cmd='refreshenv';       Desc='PATH を再読込 (インストール後に)' }
+        @{ Cmd='clip / paste';     Desc='クリップボードへ書込 / 読出' }
+        @{ Cmd='myip';             Desc='公開 IP アドレスを表示' }
+        @{ Cmd='port <n>';         Desc='ポートを使用中のプロセスを表示' }
+        @{ Cmd='killport <n>';     Desc='ポートを使用中のプロセスを強制終了' }
+    )
+    'Dev environment' = @(
+        @{ Cmd='Show-DevEnv';      Desc='開発ツールの導入状況を一覧' }
+        @{ Cmd='Install-DevTools'; Desc='未導入ツールを一括インストール' }
+        @{ Cmd='Update-DevTools';  Desc='winget/PS モジュールを更新' }
+    )
+    'Aliases' = @(
+        @{ Cmd='cc / cop';         Desc='claude / copilot' }
+        @{ Cmd='g';                Desc='git' }
+        @{ Cmd='which';            Desc='Get-Command' }
+    )
+}
+
+# Show the commands this profile provides. Optional keyword filters cmd/desc/section.
+function Show-ProfileHelp {
+    param([string]$Filter)
+
+    foreach ($section in $script:ProfileHelp.Keys) {
+        $items = $script:ProfileHelp[$section]
+        if ($Filter) {
+            $items = @($items | Where-Object {
+                $_.Cmd -like "*$Filter*" -or $_.Desc -like "*$Filter*" -or $section -like "*$Filter*"
+            })
+        }
+        if (-not $items) { continue }
+
+        Write-Host ''
+        Write-Host "[$section]" -ForegroundColor Cyan
+        foreach ($i in $items) {
+            Write-Host ('  {0,-22}' -f $i.Cmd) -ForegroundColor Yellow -NoNewline
+            Write-Host $i.Desc -ForegroundColor Gray
+        }
+    }
+    Write-Host ''
+    Write-Host "tip: 'phelp <keyword>' で絞り込み (例: phelp git)" -ForegroundColor DarkGray
+}
+Set-Alias phelp Show-ProfileHelp
