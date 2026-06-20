@@ -384,6 +384,18 @@ $script:DevTools = @(
     @{ Name='fzf';               Backend='winget';   Id='junegunn.fzf';          Cmd='fzf' }
 )
 
+# Ensure Python/pip is available; install via winget if missing. Returns $true on success.
+function Install-PythonIfMissing {
+    if ((Test-Cmd python) -or (Test-Cmd pip)) { return $true }
+    Write-Host 'Python/pip not found; installing Python via winget...' -ForegroundColor Green
+    winget install --id Python.Python.3.12 --exact --source winget --accept-package-agreements --accept-source-agreements
+    refreshenv
+    $script:_cmdCache.Remove('python'); $script:_cmdCache.Remove('pip')
+    if ((Test-Cmd python) -or (Test-Cmd pip)) { return $true }
+    Write-Warning 'Python install ran but python/pip is still not on PATH (a new shell may be required).'
+    return $false
+}
+
 # Detect whether a catalog tool is installed
 function Test-ToolInstalled {
     param([Parameter(Mandatory)]$Tool)
@@ -434,8 +446,9 @@ function Install-DevTools {
                 'winget'   { winget install --id $t.Id --exact --source winget --accept-package-agreements --accept-source-agreements }
                 'msstore'  { winget install --id $t.Id --source msstore --accept-package-agreements --accept-source-agreements }
                 'pip'      {
-                    if (-not (Test-Cmd python) -and -not (Test-Cmd pip)) { throw 'Python/pip not found' }
-                    pip install --user $t.Id
+                    if (-not (Install-PythonIfMissing)) { throw 'Python/pip not found and could not be installed' }
+                    if (Test-Cmd pip) { pip install --user $t.Id }
+                    else { python -m pip install --user $t.Id }
                 }
                 'psmodule' { Install-Module $t.Id -Scope CurrentUser -Force -AcceptLicense }
             }
