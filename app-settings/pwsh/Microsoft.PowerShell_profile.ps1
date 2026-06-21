@@ -497,6 +497,8 @@ $script:DevTools = @(
     @{ Name='eza';               Backend='winget';   Id='eza-community.eza';     Cmd='eza' }
     @{ Name='bat';               Backend='winget';   Id='sharkdp.bat';           Cmd='bat' }
     @{ Name='fd';                Backend='winget';   Id='sharkdp.fd';            Cmd='fd' }
+    @{ Name='ripgrep';           Backend='winget';   Id='BurntSushi.ripgrep.MSVC'; Cmd='rg' }
+    @{ Name='jq';                Backend='winget';   Id='jqlang.jq';             Cmd='jq' }
     @{ Name='delta';             Backend='winget';   Id='dandavison.delta';      Cmd='delta'; PostInstall='delta' }
     @{ Name='gsudo';             Backend='winget';   Id='gerardog.gsudo';        Cmd='gsudo' }
     @{ Name='lazygit';           Backend='winget';   Id='JesseDuffield.lazygit'; Cmd='lazygit' }
