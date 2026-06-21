@@ -104,6 +104,16 @@ function touch {
     else { New-Item -ItemType File -Path $Path | Out-Null }
 }
 
+# Copy a file to <name>.bak-YYYYMMDD-HHmmss alongside it (snapshot before edits)
+function backup-file {
+    param([Parameter(Mandatory)][string]$Path)
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { Write-Warning "Not a file: $Path"; return }
+    $item = Get-Item -LiteralPath $Path
+    $dest = Join-Path $item.DirectoryName ('{0}.bak-{1}' -f $item.Name, (Get-Date -Format 'yyyyMMdd-HHmmss'))
+    Copy-Item -LiteralPath $item.FullName -Destination $dest
+    Write-Host "Backed up -> $dest" -ForegroundColor Green
+}
+
 # Reload this profile
 function reload { . $PROFILE }
 
@@ -185,6 +195,92 @@ function glog {
         fzf --ansi --no-sort --reverse --preview $preview
 }
 
+# gita wrapper: clean each repo's stray "nul" file, then pull every repo.
+# A repo whose current branch has no origin upstream is switched to -Fallback first.
+function clean-pull-all {
+    [CmdletBinding()]
+    param([string]$Fallback = 'main')
+
+    if (-not (Test-Cmd gita)) { Write-Warning 'clean-pull-all needs gita (gita add <path> to register repos)'; return }
+
+    $names = @(((gita ls) -join ' ') -split '\s+' | Where-Object { $_ })
+    if ($names.Count -eq 0) { Write-Warning 'No repos registered in gita (use: gita add <path>)'; return }
+
+    foreach ($name in $names) {
+        $repo = (gita ls $name).Trim()
+        Write-Host "[$name] " -ForegroundColor Cyan -NoNewline
+        if (-not $repo -or -not (Test-Path -LiteralPath $repo)) { Write-Warning "path not found: $repo"; continue }
+        Write-Host $repo -ForegroundColor DarkGray
+
+        # 1) Remove Windows-reserved "nul" files (block git checkout/pull on Windows).
+        $stray = @(
+            git -C $repo ls-files
+            git -C $repo ls-files --others --exclude-standard
+        ) | Where-Object { $_ -match '(^|/)nul$' } | Sort-Object -Unique
+        foreach ($rel in $stray) {
+            $full = Join-Path $repo ($rel -replace '/', '\')
+            Remove-Item -LiteralPath "\\?\$full" -Force -ErrorAction SilentlyContinue
+            Write-Host "  removed stray file: $rel" -ForegroundColor Yellow
+        }
+
+        # 2) Fetch, then pull the current branch; fall back if it has no origin upstream.
+        git -C $repo fetch --prune --quiet
+        $branch = (git -C $repo rev-parse --abbrev-ref HEAD).Trim()
+        git -C $repo rev-parse --verify --quiet "origin/$branch" *> $null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "  no origin/$branch -> switching to $Fallback" -ForegroundColor Yellow
+            git -C $repo checkout $Fallback
+            if ($LASTEXITCODE -ne 0) { Write-Warning "  checkout $Fallback failed"; continue }
+        }
+        git -C $repo pull --ff-only
+    }
+}
+
+# fzf でブランチを選んで切替。ローカルに無ければ origin から作成して追跡。
+function git-switch {
+    if (-not (Test-Cmd fzf)) { Write-Warning 'git-switch needs fzf'; return }
+    $sel = git branch --all --format='%(refname:short)' |
+        Where-Object { $_ -and $_ -notmatch '/HEAD$' } |
+        Sort-Object -Unique | fzf
+    if (-not $sel) { return }
+    $local = $sel.Trim() -replace '^origin/', ''
+    git rev-parse --verify --quiet "refs/heads/$local" *> $null
+    if ($LASTEXITCODE -eq 0) { git checkout $local }
+    else { git checkout -b $local --track "origin/$local" }
+}
+
+# 現在ブランチへマージ済みのローカルブランチを一括削除 (保護ブランチは残す)。
+function git-clean-branches {
+    param([string[]]$Protected = @('main', 'master', 'develop'))
+    $cur = (git rev-parse --abbrev-ref HEAD).Trim()
+    $merged = @(git branch --merged |
+        ForEach-Object { ($_ -replace '^[*+ ]+', '').Trim() } |
+        Where-Object { $_ -and $_ -ne $cur -and $_ -notin $Protected })
+    if ($merged.Count -eq 0) { Write-Host 'No merged branches to delete.' -ForegroundColor Green; return }
+    Write-Host 'Merged branches to delete:' -ForegroundColor Cyan
+    $merged | ForEach-Object { Write-Host "  $_" }
+    if ((Read-Host 'Proceed? (y/N)') -notmatch '^(y|yes)$') { Write-Host 'Aborted.'; return }
+    $merged | ForEach-Object { git branch -d $_ }
+}
+
+# このディレクトリと直下のサブディレクトリにある git リポジトリを gita に登録。
+function gita-scan {
+    param([string]$Path = '.')
+    if (-not (Test-Cmd gita)) { Write-Warning 'gita-scan needs gita'; return }
+    $root = (Resolve-Path -LiteralPath $Path -ErrorAction SilentlyContinue).Path
+    if (-not $root) { Write-Warning "Path not found: $Path"; return }
+
+    $targets = @()
+    if (Test-Path -LiteralPath (Join-Path $root '.git')) { $targets += $root }
+    $targets += @(Get-ChildItem -LiteralPath $root -Directory -Force -ErrorAction SilentlyContinue |
+        Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName '.git') } |
+        Select-Object -ExpandProperty FullName)
+
+    if ($targets.Count -eq 0) { Write-Host 'No git repos found (this dir and its direct subdirs).' -ForegroundColor Yellow; return }
+    foreach ($t in $targets) { gita add $t }
+    Write-Host "Registered $($targets.Count) repo(s) with gita." -ForegroundColor Green
+}
+
 # ---------------------------------------------------------------------------
 # §4 Visual Studio / build (C#/C++)
 # ---------------------------------------------------------------------------
@@ -262,8 +358,10 @@ function msb { msbuild @args }
 # ---------------------------------------------------------------------------
 
 # zoxide: smart cd (z / zi)
+# --hook pwd: hook Set-Location instead of prompt, so starship (which
+# overwrites prompt below) doesn't clobber the directory-tracking hook.
 if (Test-Cmd zoxide) {
-    Invoke-Expression (& { (zoxide init powershell | Out-String) })
+    Invoke-Expression (& { (zoxide init --hook pwd powershell | Out-String) })
 }
 
 # Starship: cross-shell prompt (best with a Nerd Font for glyphs)
@@ -604,6 +702,7 @@ $script:ProfileHelp = [ordered]@{
         @{ Cmd='ff';               Desc='fzf でファイルを絞り込んで開く' }
         @{ Cmd='fcd';              Desc='fzf でディレクトリを絞り込んで cd' }
         @{ Cmd='touch <path>';     Desc='ファイル作成 / タイムスタンプ更新' }
+        @{ Cmd='backup-file <f>';  Desc='<名前>.bak-日時 でバックアップ作成' }
         @{ Cmd='reload';           Desc='プロファイルを再読込' }
         @{ Cmd='profile';          Desc='プロファイルを編集 (code/notepad)' }
     )
@@ -622,6 +721,10 @@ $script:ProfileHelp = [ordered]@{
         @{ Cmd='groot';            Desc='リポジトリのルートへ cd' }
         @{ Cmd='gclone <url>';     Desc='clone して cd' }
         @{ Cmd='glog';             Desc='fzf でコミット閲覧 (delta プレビュー)' }
+        @{ Cmd='clean-pull-all';   Desc='gita 全リポジトリを掃除して pull (-Fallback で切替先指定)' }
+        @{ Cmd='git-switch';       Desc='fzf でブランチ切替 (無ければ origin から作成)' }
+        @{ Cmd='git-clean-branches'; Desc='マージ済みローカルブランチを一括削除' }
+        @{ Cmd='gita-scan [path]'; Desc='直下の git リポジトリを gita に一括登録' }
     )
     'Visual Studio / build' = @(
         @{ Cmd='vsdev';            Desc='現セッションを VS Developer 環境化' }
