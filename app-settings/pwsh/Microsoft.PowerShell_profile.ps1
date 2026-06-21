@@ -21,6 +21,26 @@ function Test-Cmd {
     $script:_cmdCache[$Name]
 }
 
+# Cache a tool's shell-init output to a file and dot-source that instead of
+# spawning the tool on every startup. Regenerates when the exe is newer.
+function Get-InitCache {
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][string]$Exe,
+        [Parameter(Mandatory)][scriptblock]$Generator
+    )
+    $dir   = Join-Path $env:LOCALAPPDATA 'pwsh-init-cache'
+    $path  = Join-Path $dir "$Name.ps1"
+    $src   = (Get-Command $Exe -ErrorAction Ignore).Source
+    $stale = (-not (Test-Path -LiteralPath $path)) -or
+             ($src -and (Get-Item -LiteralPath $src).LastWriteTime -gt (Get-Item -LiteralPath $path).LastWriteTime)
+    if ($stale) {
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+        (& $Generator) | Out-String | Set-Content -LiteralPath $path -Encoding utf8
+    }
+    $path
+}
+
 # ---------------------------------------------------------------------------
 # §1 Aliases
 # ---------------------------------------------------------------------------
@@ -361,12 +381,12 @@ function msb { msbuild @args }
 # --hook pwd: hook Set-Location instead of prompt, so starship (which
 # overwrites prompt below) doesn't clobber the directory-tracking hook.
 if (Test-Cmd zoxide) {
-    Invoke-Expression (& { (zoxide init --hook pwd powershell | Out-String) })
+    . (Get-InitCache 'zoxide' 'zoxide' { zoxide init --hook pwd powershell })
 }
 
 # Starship: cross-shell prompt (best with a Nerd Font for glyphs)
 if (Test-Cmd starship) {
-    Invoke-Expression (&starship init powershell)
+    . (Get-InitCache 'starship' 'starship' { starship init powershell })
 }
 
 # bat: syntax-highlighted cat (bat outputs plain text when piped)
@@ -379,19 +399,25 @@ if (Test-Cmd gsudo) {
     function sudo { gsudo @args }
 }
 
-# PSFzf: Ctrl+t (paths) / Alt+c (cd). Ctrl+r stays on the custom handler below.
-if (Get-Module -ListAvailable -Name PSFzf) {
-    Import-Module PSFzf
-    try {
-        Set-PsFzfOption -PSReadlineChordProvider 'Ctrl+t' -PSReadlineChordSetLocation 'Alt+c'
-    } catch {
-        Write-Warning "PSFzf binding failed: $($_.Exception.Message)"
+# Defer heavy modules (PSFzf + Terminal-Icons, ~2s combined) to the first idle
+# tick so the prompt appears immediately; they load once shortly after startup.
+$global:_deferDone = $false
+$null = Register-EngineEvent -SourceIdentifier PowerShell.OnIdle -Action {
+    if ($global:_deferDone) { return }
+    $global:_deferDone = $true
+    if (Get-Module -ListAvailable -Name PSFzf) {
+        try {
+            Import-Module PSFzf
+            Set-PsFzfOption -PSReadlineChordProvider 'Ctrl+t' -PSReadlineChordSetLocation 'Alt+c'
+            # PSFzf grabs Ctrl+r on import; re-assert the custom fzf history handler.
+            if (Get-Command fzf -ErrorAction Ignore) {
+                Set-PSReadLineKeyHandler -Key Ctrl+r -ScriptBlock { Invoke-FzfHistory }
+            }
+        } catch {}
     }
-}
-
-# Terminal-Icons: icons in directory listings
-if (Get-Module -ListAvailable -Name Terminal-Icons) {
-    Import-Module Terminal-Icons
+    if (Get-Module -ListAvailable -Name Terminal-Icons) {
+        Import-Module Terminal-Icons
+    }
 }
 
 # Native tab completion (verified snippets), each guarded on command presence
@@ -405,7 +431,7 @@ if (Test-Cmd dotnet) {
 }
 
 if (Test-Cmd gh) {
-    try { Invoke-Expression (& gh completion -s powershell | Out-String) } catch {}
+    . (Get-InitCache 'gh' 'gh' { gh completion -s powershell })
 }
 
 if (Test-Cmd winget) {
