@@ -10,6 +10,8 @@ $HooksSourceDir  = Join-Path $ScriptDir "hooks"
 $HooksDestDir    = Join-Path $ClaudeDir "hooks"
 $SkillsSourceDir = Join-Path $ScriptDir "skills"
 $SkillsDestDir   = Join-Path $ClaudeDir "skills"
+$AgentsSourceDir = Join-Path $ScriptDir "agents"
+$AgentsDestDir   = Join-Path $ClaudeDir "agents"
 $TemplateFile    = Join-Path $ScriptDir "settings.template.json"
 $DefaultIdleOutputDir = Join-Path $env:USERPROFILE "claude-idle-snapshots"
 
@@ -77,6 +79,19 @@ if (Test-Path $SkillsSourceDir) {
     }
 }
 
+# Copy subagent definitions
+if (Test-Path $AgentsSourceDir) {
+    Write-Host "Copying agents..." -ForegroundColor Green
+    if (-not (Test-Path $AgentsDestDir)) {
+        New-Item -ItemType Directory -Path $AgentsDestDir | Out-Null
+    }
+    foreach ($file in (Get-ChildItem -Path $AgentsSourceDir -Filter "*.md")) {
+        $dest = Join-Path $AgentsDestDir $file.Name
+        Copy-Item $file.FullName $dest -Force
+        Write-Host "  - agents\$($file.Name)" -ForegroundColor Gray
+    }
+}
+
 # Set ENABLE_TOOL_SEARCH environment variable if not exists
 $envName = "ENABLE_TOOL_SEARCH"
 $currentValue = [Environment]::GetEnvironmentVariable($envName, "User")
@@ -122,10 +137,11 @@ if ($HookRegistrations.Count -gt 0) {
             $settingsObj.hooks | Add-Member -MemberType NoteProperty -Name $event -Value @()
         }
 
-        # 同じ matcher が既に存在する場合はスキップ
+        # 同じスクリプトが既にこの event に登録済みならスキップ（ファイル名で識別）。
+        # matcher ではなくファイル名をキーにすることで、同一 event に matcher なしの
+        # 別スクリプトを複数登録できる（例: Stop に session-end-summary と self-review-guard）。
         $alreadyExists = @($settingsObj.hooks.$event | Where-Object {
-            ($null -eq $reg.matcher -and -not ($_.PSObject.Properties.Name -contains "matcher")) -or
-            ($_.PSObject.Properties.Name -contains "matcher" -and $_.matcher -eq $reg.matcher)
+            @($_.hooks | Where-Object { $_.command -like "*$($reg.file)*" }).Count -gt 0
         })
         if ($alreadyExists.Count -gt 0) {
             Write-Host "  - $($reg.file): already registered, skipping" -ForegroundColor DarkGray
@@ -153,6 +169,10 @@ Write-Host "  - $SettingsFile" -ForegroundColor Gray
 if (Test-Path $SkillsDestDir) {
     Write-Host "Installed skills:" -ForegroundColor Cyan
     Get-ChildItem $SkillsDestDir -Directory | ForEach-Object { Write-Host "  - $($_.Name)" -ForegroundColor Gray }
+}
+if (Test-Path $AgentsDestDir) {
+    Write-Host "Installed agents:" -ForegroundColor Cyan
+    Get-ChildItem $AgentsDestDir -Filter "*.md" | ForEach-Object { Write-Host "  - $($_.Name)" -ForegroundColor Gray }
 }
 Write-Host ""
 Write-Host "Note: Restart Claude Code for changes to take effect." -ForegroundColor Yellow
