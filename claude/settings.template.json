@@ -140,7 +140,7 @@
           {
             "type": "command",
             "shell": "powershell",
-            "command": "Write-Output '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"実装変更前に必ずadvisor()を呼んでセルフレビュー/設計確認を行うこと。未呼出ならまずadvisor()を実行してから本ツールを使ってください。\"}}'"
+            "command": "Write-Output '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"コード変更を行うターンでは、回答を確定する前に Task ツールで subagent_type=self-review のサブエージェントを起動し、変更内容のセルフレビューを必ず実施すること（Stopフックでも強制されます）。\"}}'"
           }
         ]
       }
@@ -156,17 +156,7 @@
         ]
       }
     ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "powershell",
-            "command": "$i = [Console]::In.ReadToEnd() | ConvertFrom-Json; if ($i.transcript_path -and (Test-Path $i.transcript_path) -and -not (Select-String -Path $i.transcript_path -Pattern '\"name\":\"advisor\",\"input\"' -SimpleMatch -Quiet)) { Write-Output '{\"decision\":\"block\",\"reason\":\"完了前にadvisor()を呼んでセルフレビューを依頼してください\"}' }"
-          }
-        ]
-      }
-    ]
+    "Stop": []
   },
   "statusLine": {
     "type": "command",
