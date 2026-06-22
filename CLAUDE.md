@@ -10,10 +10,11 @@ Windows環境のClaude Code dotfiles・開発環境構成リポジトリ。Claud
 
 ```
 claude/              Claude Code 設定の管理元（~/.claude へインストール）
-  install.ps1        インストーラ（hooks・skills・settingsを ~/.claude に展開）
+  install.ps1        インストーラ（hooks・skills・agents・settingsを ~/.claude に展開）
   settings.template.json  settings.json テンプレート（{{CLAUDE_DIR}} 等のプレースホルダ）
   hooks/             フック用PowerShellスクリプト（.HOOKブロックでメタデータ定義）
   skills/            Claude Code スキル（各サブディレクトリが1スキル）
+  agents/            サブエージェント定義（各 .md が1エージェント）
 app-settings/        アプリ設定ファイルのバックアップ・管理
 tools/               汎用PowerShellユーティリティ
 ```
@@ -29,6 +30,17 @@ tools/               汎用PowerShellユーティリティ
 - `claude/skills/` 配下のサブディレクトリが個別スキル
 - 各スキルは `SKILL.md`（プロンプト定義）と `references/`（参照資料）で構成
 - `.skill` ファイル（単一ファイル形式）も存在する（例: `ai-news-researcher.skill`）
+
+### agents の仕組み
+
+- `claude/agents/` 配下の各 `.md` が個別サブエージェント（frontmatterに `name` / `description` / `tools` / `model`）
+- `install.ps1` が `~/.claude/agents/` へコピーする
+
+### セルフレビューの仕組み（self-review）
+
+- コード変更（Edit/Write/MultiEdit/NotebookEdit）を行ったターンでは、出力確定前に `self-review` サブエージェントでのセルフレビューを必須とする
+- `hooks/self-review-guard.ps1`（Stopフック）が transcript をper-turnで解析し、コード変更があるのにレビュー未実施なら応答をブロックして実施を促す
+- レビューは読み取り専用で、指摘のみを返す（修正はメインエージェントが行う）
 
 ### settings.template.json
 
