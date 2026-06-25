@@ -143,6 +143,18 @@
             "command": "Write-Output '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"実装変更前に必ずadvisor()を呼んでセルフレビュー/設計確認を行うこと。未呼出ならまずadvisor()を実行してから本ツールを使ってください。\"}}'"
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "agent",
+            "if": "Write(**/review-gate-test*)",
+            "prompt": "{{REVIEW_GATE_PROMPT}}",
+            "model": "claude-haiku-4-5",
+            "timeout": 120
+          }
+        ]
       }
     ],
     "PostToolUse": [

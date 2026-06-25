@@ -11,6 +11,7 @@ $HooksDestDir    = Join-Path $ClaudeDir "hooks"
 $SkillsSourceDir = Join-Path $ScriptDir "skills"
 $SkillsDestDir   = Join-Path $ClaudeDir "skills"
 $TemplateFile    = Join-Path $ScriptDir "settings.template.json"
+$ReviewGatePromptFile = Join-Path $HooksSourceDir "review-gate.prompt.md"
 $DefaultIdleOutputDir = Join-Path $env:USERPROFILE "claude-idle-snapshots"
 
 Write-Host "Claude Code dotfiles installer" -ForegroundColor Cyan
@@ -96,6 +97,22 @@ $claudeDirEscaped   = $ClaudeDir -replace '\\', '\\\\'
 $idleOutputEscaped  = $DefaultIdleOutputDir -replace '\\', '\\\\'
 $settings = $template -replace '\{\{CLAUDE_DIR\}\}', $claudeDirEscaped `
                       -replace '\{\{IDLE_OUTPUT_DIR\}\}', $idleOutputEscaped
+
+# review-gate agent フックのプロンプトをファイルから読み込み、JSON 文字列として埋め込む。
+# PS5.1 の ConvertTo-Json は単一文字列を {value,Count,...} に包む癖があるため使わず、
+# JSON 文字列に必要な最小限のエスケープを決定的に適用する。
+if (Test-Path $ReviewGatePromptFile) {
+    $reviewGatePrompt = Get-Content $ReviewGatePromptFile -Raw -Encoding UTF8
+    $escaped = $reviewGatePrompt -replace '\\', '\\' `
+                                 -replace '"', '\"' `
+                                 -replace "`r", '\r' `
+                                 -replace "`n", '\n' `
+                                 -replace "`t", '\t'
+    # テンプレート側の "prompt": "{{REVIEW_GATE_PROMPT}}" の placeholder のみ差し替える
+    # （$ を特別扱いする -replace ではなく literal な .Replace を使う）
+    $settings = $settings.Replace('{{REVIEW_GATE_PROMPT}}', $escaped)
+}
+
 $settingsObj = $settings | ConvertFrom-Json
 
 # hooks/ スクリプトのメタデータから settings.json に hook を登録
