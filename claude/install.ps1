@@ -1,5 +1,11 @@
 # Claude Code dotfiles installer for Windows
-# Usage: .\install.ps1
+# Usage: .\install.ps1 [-ReviewGatePath <name>]
+
+param(
+    # review-gate フックが発火する対象パスのトークン（ファイル名に含まれる文字列）。
+    # settings.json の if 条件とレビュープロンプトの両方に install 時に埋め込む。
+    [string]$ReviewGatePath = "review-gate-test"
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -112,6 +118,9 @@ if (Test-Path $ReviewGatePromptFile) {
     # （$ を特別扱いする -replace ではなく literal な .Replace を使う）
     $settings = $settings.Replace('{{REVIEW_GATE_PROMPT}}', $escaped)
 }
+
+# review-gate の対象パストークンを if 条件・プロンプト両方の placeholder に埋め込む
+$settings = $settings.Replace('{{REVIEW_GATE_PATH}}', $ReviewGatePath)
 
 $settingsObj = $settings | ConvertFrom-Json
 
