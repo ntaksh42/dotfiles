@@ -149,9 +149,9 @@
         "hooks": [
           {
             "type": "agent",
-            "if": "Write(**/review-gate-test*)",
+            "if": "Write(**/{{REVIEW_GATE_PATH}}*)",
             "prompt": "{{REVIEW_GATE_PROMPT}}",
-            "model": "claude-haiku-4-5",
+            "model": "opus",
             "timeout": 120
           }
         ]
