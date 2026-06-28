@@ -1,0 +1,13 @@
+# 改行コードを正規化し、チェックアウト時の CRLF 変換警告を防ぐ
+* text=auto
+
+# Windows PowerShell スクリプトは CRLF を維持
+*.ps1  text eol=crlf
+*.psm1 text eol=crlf
+*.psd1 text eol=crlf
+
+# 以下は LF で統一
+*.md   text eol=lf
+*.toml text eol=lf
+*.json text eol=lf
+*.sh   text eol=lf
