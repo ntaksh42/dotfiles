@@ -481,6 +481,31 @@ function killport {
     }
 }
 
+# Claude Fable を司令塔にして起動: 立案・俯瞰は Fable、実行はサブエージェント
+function script:Invoke-FableOrchest {
+    param([Parameter(Mandatory)][string]$SubagentModel, [object[]]$Rest)
+    $orchestPrompt = @'
+あなたは司令塔として俯瞰・立案・検証を担い、実行はサブエージェントに委譲する。
+
+- 委譲プロンプトは自己完結させる: 対象ファイル、背景、期待結果、完了条件、報告形式（変更差分と検証結果のみ簡潔に）を必ず含める。サブエージェントは会話履歴を参照できない。
+- 独立したタスクは 1 メッセージで並列に委譲する。
+- 成果物を受領するたびに自分で検証する（差分確認、テスト・lint 実行）。不合格なら修正点を具体化して再委譲する。
+- 例外: 2〜3 ステップで終わる小さな作業、設計判断、あいまいな要件の解釈は委譲せず自分で行う。
+'@
+    $prev = $env:CLAUDE_CODE_SUBAGENT_MODEL
+    $env:CLAUDE_CODE_SUBAGENT_MODEL = $SubagentModel
+    try {
+        claude --model claude-fable-5 --append-system-prompt $orchestPrompt @Rest
+    } finally {
+        if ($null -ne $prev) { $env:CLAUDE_CODE_SUBAGENT_MODEL = $prev }
+        else { Remove-Item Env:CLAUDE_CODE_SUBAGENT_MODEL -ErrorAction Ignore }
+    }
+}
+function fable-orchest      { Invoke-FableOrchest 'claude-sonnet-5' $args }
+function fable-orchest-opus { Invoke-FableOrchest 'claude-opus-4-8' $args }
+Set-Alias ccf  fable-orchest
+Set-Alias ccfo fable-orchest-opus
+
 # ---------------------------------------------------------------------------
 # §6 Environment setup helpers
 # ---------------------------------------------------------------------------
@@ -770,6 +795,8 @@ $script:ProfileHelp = [ordered]@{
         @{ Cmd='myip';             Desc='公開 IP アドレスを表示' }
         @{ Cmd='port <n>';         Desc='ポートを使用中のプロセスを表示' }
         @{ Cmd='killport <n>';     Desc='ポートを使用中のプロセスを強制終了' }
+        @{ Cmd='fable-orchest / ccf'; Desc='Fable が立案・Sonnet 5 が実行の構成で claude 起動' }
+        @{ Cmd='fable-orchest-opus / ccfo'; Desc='Fable が立案・Opus 4.8 が実行の構成で claude 起動' }
     )
     'Dev environment' = @(
         @{ Cmd='Show-DevEnv';      Desc='開発ツールの導入状況を一覧' }
