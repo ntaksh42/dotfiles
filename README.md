@@ -24,18 +24,7 @@ git clone https://github.com/ntaksh42/env.git
 cd env
 ```
 
-### 2. アイドル通知の出力先フォルダを設定
-
-`idle-snapshot.ps1` はアイドル時に HTML ファイルを生成します。  
-出力先は環境変数 `CLAUDE_IDLE_OUTPUT_DIR` で指定します（未設定時は `~/claude-idle-snapshots`）。
-
-Power Automate など外部サービスで監視するフォルダを指定してください：
-
-```powershell
-[Environment]::SetEnvironmentVariable("CLAUDE_IDLE_OUTPUT_DIR", "C:\path\to\your\folder", "User")
-```
-
-### 3. インストーラを実行
+### 2. インストーラを実行
 
 ```powershell
 powershell.exe -ExecutionPolicy Bypass -File claude\install.ps1
@@ -44,10 +33,11 @@ powershell.exe -ExecutionPolicy Bypass -File claude\install.ps1
 インストーラが行うこと：
 - `claude/hooks/*.ps1` を `~/.claude/hooks/` にコピー
 - `claude/skills/` を `~/.claude/skills/` にコピー
+- `claude/agents/*.md` を `~/.claude/agents/` にコピー
 - `settings.template.json` からパスを解決して `~/.claude/settings.json` を生成
 - 各フックスクリプト先頭の `.HOOK` メタデータを読み取り、settings.json に自動登録
 
-### 4. Claude Code を再起動
+### 3. Claude Code を再起動
 
 設定を反映するために Claude Code を再起動してください。
 
@@ -63,28 +53,6 @@ powershell.exe -ExecutionPolicy Bypass -File claude\install.ps1
 
 ---
 
-## アイドル通知機能（idle-snapshot）
-
-Claude Code がアイドル状態になったとき（`idle_prompt` 通知）に HTML ファイルを生成する機能です。
-
-### 生成されるファイル
-
-ファイル名形式：`{PC名}_{yyyyMMdd-HHmmss}.html`  
-例：`DESKTOP-PC01_20260516-143210.html`
-
-内容：
-- セッション情報（PC名・時刻・セッションID・作業ディレクトリ）
-- Git のブランチ・変更ファイル一覧（git リポジトリ内の場合）
-- 直近の会話メッセージ（最大3件）
-
-### Power Automate との連携例
-
-1. Power Automate で「ファイルが作成されたとき」トリガーを設定
-2. 監視フォルダに `CLAUDE_IDLE_OUTPUT_DIR` と同じパスを指定
-3. メール送信やチーム通知などのアクションを追加
-
----
-
 ## フックの仕組み
 
 各フックスクリプトは先頭に `.HOOK` メタデータブロックを持ちます：
@@ -93,8 +61,9 @@ Claude Code がアイドル状態になったとき（`idle_prompt` 通知）に
 <#
 .HOOK
 {
-  "event": "Notification",
-  "matcher": "idle_prompt"
+  "event": "PostToolUse",
+  "matcher": "Task",
+  "async": true
 }
 #>
 ```
