@@ -2,18 +2,22 @@
 #
 # 配置先: ~/.config/starship.toml
 # 管理元: このリポジトリの app-settings/starship/starship.toml
-#   反映方法: Copy-Item app-settings\starship\starship.toml $HOME\.config\starship.toml
+#   反映方法: powershell.exe -File tools/Sync-AppSettings.ps1
 #
-# 記号はすべて ASCII なので Nerd Font 不要。どのフォントでも崩れない。
+# 記号は一般 Unicode のみで Nerd Font 不要。PUA グリフを使わないため
+# フォントフォールバックが効き、どのターミナルでも崩れない。
 # Nerd Font を使う場合は各記号をグリフに置き換えると更に見やすくなる
 # (例: git_branch.symbol = " ", modified = "✚${count}" など)。
 
 add_newline = false
 format = "$directory$git_branch$git_status$git_state$character"
+# 右プロンプト: 終了コード・実行時間・時刻を入力行の右端に控えめに表示
+right_format = "$status$cmd_duration$time"
 
 [directory]
 truncation_length = 3        # 深い階層は末尾 3 つに省略 (ブランチ情報を右に押し出さない)
 truncate_to_repo = true      # git リポジトリ内はリポジトリルートからの相対パス
+                             # (リポジトリ検出 ~90ms は git 系モジュールと共有されるため追加コストなし)
 style = "bold cyan"
 format = "[$path]($style) "
 read_only = " [ro]"
@@ -46,5 +50,26 @@ style = "bold red"
 format = '\([$state( $progress_current/$progress_total)]($style)\) '
 
 [character]
-success_symbol = "[>](bold green)"
-error_symbol   = "[>](bold red)"
+success_symbol = "[❯](bold green)"
+error_symbol   = "[❯](bold red)"
+
+# --- 右プロンプト用モジュール ---
+
+# 直前コマンドの終了コード (0 以外のときだけ表示)
+[status]
+disabled = false
+format = "[✘$status]($style) "
+style = "bold red"
+
+# 2 秒以上かかったコマンドの実行時間
+[cmd_duration]
+min_time = 2000
+format = "[$duration]($style) "
+style = "yellow"
+
+# 現在時刻 (スクロールバックでいつ実行したか追える)
+[time]
+disabled = false
+format = "[$time]($style)"
+style = "dimmed white"
+time_format = "%H:%M"
