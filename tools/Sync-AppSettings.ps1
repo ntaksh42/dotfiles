@@ -8,8 +8,8 @@
     -WhatIf で実際にコピーせず対象だけ確認できる。
 
 .EXAMPLE
-    powershell.exe -File tools/Sync-AppSettings.ps1
-    powershell.exe -File tools/Sync-AppSettings.ps1 -WhatIf
+    pwsh -File tools/Sync-AppSettings.ps1
+    pwsh -File tools/Sync-AppSettings.ps1 -WhatIf
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param()
@@ -19,10 +19,15 @@ $ErrorActionPreference = "Stop"
 # リポジトリルート（このスクリプトの 1 つ上）を基準にする
 $repoRoot = Split-Path -Parent $PSScriptRoot
 
+# PowerShell 7 のプロファイルパス（OneDrive の Documents リダイレクトに追従）。
+# $PROFILE は実行ホスト依存で、powershell.exe (5.1) で実行すると WindowsPowerShell 側に
+# コピーされてしまう（プロファイルは PS7 専用構文を含む）ため使わない。
+$pwsh7Profile = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'PowerShell\Microsoft.PowerShell_profile.ps1'
+
 # 同期マッピング: 管理元（repo 相対） → 反映先（実環境）
 $mappings = @(
     @{ Source = "app-settings\starship\starship.toml";              Dest = "$HOME\.config\starship.toml" }
-    @{ Source = "app-settings\pwsh\Microsoft.PowerShell_profile.ps1"; Dest = $PROFILE }
+    @{ Source = "app-settings\pwsh\Microsoft.PowerShell_profile.ps1"; Dest = $pwsh7Profile }
 )
 
 foreach ($m in $mappings) {
