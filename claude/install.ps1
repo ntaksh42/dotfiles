@@ -1,11 +1,7 @@
 # Claude Code dotfiles installer for Windows
-# Usage: .\install.ps1 [-ReviewGatePath <name>]
+# Usage: .\install.ps1
 
-param(
-    # review-gate フックが発火する対象パスのトークン（ファイル名に含まれる文字列）。
-    # settings.json の if 条件とレビュープロンプトの両方に install 時に埋め込む。
-    [string]$ReviewGatePath = "review-gate-test"
-)
+param()
 
 $ErrorActionPreference = "Stop"
 
@@ -19,8 +15,6 @@ $SkillsDestDir   = Join-Path $ClaudeDir "skills"
 $AgentsSourceDir = Join-Path $ScriptDir "agents"
 $AgentsDestDir   = Join-Path $ClaudeDir "agents"
 $TemplateFile    = Join-Path $ScriptDir "settings.template.json"
-$ReviewGatePromptFile = Join-Path $HooksSourceDir "review-gate.prompt.md"
-$DefaultIdleOutputDir = Join-Path $env:USERPROFILE "claude-idle-snapshots"
 
 Write-Host "Claude Code dotfiles installer" -ForegroundColor Cyan
 Write-Host "==============================" -ForegroundColor Cyan
@@ -113,28 +107,8 @@ if (-not $currentValue) {
 # Generate settings.json from template
 Write-Host "Generating settings.json..." -ForegroundColor Green
 $template = Get-Content $TemplateFile -Raw
-$claudeDirEscaped   = $ClaudeDir -replace '\\', '\\\\'
-$idleOutputEscaped  = $DefaultIdleOutputDir -replace '\\', '\\\\'
-$settings = $template -replace '\{\{CLAUDE_DIR\}\}', $claudeDirEscaped `
-                      -replace '\{\{IDLE_OUTPUT_DIR\}\}', $idleOutputEscaped
-
-# review-gate agent フックのプロンプトをファイルから読み込み、JSON 文字列として埋め込む。
-# PS5.1 の ConvertTo-Json は単一文字列を {value,Count,...} に包む癖があるため使わず、
-# JSON 文字列に必要な最小限のエスケープを決定的に適用する。
-if (Test-Path $ReviewGatePromptFile) {
-    $reviewGatePrompt = Get-Content $ReviewGatePromptFile -Raw -Encoding UTF8
-    $escaped = $reviewGatePrompt -replace '\\', '\\' `
-                                 -replace '"', '\"' `
-                                 -replace "`r", '\r' `
-                                 -replace "`n", '\n' `
-                                 -replace "`t", '\t'
-    # テンプレート側の "prompt": "{{REVIEW_GATE_PROMPT}}" の placeholder のみ差し替える
-    # （$ を特別扱いする -replace ではなく literal な .Replace を使う）
-    $settings = $settings.Replace('{{REVIEW_GATE_PROMPT}}', $escaped)
-}
-
-# review-gate の対象パストークンを if 条件・プロンプト両方の placeholder に埋め込む
-$settings = $settings.Replace('{{REVIEW_GATE_PATH}}', $ReviewGatePath)
+$claudeDirEscaped = $ClaudeDir -replace '\\', '\\\\'
+$settings = $template -replace '\{\{CLAUDE_DIR\}\}', $claudeDirEscaped
 
 $settingsObj = $settings | ConvertFrom-Json
 
@@ -177,12 +151,6 @@ if ($HookRegistrations.Count -gt 0) {
 }
 
 $settingsObj | ConvertTo-Json -Depth 10 | Set-Content -Path $SettingsFile -Encoding UTF8
-
-# Create idle output directory
-if (-not (Test-Path $DefaultIdleOutputDir)) {
-    New-Item -ItemType Directory -Path $DefaultIdleOutputDir -Force | Out-Null
-    Write-Host "Created idle output dir: $DefaultIdleOutputDir" -ForegroundColor Gray
-}
 
 Write-Host ""
 Write-Host "Installation complete!" -ForegroundColor Green

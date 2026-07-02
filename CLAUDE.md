@@ -33,7 +33,7 @@ tools/               汎用PowerShellユーティリティ
 
 ### settings.template.json
 
-- プレースホルダ: `{{CLAUDE_DIR}}` → `~/.claude`、`{{IDLE_OUTPUT_DIR}}` → `~/claude-idle-snapshots`
+- プレースホルダ: `{{CLAUDE_DIR}}` → `~/.claude`
 - インストーラがプレースホルダを実際のパスに置換して `~/.claude/settings.json` を生成
 
 ## コマンド

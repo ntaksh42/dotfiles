@@ -21,7 +21,7 @@ description: この dotfiles リポジトリの設定整合性を点検する。
 
 ### 2. settings.template.json
 - JSON として妥当か（`ConvertFrom-Json` で読めるか）
-- プレースホルダは `{{CLAUDE_DIR}}` / `{{IDLE_OUTPUT_DIR}}` のみか（未定義プレースホルダが残っていないか）
+- プレースホルダは `{{CLAUDE_DIR}}` のみか（未定義プレースホルダが残っていないか）
 - Windows パスは `\\\\`（JSON + PowerShell 二重エスケープ）になっているか
 - `$schema` 等の必須キー構成が崩れていないか
 

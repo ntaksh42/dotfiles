@@ -143,18 +143,6 @@
             "command": "Write-Output '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"実装変更前に必ずadvisor()を呼んでセルフレビュー/設計確認を行うこと。未呼出ならまずadvisor()を実行してから本ツールを使ってください。\"}}'"
           }
         ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "agent",
-            "if": "Write(**/{{REVIEW_GATE_PATH}}*)",
-            "prompt": "{{REVIEW_GATE_PROMPT}}",
-            "model": "opus",
-            "timeout": 120
-          }
-        ]
       }
     ],
     "PostToolUse": [
@@ -184,9 +172,6 @@
     "type": "command",
     "command": "npx -y ccstatusline@latest",
     "padding": 0
-  },
-  "env": {
-    "CLAUDE_IDLE_OUTPUT_DIR": "{{IDLE_OUTPUT_DIR}}"
   },
   "language": "Japanese",
   "alwaysThinkingEnabled": true
