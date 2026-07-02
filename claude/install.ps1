@@ -16,6 +16,8 @@ $HooksSourceDir  = Join-Path $ScriptDir "hooks"
 $HooksDestDir    = Join-Path $ClaudeDir "hooks"
 $SkillsSourceDir = Join-Path $ScriptDir "skills"
 $SkillsDestDir   = Join-Path $ClaudeDir "skills"
+$AgentsSourceDir = Join-Path $ScriptDir "agents"
+$AgentsDestDir   = Join-Path $ClaudeDir "agents"
 $TemplateFile    = Join-Path $ScriptDir "settings.template.json"
 $ReviewGatePromptFile = Join-Path $HooksSourceDir "review-gate.prompt.md"
 $DefaultIdleOutputDir = Join-Path $env:USERPROFILE "claude-idle-snapshots"
@@ -81,6 +83,18 @@ if (Test-Path $SkillsSourceDir) {
         $destSkillDir = Join-Path $SkillsDestDir $skillDir.Name
         Copy-Item $skillDir.FullName $destSkillDir -Recurse -Force
         Write-Host "  - $($skillDir.Name)" -ForegroundColor Gray
+    }
+}
+
+# Copy agents (subagent definitions)
+if (Test-Path $AgentsSourceDir) {
+    Write-Host "Copying agents..." -ForegroundColor Green
+    if (-not (Test-Path $AgentsDestDir)) {
+        New-Item -ItemType Directory -Path $AgentsDestDir | Out-Null
+    }
+    foreach ($file in (Get-ChildItem -Path $AgentsSourceDir -Filter "*.md")) {
+        Copy-Item $file.FullName (Join-Path $AgentsDestDir $file.Name) -Force
+        Write-Host "  - agents\$($file.Name)" -ForegroundColor Gray
     }
 }
 

@@ -481,12 +481,17 @@ function killport {
     }
 }
 
-# Claude Fable を司令塔にして起動: 立案・俯瞰は Fable、実行はサブエージェント
-function script:Invoke-FableOrchest {
-    param([Parameter(Mandatory)][string]$SubagentModel, [object[]]$Rest)
+# 司令塔/実行を分離して claude 起動: 立案・俯瞰は上位モデル、実行はサブエージェント
+function script:Invoke-ClaudeOrchest {
+    param(
+        [Parameter(Mandatory)][string]$MainModel,
+        [Parameter(Mandatory)][string]$SubagentModel,
+        [object[]]$Rest
+    )
     $orchestPrompt = @'
 あなたは司令塔として俯瞰・立案・検証を担い、実行はサブエージェントに委譲する。
 
+- 実装・修正の委譲先には implementer サブエージェントを使う（報告形式と作法が定義済み）。
 - 委譲プロンプトは自己完結させる: 対象ファイル、背景、期待結果、完了条件、報告形式（変更差分と検証結果のみ簡潔に）を必ず含める。サブエージェントは会話履歴を参照できない。
 - 独立したタスクは 1 メッセージで並列に委譲する。
 - 成果物を受領するたびに自分で検証する（差分確認、テスト・lint 実行）。不合格なら修正点を具体化して再委譲する。
@@ -495,16 +500,20 @@ function script:Invoke-FableOrchest {
     $prev = $env:CLAUDE_CODE_SUBAGENT_MODEL
     $env:CLAUDE_CODE_SUBAGENT_MODEL = $SubagentModel
     try {
-        claude --model claude-fable-5 --append-system-prompt $orchestPrompt @Rest
+        claude --model $MainModel --append-system-prompt $orchestPrompt @Rest
     } finally {
         if ($null -ne $prev) { $env:CLAUDE_CODE_SUBAGENT_MODEL = $prev }
         else { Remove-Item Env:CLAUDE_CODE_SUBAGENT_MODEL -ErrorAction Ignore }
     }
 }
-function fable-orchest      { Invoke-FableOrchest 'claude-sonnet-5' $args }
-function fable-orchest-opus { Invoke-FableOrchest 'claude-opus-4-8' $args }
+function fable-orchest      { Invoke-ClaudeOrchest 'claude-fable-5'  'claude-sonnet-5' $args }
+function fable-orchest-opus { Invoke-ClaudeOrchest 'claude-fable-5'  'claude-opus-4-8' $args }
+function opus-orchest       { Invoke-ClaudeOrchest 'claude-opus-4-8' 'claude-sonnet-5' $args }
+function fable-orchest-plan { Invoke-ClaudeOrchest 'claude-fable-5'  'claude-sonnet-5' (@('--permission-mode', 'plan') + $args) }
 Set-Alias ccf  fable-orchest
 Set-Alias ccfo fable-orchest-opus
+Set-Alias cco  opus-orchest
+Set-Alias ccfp fable-orchest-plan
 
 # ---------------------------------------------------------------------------
 # §6 Environment setup helpers
@@ -797,6 +806,8 @@ $script:ProfileHelp = [ordered]@{
         @{ Cmd='killport <n>';     Desc='ポートを使用中のプロセスを強制終了' }
         @{ Cmd='fable-orchest / ccf'; Desc='Fable が立案・Sonnet 5 が実行の構成で claude 起動' }
         @{ Cmd='fable-orchest-opus / ccfo'; Desc='Fable が立案・Opus 4.8 が実行の構成で claude 起動' }
+        @{ Cmd='opus-orchest / cco'; Desc='Opus 4.8 が立案・Sonnet 5 が実行の構成で claude 起動' }
+        @{ Cmd='fable-orchest-plan / ccfp'; Desc='ccf を plan モードで起動（立案を承認してから実行）' }
     )
     'Dev environment' = @(
         @{ Cmd='Show-DevEnv';      Desc='開発ツールの導入状況を一覧' }
