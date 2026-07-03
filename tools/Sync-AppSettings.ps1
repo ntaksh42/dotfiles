@@ -28,6 +28,8 @@ $pwsh7Profile = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'PowerSh
 $mappings = @(
     @{ Source = "app-settings\starship\starship.toml";              Dest = "$HOME\.config\starship.toml" }
     @{ Source = "app-settings\pwsh\Microsoft.PowerShell_profile.ps1"; Dest = $pwsh7Profile }
+    # Everything は終了時に Filters.csv を上書き保存するため、反映前に終了させておくこと
+    @{ Source = "app-settings\everything\Filters.csv";               Dest = "$env:APPDATA\Everything\Filters.csv" }
 )
 
 foreach ($m in $mappings) {
