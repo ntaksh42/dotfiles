@@ -1,0 +1,5 @@
+Name,Case,Whole Word,Path,Diacritics,Regex,Search,Macro,Key
+Everything,0,0,0,0,0,,,0
+Sln,0,0,0,0,0,ext:sln,sln,0
+Exe,0,0,0,0,0,ext:exe,exe,0
+Excel,0,0,0,0,0,ext:xls;xlsm;xlsx,xlsx,0
