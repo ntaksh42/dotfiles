@@ -28,20 +28,20 @@ style = "bold purple"
 format = "[$branch]($style) "
 
 # 作業状況: 種類ごとにカウント付きラベルで色分け表示。
-#   +N ステージ済み / !N 変更 / ?N 未追跡 / xN 削除 / rN リネーム
-#   *N stash / =N 競合 / ⇡N ahead / ⇣N behind
+#   addN ステージ済み / modN 変更 / newN 未追跡 / delN 削除 / renN リネーム
+#   stashN stash / conflictN 競合 / ⇡N ahead / ⇣N behind
 [git_status]
 style = "bold yellow"
-conflicted = "[=${count}](bold red) "
+conflicted = "[conflict${count}](bold red) "
 ahead      = "[⇡${count}](bold green) "
 behind     = "[⇣${count}](bold red) "
 diverged   = "[⇡${ahead_count}⇣${behind_count}](bold red) "
-untracked  = "[?${count}](blue) "
-stashed    = "[*${count}](cyan) "
-modified   = "[!${count}](yellow) "
-staged     = "[+${count}](green) "
-renamed    = "[r${count}](yellow) "
-deleted    = "[x${count}](red) "
+untracked  = "[new${count}](blue) "
+stashed    = "[stash${count}](cyan) "
+modified   = "[mod${count}](yellow) "
+staged     = "[add${count}](green) "
+renamed    = "[ren${count}](yellow) "
+deleted    = "[del${count}](red) "
 format = "([$all_status$ahead_behind]($style))"
 
 # rebase / merge / cherry-pick / bisect の途中状態を表示 (進捗付き)
