@@ -15,6 +15,26 @@ tools/                     汎用 PowerShell ユーティリティ
 docs/                      ドキュメント・設計資料
 ```
 
+## Git 設定
+
+PowerShell 7 / Git for Windows 向けの共有設定は
+`app-settings/git/.gitconfig` にあります。個人情報や署名鍵、認証 helper は
+公開用の設定から分離し、`~/.gitconfig.local` で管理します。既存の設定が
+ある場合は、それをローカル設定として残してから共有設定を配置します。
+
+```powershell
+# 既存の ~/.gitconfig がある場合（認証・ユーザー情報もそのまま保持）
+Move-Item ~/.gitconfig ~/.gitconfig.local
+Copy-Item app-settings/git/.gitconfig ~/.gitconfig
+
+# Git を初めて設定する場合は、上の Move-Item の代わりにこちらを実行
+Copy-Item app-settings/git/.gitconfig.local.example ~/.gitconfig.local
+notepad ~/.gitconfig.local
+```
+
+`delta` が未導入の場合は `Install-DevTools` で導入できます。設定後は
+`git config --global --list` で読み込み結果を確認してください。
+
 ## セットアップ手順
 
 ### 1. リポジトリをクローン
