@@ -11,6 +11,10 @@ try {
     [Console]::OutputEncoding = [Console]::InputEncoding = [System.Text.UTF8Encoding]::new()
 } catch {}
 
+# Remember the file that was actually loaded. This remains correct when the
+# profile is dot-sourced from a synced or non-default location.
+$script:DotfilesProfilePath = if ($PSCommandPath) { $PSCommandPath } else { $PROFILE.CurrentUserCurrentHost }
+
 # Cached command-existence check used by feature guards
 $script:_cmdCache = @{}
 function Test-Cmd {
@@ -90,15 +94,18 @@ function up {
 # Jump to source\repos
 function repos { Set-Location (Join-Path $env:USERPROFILE 'source\repos') }
 
-# Listing: eza when available, else Get-ChildItem
-if (Test-Cmd eza) {
-    function ll { eza -lh  --git --icons --group-directories-first @args }
-    function la { eza -lah --git --icons --group-directories-first @args }
-    function lt { eza --tree --level=2 --icons @args }
-} else {
-    function ll { Get-ChildItem @args }
-    function la { Get-ChildItem -Force @args }
-    function lt { Get-ChildItem -Recurse -Depth 1 @args }
+# Listing: defer the eza lookup until the first listing command is used.
+function ll {
+    if (Test-Cmd eza) { eza -lh --git --icons --group-directories-first @args }
+    else { Get-ChildItem @args }
+}
+function la {
+    if (Test-Cmd eza) { eza -lah --git --icons --group-directories-first @args }
+    else { Get-ChildItem -Force @args }
+}
+function lt {
+    if (Test-Cmd eza) { eza --tree --level=2 --icons @args }
+    else { Get-ChildItem -Recurse -Depth 1 @args }
 }
 
 # Fuzzy find a file and open it (fd + fzf)
@@ -135,11 +142,61 @@ function backup-file {
 }
 
 # Reload this profile
-function reload { . $PROFILE }
+function reload { . $script:DotfilesProfilePath }
+
+# Measure this profile in clean child PowerShell processes. Tool init caches are
+# intentionally preserved so the result represents normal, warm startup.
+function Measure-ProfileStartup {
+    [CmdletBinding()]
+    param(
+        [ValidateRange(1, 20)][int]$Samples = 5,
+        [ValidateScript({ Test-Path -LiteralPath $_ -PathType Leaf })]
+        [string]$Path = $script:DotfilesProfilePath
+    )
+
+    $resolved = (Resolve-Path -LiteralPath $Path).Path
+    $pwsh = (Get-Process -Id $PID).Path
+    $measureCommand = @'
+$sw = [Diagnostics.Stopwatch]::StartNew()
+. $env:DOTFILES_PROFILE_MEASURE_PATH
+$sw.Stop()
+'__PROFILE_MS__={0}' -f $sw.Elapsed.TotalMilliseconds.ToString([Globalization.CultureInfo]::InvariantCulture)
+'@
+
+    $values = foreach ($sample in 1..$Samples) {
+        $psi = [Diagnostics.ProcessStartInfo]::new()
+        $psi.FileName = $pwsh
+        $psi.UseShellExecute = $false
+        $psi.CreateNoWindow = $true
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $psi.Environment['DOTFILES_PROFILE_MEASURE_PATH'] = $resolved
+        foreach ($argument in @('-NoLogo', '-NoProfile', '-NonInteractive', '-Command', $measureCommand)) {
+            [void]$psi.ArgumentList.Add($argument)
+        }
+
+        $process = [Diagnostics.Process]::Start($psi)
+        $stdout = $process.StandardOutput.ReadToEnd()
+        $stderr = $process.StandardError.ReadToEnd()
+        $process.WaitForExit()
+        if ($process.ExitCode -ne 0 -or $stdout -notmatch '__PROFILE_MS__=([0-9.]+)') {
+            throw "Profile measurement failed (exit $($process.ExitCode)): $stderr"
+        }
+        [double]::Parse($Matches[1], [Globalization.CultureInfo]::InvariantCulture)
+    }
+
+    $stats = $values | Measure-Object -Minimum -Maximum -Average
+    [PSCustomObject]@{
+        Samples = $Samples
+        AverageMs = [math]::Round($stats.Average, 2)
+        MinimumMs = [math]::Round($stats.Minimum, 2)
+        MaximumMs = [math]::Round($stats.Maximum, 2)
+    }
+}
 
 # Edit this profile (VS Code if present, else Notepad)
 function Edit-Profile {
-    if (Test-Cmd code) { code $PROFILE } else { notepad $PROFILE }
+    if (Test-Cmd code) { code $script:DotfilesProfilePath } else { notepad $script:DotfilesProfilePath }
 }
 Set-Alias profile Edit-Profile
 
@@ -179,16 +236,13 @@ function gco {
     if ($branch) { git checkout ($branch.Trim() -replace '^origin/', '') }
 }
 
-# lazygit TUI
-if (Test-Cmd lazygit) { function lg { lazygit @args } }
-
-# gh helpers
-if (Test-Cmd gh) {
-    function prc { gh pr create @args }
-    function prv { gh pr view --web @args }
-    function prl { gh pr list @args }
-    function prs { gh pr status @args }
-}
+# These wrappers do not need an eager command lookup. If a tool is missing,
+# PowerShell's normal command-not-found message is sufficient on first use.
+function lg  { lazygit @args }
+function prc { gh pr create @args }
+function prv { gh pr view --web @args }
+function prl { gh pr list @args }
+function prs { gh pr status @args }
 
 # cd to the git repository root
 function groot {
@@ -390,21 +444,28 @@ if (Test-Cmd starship) {
 }
 
 # bat: syntax-highlighted cat (bat outputs plain text when piped)
-if (Test-Cmd bat) {
-    function cat { bat @args }
+function cat {
+    if (Test-Cmd bat) { bat @args } else { Get-Content @args }
 }
 
 # gsudo: sudo for Windows
-if (Test-Cmd gsudo) {
-    function sudo { gsudo @args }
+function sudo {
+    if (Test-Cmd gsudo) { gsudo @args }
+    else { Write-Warning 'sudo needs gsudo' }
 }
 
 # Defer heavy modules (PSFzf + Terminal-Icons, ~2s combined) to the first idle
 # tick so the prompt appears immediately; they load once shortly after startup.
-$global:_deferDone = $false
+$global:_dotfilesProfileDeferredDone = $false
+if ($global:_dotfilesProfileIdleSubscriptionId) {
+    Unregister-Event -SubscriptionId $global:_dotfilesProfileIdleSubscriptionId -ErrorAction Ignore
+}
 $null = Register-EngineEvent -SourceIdentifier PowerShell.OnIdle -Action {
-    if ($global:_deferDone) { return }
-    $global:_deferDone = $true
+    if ($global:_dotfilesProfileDeferredDone) { return }
+    $global:_dotfilesProfileDeferredDone = $true
+    if (Get-Command gh -ErrorAction Ignore) {
+        try { . (Get-InitCache 'gh' 'gh' { gh completion -s powershell }) } catch {}
+    }
     if (Get-Module -ListAvailable -Name PSFzf) {
         try {
             Import-Module PSFzf
@@ -421,28 +482,23 @@ $null = Register-EngineEvent -SourceIdentifier PowerShell.OnIdle -Action {
 }
 
 # Native tab completion (verified snippets), each guarded on command presence
-if (Test-Cmd dotnet) {
-    Register-ArgumentCompleter -Native -CommandName dotnet -ScriptBlock {
-        param($commandName, $wordToComplete, $cursorPosition)
-        dotnet complete --position $cursorPosition "$wordToComplete" | ForEach-Object {
-            [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
-        }
+Register-ArgumentCompleter -Native -CommandName dotnet -ScriptBlock {
+    param($commandName, $wordToComplete, $cursorPosition)
+    dotnet complete --position $cursorPosition "$wordToComplete" | ForEach-Object {
+        [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
     }
 }
+$global:_dotfilesProfileIdleSubscriptionId = (Get-EventSubscriber -SourceIdentifier PowerShell.OnIdle |
+    Sort-Object SubscriptionId -Descending |
+    Select-Object -First 1).SubscriptionId
 
-if (Test-Cmd gh) {
-    . (Get-InitCache 'gh' 'gh' { gh completion -s powershell })
-}
-
-if (Test-Cmd winget) {
-    Register-ArgumentCompleter -Native -CommandName winget -ScriptBlock {
-        param($wordToComplete, $commandAst, $cursorPosition)
-        [Console]::InputEncoding = [Console]::OutputEncoding = $OutputEncoding = [System.Text.Utf8Encoding]::new()
-        $word = $wordToComplete.Replace('"', '""')
-        $ast  = $commandAst.ToString().Replace('"', '""')
-        winget complete --word="$word" --commandline "$ast" --position $cursorPosition | ForEach-Object {
-            [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
-        }
+Register-ArgumentCompleter -Native -CommandName winget -ScriptBlock {
+    param($wordToComplete, $commandAst, $cursorPosition)
+    [Console]::InputEncoding = [Console]::OutputEncoding = $OutputEncoding = [System.Text.Utf8Encoding]::new()
+    $word = $wordToComplete.Replace('"', '""')
+    $ast  = $commandAst.ToString().Replace('"', '""')
+    winget complete --word="$word" --commandline "$ast" --position $cursorPosition | ForEach-Object {
+        [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
     }
 }
 
@@ -655,6 +711,7 @@ function Update-DevTools {
 # Interactive history search with delete support (Ctrl+r replacement)
 # Usage: Ctrl+r to search, Del to delete selected entry and re-open
 function Invoke-FzfHistory {
+    if (-not (Test-Cmd fzf)) { Write-Warning 'History search needs fzf'; return }
     $histFile = Join-Path $env:APPDATA 'Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt'
     if (-not (Test-Path $histFile)) { return }
 
@@ -686,7 +743,7 @@ function Invoke-FzfHistory {
     }
 }
 
-if ($host.Name -eq 'ConsoleHost') {
+if ($host.Name -eq 'ConsoleHost' -and -not [Console]::IsInputRedirected -and -not [Console]::IsOutputRedirected) {
     Import-Module PSReadLine
 
     Set-PSReadLineOption -PredictionSource History
@@ -744,9 +801,7 @@ if ($host.Name -eq 'ConsoleHost') {
     }
 
     # fzf history search (registered last so PSFzf doesn't override Ctrl+r)
-    if (Test-Cmd fzf) {
-        Set-PSReadLineKeyHandler -Key Ctrl+r -ScriptBlock { Invoke-FzfHistory }
-    }
+    Set-PSReadLineKeyHandler -Key Ctrl+r -ScriptBlock { Invoke-FzfHistory }
 }
 
 # ---------------------------------------------------------------------------
@@ -767,6 +822,7 @@ $script:ProfileHelp = [ordered]@{
         @{ Cmd='touch <path>';     Desc='ファイル作成 / タイムスタンプ更新' }
         @{ Cmd='backup-file <f>';  Desc='<名前>.bak-日時 でバックアップ作成' }
         @{ Cmd='reload';           Desc='プロファイルを再読込' }
+        @{ Cmd='Measure-ProfileStartup'; Desc='プロファイル起動時間を別プロセスで計測' }
         @{ Cmd='profile';          Desc='プロファイルを編集 (code/notepad)' }
     )
     'Git / GitHub' = @(
