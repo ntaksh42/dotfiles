@@ -1,0 +1,89 @@
+# Shared Git settings for Git for Windows + PowerShell 7.
+# Keep names, email addresses, signing keys, and credential helpers in
+# ~/.gitconfig.local so this file remains safe to publish.
+
+[init]
+	defaultBranch = main
+
+[core]
+	# Keep LF in the repository. Editors may still display native line endings.
+	autocrlf = input
+	longpaths = true
+	quotepath = false
+	pager = delta
+
+[interactive]
+	diffFilter = delta --color-only
+
+[delta]
+	navigate = true
+	line-numbers = true
+	decorations = true
+	hyperlinks = true
+
+[diff]
+	algorithm = histogram
+	colorMoved = default
+
+[merge]
+	conflictStyle = zdiff3
+
+[fetch]
+	prune = true
+	pruneTags = true
+	parallel = 0
+
+[pull]
+	# Never create an accidental merge commit when pulling.
+	ff = only
+
+[push]
+	default = current
+	autoSetupRemote = true
+	followTags = true
+
+[rebase]
+	autoSquash = true
+	autoStash = true
+
+[rerere]
+	enabled = true
+	autoUpdate = true
+
+[branch]
+	sort = -committerdate
+
+[tag]
+	sort = version:refname
+
+[column]
+	ui = auto
+
+[color]
+	ui = auto
+
+[help]
+	autoCorrect = prompt
+
+# These complement the short PowerShell functions in the profile. Use them as
+# `git <alias>`, for example `git sw`, `git graph`, or `git unstage README.md`.
+[alias]
+	s = status --short --branch
+	co = checkout
+	br = branch
+	pl = pull
+	ps = push
+	cl = clone
+	sw = switch
+	swc = switch --create
+	restore-file = restore
+	unstage = restore --staged --
+	last = log -1 --stat
+	graph = log --graph --decorate --all --date=short --pretty=format:%C(auto)%h%C(reset)%x09%C(cyan)%ad%C(reset)%x09%C(auto)%d%C(reset)%s%C(dim)%x20(%an)%C(reset)
+	contributors = shortlog --summary --numbered --email
+	aliases = config --get-regexp ^alias\\.
+	amend = commit --amend --no-edit
+
+# Load machine-specific settings last so they can override shared defaults.
+[include]
+	path = ~/.gitconfig.local
