@@ -1,0 +1,12 @@
+# Copy this file to ~/.gitconfig.local and replace the example values.
+[user]
+	name = Your Name
+	email = your-address@example.com
+
+# Optional: use a different identity for repositories under a work directory.
+# Add this block to ~/.gitconfig.local:
+#
+# [includeIf "gitdir/i:C:/Users/your-name/work/"]
+#     path = ~/.gitconfig.work
+#
+# Then create ~/.gitconfig.work containing another [user] section.
