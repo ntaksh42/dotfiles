@@ -15,6 +15,7 @@ $SkillsDestDir   = Join-Path $ClaudeDir "skills"
 $AgentsSourceDir = Join-Path $ScriptDir "agents"
 $AgentsDestDir   = Join-Path $ClaudeDir "agents"
 $TemplateFile    = Join-Path $ScriptDir "settings.template.json"
+$GlobalClaudeMd  = Join-Path $ScriptDir "CLAUDE.global.md"
 
 Write-Host "Claude Code dotfiles installer" -ForegroundColor Cyan
 Write-Host "==============================" -ForegroundColor Cyan
@@ -90,6 +91,19 @@ if (Test-Path $AgentsSourceDir) {
         Copy-Item $file.FullName (Join-Path $AgentsDestDir $file.Name) -Force
         Write-Host "  - agents\$($file.Name)" -ForegroundColor Gray
     }
+}
+
+# Copy global CLAUDE.md (CLAUDE.global.md -> ~/.claude/CLAUDE.md)
+if (Test-Path $GlobalClaudeMd) {
+    Write-Host "Copying global CLAUDE.md..." -ForegroundColor Green
+    $ClaudeMdDest = Join-Path $ClaudeDir "CLAUDE.md"
+    if (Test-Path $ClaudeMdDest) {
+        $ClaudeMdBackup = Join-Path $ClaudeDir "CLAUDE.md.backup.$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+        Write-Host "  Backing up existing CLAUDE.md to $ClaudeMdBackup" -ForegroundColor Yellow
+        Copy-Item $ClaudeMdDest $ClaudeMdBackup
+    }
+    Copy-Item $GlobalClaudeMd $ClaudeMdDest -Force
+    Write-Host "  - CLAUDE.md (from CLAUDE.global.md)" -ForegroundColor Gray
 }
 
 # Set ENABLE_TOOL_SEARCH environment variable if not exists

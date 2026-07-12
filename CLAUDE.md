@@ -12,6 +12,7 @@ Windows環境のClaude Code dotfiles・開発環境構成リポジトリ。Claud
 claude/              Claude Code 設定の管理元（~/.claude へインストール）
   install.ps1        インストーラ（hooks・skills・settingsを ~/.claude に展開）
   settings.template.json  settings.json テンプレート（{{CLAUDE_DIR}} 等のプレースホルダ）
+  CLAUDE.global.md   グローバル CLAUDE.md の管理元（~/.claude/CLAUDE.md へ展開、既存はバックアップ）
   hooks/             フック用PowerShellスクリプト（.HOOKブロックでメタデータ定義）
   skills/            Claude Code スキル（各サブディレクトリが1スキル）
   agents/            サブエージェント定義（.md、~/.claude/agents へインストール）
