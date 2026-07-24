@@ -92,77 +92,27 @@
       "Bash(powershell.exe:*)",
       "Bash(powershell:*)",
       "Bash(PYTHONIOENCODING=utf-8:*)"
+    ],
+    "deny": [
+      "Edit(//**/.env)",
+      "Edit(//**/.env.*)",
+      "Edit(//**/credentials.json)",
+      "Edit(//**/secrets.json)",
+      "Edit(//**/*.key)",
+      "Edit(//**/*.pem)",
+      "Edit(//**/*.pfx)",
+      "Edit(//**/*.p12)",
+      "Edit(//**/appsettings.Development.json)",
+      "Edit(//**/appsettings.Production.json)"
     ]
   },
   "hooks": {
-    "PostCompact": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell.exe -ExecutionPolicy Bypass -File \"{{CLAUDE_DIR}}\\hooks\\compact-context-reinject.ps1\""
-          }
-        ]
-      }
-    ],
     "Notification": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -ExecutionPolicy Bypass -File \"{{CLAUDE_DIR}}\\claude-notification.ps1\" -Title \"Claude Code\" -Message \"Your Action Needed\""
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell.exe -ExecutionPolicy Bypass -File \"{{CLAUDE_DIR}}\\hooks\\dangerous-command-guard.ps1\""
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell.exe -ExecutionPolicy Bypass -File \"{{CLAUDE_DIR}}\\hooks\\protect-files.ps1\""
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "powershell",
-            "command": "Write-Output '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"実装変更前に必ずadvisor()を呼んでセルフレビュー/設計確認を行うこと。未呼出ならまずadvisor()を実行してから本ツールを使ってください。\"}}'"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell.exe -ExecutionPolicy Bypass -File \"{{CLAUDE_DIR}}\\hooks\\audit-log.ps1\"",
-            "async": true
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "powershell",
-            "command": "$i = [Console]::In.ReadToEnd() | ConvertFrom-Json; if ($i.transcript_path -and (Test-Path $i.transcript_path) -and -not (Select-String -Path $i.transcript_path -Pattern '\"name\":\"advisor\",\"input\"' -SimpleMatch -Quiet)) { Write-Output '{\"decision\":\"block\",\"reason\":\"完了前にadvisor()を呼んでセルフレビューを依頼してください\"}' }"
+            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{{CLAUDE_DIR}}\\claude-notification.ps1\" -Title \"Claude Code\" -Message \"Your Action Needed\""
           }
         ]
       }
@@ -174,5 +124,5 @@
     "padding": 0
   },
   "language": "Japanese",
-  "alwaysThinkingEnabled": true
+  "alwaysThinkingEnabled": false
 }
