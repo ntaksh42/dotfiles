@@ -121,7 +121,8 @@ if (-not $currentValue) {
 # Generate settings.json from template
 Write-Host "Generating settings.json..." -ForegroundColor Green
 $template = Get-Content $TemplateFile -Raw
-$claudeDirEscaped = $ClaudeDir -replace '\\', '\\\\'
+# JSON テキストへの埋め込みなのでバックスラッシュを1段だけエスケープする
+$claudeDirEscaped = $ClaudeDir -replace '\\', '\\'
 $settings = $template -replace '\{\{CLAUDE_DIR\}\}', $claudeDirEscaped
 
 $settingsObj = $settings | ConvertFrom-Json
@@ -135,7 +136,8 @@ if ($HookRegistrations.Count -gt 0) {
     }
 
     foreach ($reg in $HookRegistrations) {
-        $cmd = "powershell.exe -ExecutionPolicy Bypass -File `"%USERPROFILE%\\.claude\\hooks\\$($reg.file)`""
+        # PSObject に載せる値なので生パスで持たせる（エスケープは ConvertTo-Json が行う）
+        $cmd = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$HooksDestDir\$($reg.file)`""
         $cmdEntry = [PSCustomObject]@{ type = "command"; command = $cmd }
         if ($null -ne $reg.async)       { $cmdEntry | Add-Member -MemberType NoteProperty -Name "async"       -Value $reg.async }
         if ($null -ne $reg.asyncRewake) { $cmdEntry | Add-Member -MemberType NoteProperty -Name "asyncRewake" -Value $reg.asyncRewake }
@@ -164,7 +166,9 @@ if ($HookRegistrations.Count -gt 0) {
     }
 }
 
-$settingsObj | ConvertTo-Json -Depth 10 | Set-Content -Path $SettingsFile -Encoding UTF8
+# PS 5.1 の -Encoding UTF8 は BOM を付けるため、BOM なし UTF-8 を明示して書き出す
+$settingsJson = $settingsObj | ConvertTo-Json -Depth 10
+[System.IO.File]::WriteAllText($SettingsFile, $settingsJson, (New-Object System.Text.UTF8Encoding $false))
 
 Write-Host ""
 Write-Host "Installation complete!" -ForegroundColor Green

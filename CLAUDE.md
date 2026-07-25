@@ -50,9 +50,9 @@ powershell.exe -File tools/Update-GitRepositories.ps1 -Path "C:\Projects"
 ## 開発規約
 
 - hookスクリプトには必ず `.HOOK` メタデータブロックを含める（install.ps1の自動登録に必要）
-- スキルはサブディレクトリ形式（`SKILL.md` + `references/`）を推奨
+- スキルはサブディレクトリ形式（`SKILL.md` + `references/`）を使用する（`*.skill` 単一ファイル形式は install.ps1 がコピーしないため展開されない）
 - PowerShellスクリプトは `$ErrorActionPreference = "Stop"` を使用
-- settings.template.json のパスには `\\\\` エスケープを使用（JSON + PowerShellの二重エスケープ）
+- settings.template.json のパスは JSON 文字列としての `\\` エスケープを使用（`\\\\` は過剰）
 
 ## モデルの使い分け
 

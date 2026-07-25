@@ -22,7 +22,7 @@ description: この dotfiles リポジトリの設定整合性を点検する。
 ### 2. settings.template.json
 - JSON として妥当か（`ConvertFrom-Json` で読めるか）
 - プレースホルダは `{{CLAUDE_DIR}}` のみか（未定義プレースホルダが残っていないか）
-- Windows パスは `\\\\`（JSON + PowerShell 二重エスケープ）になっているか
+- Windows パスは JSON 文字列としての `\\` になっているか（`\\\\` は過剰エスケープ）
 - `$schema` 等の必須キー構成が崩れていないか
 
 ### 3. skills 構成
@@ -34,6 +34,17 @@ description: この dotfiles リポジトリの設定整合性を点検する。
 ### 4. install.ps1 との突き合わせ
 - hooks のうち `.HOOK` ブロックを持たないものは「登録対象外」として一覧化する
 - 同一 event × 同一 matcher の重複（install.ps1 はスキップするが意図しない重複は警告）
+
+### 5. ~/.claude 側の残骸
+install.ps1 はコピーのみで削除を行わないため、dotfiles から消したものが展開先に残り続ける。
+
+- `~/.claude/hooks/*.ps1` のうち `claude/hooks/` に無いもの
+- `~/.claude/skills/*/` のうち `claude/skills/` に無いもの
+- `~/.claude/agents/*.md` のうち `claude/agents/` に無いもの
+
+残骸の hook は settings.json が毎回テンプレートから再生成されるため発火しないが、
+**残骸の skill は `~/.claude/skills/` に置かれているだけで有効になる**（dotfiles を経由しない）。
+skills の残骸は優先度を上げて報告する。
 
 ## 進め方
 

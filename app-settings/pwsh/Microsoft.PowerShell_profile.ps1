@@ -563,8 +563,8 @@ function script:Invoke-ClaudeOrchest {
     }
 }
 function fable-orchest      { Invoke-ClaudeOrchest 'claude-fable-5'  'claude-sonnet-5' $args }
-function fable-orchest-opus { Invoke-ClaudeOrchest 'claude-fable-5'  'claude-opus-4-8' $args }
-function opus-orchest       { Invoke-ClaudeOrchest 'claude-opus-4-8' 'claude-sonnet-5' $args }
+function fable-orchest-opus { Invoke-ClaudeOrchest 'claude-fable-5'  'claude-opus-5' $args }
+function opus-orchest       { Invoke-ClaudeOrchest 'claude-opus-5'   'claude-sonnet-5' $args }
 function fable-orchest-plan { Invoke-ClaudeOrchest 'claude-fable-5'  'claude-sonnet-5' (@('--permission-mode', 'plan') + $args) }
 Set-Alias ccf  fable-orchest
 Set-Alias ccfo fable-orchest-opus
@@ -862,8 +862,8 @@ $script:ProfileHelp = [ordered]@{
         @{ Cmd='port <n>';         Desc='ポートを使用中のプロセスを表示' }
         @{ Cmd='killport <n>';     Desc='ポートを使用中のプロセスを強制終了' }
         @{ Cmd='fable-orchest / ccf'; Desc='Fable が立案・Sonnet 5 が実行の構成で claude 起動' }
-        @{ Cmd='fable-orchest-opus / ccfo'; Desc='Fable が立案・Opus 4.8 が実行の構成で claude 起動' }
-        @{ Cmd='opus-orchest / cco'; Desc='Opus 4.8 が立案・Sonnet 5 が実行の構成で claude 起動' }
+        @{ Cmd='fable-orchest-opus / ccfo'; Desc='Fable が立案・Opus 5 が実行の構成で claude 起動' }
+        @{ Cmd='opus-orchest / cco'; Desc='Opus 5 が立案・Sonnet 5 が実行の構成で claude 起動' }
         @{ Cmd='fable-orchest-plan / ccfp'; Desc='ccf を plan モードで起動（立案を承認してから実行）' }
     )
     'Dev environment' = @(
