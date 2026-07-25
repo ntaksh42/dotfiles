@@ -166,7 +166,9 @@ if ($HookRegistrations.Count -gt 0) {
     }
 }
 
-$settingsObj | ConvertTo-Json -Depth 10 | Set-Content -Path $SettingsFile -Encoding UTF8
+# PS 5.1 の -Encoding UTF8 は BOM を付けるため、BOM なし UTF-8 を明示して書き出す
+$settingsJson = $settingsObj | ConvertTo-Json -Depth 10
+[System.IO.File]::WriteAllText($SettingsFile, $settingsJson, (New-Object System.Text.UTF8Encoding $false))
 
 Write-Host ""
 Write-Host "Installation complete!" -ForegroundColor Green
