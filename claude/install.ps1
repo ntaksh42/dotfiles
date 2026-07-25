@@ -76,6 +76,11 @@ if (Test-Path $SkillsSourceDir) {
     $SkillDirs = Get-ChildItem -Path $SkillsSourceDir -Directory
     foreach ($skillDir in $SkillDirs) {
         $destSkillDir = Join-Path $SkillsDestDir $skillDir.Name
+        # 既存を消してから入れ替える。Copy-Item -Recurse は展開先が既にあると
+        # その配下へ入れ子コピーしてしまい、削除済みファイルも残るため。
+        if (Test-Path $destSkillDir) {
+            Remove-Item $destSkillDir -Recurse -Force
+        }
         Copy-Item $skillDir.FullName $destSkillDir -Recurse -Force
         Write-Host "  - $($skillDir.Name)" -ForegroundColor Gray
     }
