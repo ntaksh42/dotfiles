@@ -139,11 +139,81 @@
     border-top: 1px solid var(--border);
   }
 
-  /* コンテンツ本文（{{CONTENT}}展開先） */
+  /* セクション本文のタイポグラフィ */
   .content p  { margin-bottom: 0.8rem; }
   .content h2 { font-size: 1.1rem; font-weight: 700; margin: 1.2rem 0 0.5rem; color: var(--accent); }
   .content h3 { font-size: 1rem; font-weight: 600; margin: 1rem 0 0.4rem; }
   .content ul, .content ol { margin-bottom: 0.8rem; }
+
+  /* 引用 */
+  blockquote {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-light);
+    padding: 0.7rem 1rem;
+    margin: 0.8rem 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 0.9rem;
+  }
+
+  /* 折りたたみ（長い表の残り行） */
+  details { margin-top: 0.6rem; }
+  details summary {
+    cursor: pointer;
+    color: var(--accent);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.4rem 0;
+    user-select: none;
+  }
+  details summary:hover { text-decoration: underline; }
+
+  /* 図（Mermaid / SVG） */
+  .figure, pre.mermaid {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.2rem;
+    margin: 0.8rem 0;
+    text-align: center;
+    overflow-x: auto;
+  }
+  pre.mermaid {
+    color: inherit;
+    font-family: inherit;
+    font-size: inherit;
+  }
+  .figure svg, pre.mermaid svg { max-width: 100%; height: auto; }
+
+  /* 進捗バー（:::bar 記法） */
+  .bar-row {
+    display: grid;
+    grid-template-columns: minmax(80px, 1fr) 3fr auto;
+    align-items: center;
+    gap: 0.8rem;
+    margin: 0.5rem 0;
+    font-size: 0.85rem;
+  }
+  .bar-label { color: var(--text-muted); font-weight: 600; }
+  .bar-track {
+    background: var(--border);
+    border-radius: 999px;
+    height: 0.6rem;
+    overflow: hidden;
+  }
+  .bar-fill {
+    background: var(--accent);
+    height: 100%;
+    border-radius: 999px;
+  }
+  .bar-value { font-weight: 700; color: var(--accent); min-width: 3rem; text-align: right; }
+
+  /* 印刷 */
+  @media print {
+    body { background: white; padding: 0; }
+    .section, .summary-card { break-inside: avoid; }
+    details { display: block; }
+    details > summary { display: none; }
+  }
 </style>
 </head>
 <body>
