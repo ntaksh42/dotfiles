@@ -1,0 +1,94 @@
+{
+  "version": 3,
+  "lines": [
+    [
+      {
+        "id": "645e0b67-1b70-48d0-878e-0a599211ba67",
+        "type": "model"
+      },
+      {
+        "id": "c76485d7-e572-4376-9943-6f4ff5145a6e",
+        "type": "separator"
+      },
+      {
+        "id": "b2bb4fdf-eff9-4df6-91b9-0d3f571001e3",
+        "type": "thinking-effort"
+      },
+      {
+        "id": "9d872022-4654-4bf2-b37a-06d40f4755ca",
+        "type": "separator"
+      },
+      {
+        "id": "42a3f49b-1f71-480e-9e9a-12662e96e1a2",
+        "type": "context-percentage",
+        "color": "brightGreen"
+      }
+    ],
+    [
+      {
+        "id": "ea3c252d-3abc-47dd-9da6-9d40c0064ee4",
+        "type": "current-working-dir"
+      },
+      {
+        "id": "c2303628-fbe5-4e55-b810-8067bf9188bc",
+        "type": "separator"
+      },
+      {
+        "id": "addf0260-3488-44b2-ae3c-cd5b05e0ee52",
+        "type": "git-branch"
+      },
+      {
+        "id": "6bbb00de-cc72-47b9-a386-0e70029e53cc",
+        "type": "separator"
+      },
+      {
+        "id": "9927c09f-aa15-428d-9d54-62e360bb81bc",
+        "type": "git-ahead-behind"
+      }
+    ],
+    [
+      {
+        "id": "9a0bf18b-b91a-4b23-8e7a-924f2144db08",
+        "type": "session-usage"
+      },
+      {
+        "id": "ede1fb1f-11af-4136-91f6-9128f1466bbc",
+        "type": "separator"
+      },
+      {
+        "id": "527f4dd4-39d3-4464-982a-acc74a11766f",
+        "type": "reset-timer"
+      },
+      {
+        "id": "7a07cca6-6957-4392-a361-d3c83577edfc",
+        "type": "separator"
+      },
+      {
+        "id": "37519e25-ea1b-434e-ac74-d82b3c3ada8e",
+        "type": "weekly-reset-timer"
+      }
+    ]
+  ],
+  "flexMode": "full-minus-40",
+  "compactThreshold": 60,
+  "colorLevel": 2,
+  "defaultPaddingSide": "both",
+  "inheritSeparatorColors": false,
+  "globalBold": false,
+  "gitCacheTtlSeconds": 5,
+  "minimalistMode": false,
+  "powerline": {
+    "enabled": false,
+    "separators": [
+      ""
+    ],
+    "separatorInvertBackground": [
+      false
+    ],
+    "startCaps": [],
+    "endCaps": [],
+    "autoAlign": false,
+    "continueThemeAcrossLines": false
+  },
+  "exportedBy": "2.2.27"
+}

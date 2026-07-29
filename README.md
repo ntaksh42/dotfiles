@@ -35,6 +35,20 @@ notepad ~/.gitconfig.local
 `delta` が未導入の場合は `Install-DevTools` で導入できます。設定後は
 `git config --global --list` で読み込み結果を確認してください。
 
+## ステータスライン設定
+
+`claude/settings.template.json` の `statusLine` は `npx -y ccstatusline@latest`
+を呼び出します。ccstatusline はレイアウト設定を `~/ccstatusline-config.json`
+から読み込むため、管理元の
+`app-settings/ccstatusline/ccstatusline-config.json` をホーム直下に配置します。
+
+```powershell
+Copy-Item app-settings/ccstatusline/ccstatusline-config.json ~/ccstatusline-config.json
+```
+
+配置後は Claude Code を再起動すると、モデル・コンテキスト使用率・git ブランチ・
+セッション使用量の 3 行構成が反映されます。
+
 ## セットアップ手順
 
 ### 1. リポジトリをクローン
