@@ -35,7 +35,8 @@
       },
       {
         "id": "addf0260-3488-44b2-ae3c-cd5b05e0ee52",
-        "type": "git-branch"
+        "type": "git-branch",
+        "color": "blue"
       },
       {
         "id": "6bbb00de-cc72-47b9-a386-0e70029e53cc",
@@ -43,7 +44,8 @@
       },
       {
         "id": "9927c09f-aa15-428d-9d54-62e360bb81bc",
-        "type": "git-ahead-behind"
+        "type": "git-ahead-behind",
+        "color": "blue"
       }
     ],
     [
