@@ -537,6 +537,16 @@ function killport {
     }
 }
 
+# 司令塔プロンプトはプロファイルと同じ場所の prompts/ に置く。
+# 見つからない場合でも起動を壊さないよう、委譲方針の最小版にフォールバックする。
+function script:Get-ClaudeOrchestPrompt {
+    $promptPath = Join-Path (Split-Path -Parent $script:DotfilesProfilePath) 'prompts\orchest.md'
+    if (Test-Path -LiteralPath $promptPath) {
+        return (Get-Content -LiteralPath $promptPath -Raw)
+    }
+    'あなたは司令塔として俯瞰・立案・検証を担い、実装は implementer サブエージェントに委譲し、成果物は evaluator サブエージェントに検証させる。委譲プロンプトは自己完結させること。'
+}
+
 # 司令塔/実行を分離して claude 起動: 立案・俯瞰は上位モデル、実行はサブエージェント
 function script:Invoke-ClaudeOrchest {
     param(
@@ -544,15 +554,7 @@ function script:Invoke-ClaudeOrchest {
         [Parameter(Mandatory)][string]$SubagentModel,
         [object[]]$Rest
     )
-    $orchestPrompt = @'
-あなたは司令塔として俯瞰・立案・検証を担い、実行はサブエージェントに委譲する。
-
-- 実装・修正の委譲先には implementer サブエージェントを使う（報告形式と作法が定義済み）。
-- 委譲プロンプトは自己完結させる: 対象ファイル、背景、期待結果、完了条件、報告形式（変更差分と検証結果のみ簡潔に）を必ず含める。サブエージェントは会話履歴を参照できない。
-- 独立したタスクは 1 メッセージで並列に委譲する。
-- 成果物を受領したら evaluator サブエージェントに変更差分と完了条件を渡して検証させる。不合格なら修正点を具体化して implementer に再委譲する。最終判断は evaluator の報告を確認して自分で行う。
-- 例外: 2〜3 ステップで終わる小さな作業、設計判断、あいまいな要件の解釈は委譲せず自分で行う。
-'@
+    $orchestPrompt = Get-ClaudeOrchestPrompt
     $prev = $env:CLAUDE_CODE_SUBAGENT_MODEL
     $env:CLAUDE_CODE_SUBAGENT_MODEL = $SubagentModel
     try {
@@ -570,6 +572,14 @@ Set-Alias ccf  fable-orchest
 Set-Alias ccfo fable-orchest-opus
 Set-Alias cco  opus-orchest
 Set-Alias ccfp fable-orchest-plan
+
+# 司令塔プロンプトを注入しない素の起動。委譲構成が不要な通常作業向け。
+function ccop { claude --model claude-opus-5 @args }
+function ccp  { claude --model claude-opus-5 --permission-mode plan @args }
+
+# 直近の会話を継続 / セッションを選んで再開
+function ccc { claude --continue @args }
+function ccr { claude --resume @args }
 
 # ---------------------------------------------------------------------------
 # §6 Environment setup helpers
@@ -865,6 +875,10 @@ $script:ProfileHelp = [ordered]@{
         @{ Cmd='fable-orchest-opus / ccfo'; Desc='Fable が立案・Opus 5 が実行の構成で claude 起動' }
         @{ Cmd='opus-orchest / cco'; Desc='Opus 5 が立案・Sonnet 5 が実行の構成で claude 起動' }
         @{ Cmd='fable-orchest-plan / ccfp'; Desc='ccf を plan モードで起動（立案を承認してから実行）' }
+        @{ Cmd='ccop';             Desc='Opus 5 単体で claude 起動（司令塔プロンプトなし）' }
+        @{ Cmd='ccp';              Desc='ccop を plan モードで起動' }
+        @{ Cmd='ccc';              Desc='直近の会話を継続 (claude --continue)' }
+        @{ Cmd='ccr';              Desc='セッションを選んで再開 (claude --resume)' }
     )
     'Dev environment' = @(
         @{ Cmd='Show-DevEnv';      Desc='開発ツールの導入状況を一覧' }
