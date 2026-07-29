@@ -581,6 +581,32 @@ function ccp  { claude --model claude-opus-5 --permission-mode plan @args }
 function ccc { claude --continue @args }
 function ccr { claude --resume @args }
 
+# --- codex ---
+# 既定は ~/.codex/config.toml (on-request / workspace-write)。
+# 以下は安全度と推論強度を起動時に切り替えるためのプリセット。
+function cx    { codex @args }
+function cxr   { codex -s read-only -a untrusted @args }
+function cxa   { codex -a never -s workspace-write @args }
+function cxh   { codex -c model_reasoning_effort="high" @args }
+function cxrev { codex review @args }
+
+# 直近セッションを継続 / セッションを選んで再開
+function cxc { codex resume --last @args }
+function cxs { codex resume @args }
+
+# サンドボックスを外す。承認は残るので実行前に必ず目視が入る。
+function cxfa { codex -s danger-full-access @args }
+
+# 承認もサンドボックスも無効化する。取り消しの効かない操作がそのまま通るため、
+# 対象ディレクトリを提示して明示的な同意を取ってから起動する。
+function cxyolo {
+    Write-Host "FULL ACCESS: 承認なし・サンドボックスなしで codex を起動します。" -ForegroundColor Red
+    Write-Host "  作業ディレクトリ: $(Get-Location)" -ForegroundColor Yellow
+    $answer = Read-Host "続行するには 'yes' と入力"
+    if ($answer -ne 'yes') { Write-Host "中止しました。" -ForegroundColor Gray; return }
+    codex --dangerously-bypass-approvals-and-sandbox @args
+}
+
 # ---------------------------------------------------------------------------
 # §6 Environment setup helpers
 # ---------------------------------------------------------------------------
@@ -879,6 +905,17 @@ $script:ProfileHelp = [ordered]@{
         @{ Cmd='ccp';              Desc='ccop を plan モードで起動' }
         @{ Cmd='ccc';              Desc='直近の会話を継続 (claude --continue)' }
         @{ Cmd='ccr';              Desc='セッションを選んで再開 (claude --resume)' }
+    )
+    'Codex' = @(
+        @{ Cmd='cx';               Desc='codex 素の起動（config.toml の既定に従う）' }
+        @{ Cmd='cxr';              Desc='読み取り専用で起動（調査・コードリーディング向け）' }
+        @{ Cmd='cxa';              Desc='承認なしで自動実行（サンドボックス内に限定）' }
+        @{ Cmd='cxh';              Desc='推論強度 high で起動（設計判断・難しいデバッグ）' }
+        @{ Cmd='cxrev';            Desc='コードレビューを実行 (codex review)' }
+        @{ Cmd='cxc';              Desc='直近セッションを継続 (codex resume --last)' }
+        @{ Cmd='cxs';              Desc='セッションを選んで再開 (codex resume)' }
+        @{ Cmd='cxfa';             Desc='サンドボックスを外して起動（承認は残る）' }
+        @{ Cmd='cxyolo';           Desc='承認・サンドボックスとも無効化（要 yes 確認）' }
     )
     'Dev environment' = @(
         @{ Cmd='Show-DevEnv';      Desc='開発ツールの導入状況を一覧' }
