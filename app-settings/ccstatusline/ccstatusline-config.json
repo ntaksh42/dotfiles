@@ -4,7 +4,8 @@
     [
       {
         "id": "645e0b67-1b70-48d0-878e-0a599211ba67",
-        "type": "model"
+        "type": "model",
+        "color": "brightGreen"
       },
       {
         "id": "c76485d7-e572-4376-9943-6f4ff5145a6e",
@@ -12,7 +13,8 @@
       },
       {
         "id": "b2bb4fdf-eff9-4df6-91b9-0d3f571001e3",
-        "type": "thinking-effort"
+        "type": "thinking-effort",
+        "color": "brightGreen"
       },
       {
         "id": "9d872022-4654-4bf2-b37a-06d40f4755ca",
@@ -27,7 +29,8 @@
     [
       {
         "id": "ea3c252d-3abc-47dd-9da6-9d40c0064ee4",
-        "type": "current-working-dir"
+        "type": "current-working-dir",
+        "color": "brightGreen"
       },
       {
         "id": "c2303628-fbe5-4e55-b810-8067bf9188bc",
@@ -36,7 +39,7 @@
       {
         "id": "addf0260-3488-44b2-ae3c-cd5b05e0ee52",
         "type": "git-branch",
-        "color": "blue"
+        "color": "brightGreen"
       },
       {
         "id": "6bbb00de-cc72-47b9-a386-0e70029e53cc",
@@ -45,13 +48,14 @@
       {
         "id": "9927c09f-aa15-428d-9d54-62e360bb81bc",
         "type": "git-ahead-behind",
-        "color": "blue"
+        "color": "brightGreen"
       }
     ],
     [
       {
         "id": "9a0bf18b-b91a-4b23-8e7a-924f2144db08",
-        "type": "session-usage"
+        "type": "session-usage",
+        "color": "brightGreen"
       },
       {
         "id": "ede1fb1f-11af-4136-91f6-9128f1466bbc",
@@ -59,7 +63,8 @@
       },
       {
         "id": "527f4dd4-39d3-4464-982a-acc74a11766f",
-        "type": "reset-timer"
+        "type": "reset-timer",
+        "color": "brightGreen"
       },
       {
         "id": "7a07cca6-6957-4392-a361-d3c83577edfc",
@@ -67,7 +72,8 @@
       },
       {
         "id": "37519e25-ea1b-434e-ac74-d82b3c3ada8e",
-        "type": "weekly-reset-timer"
+        "type": "weekly-reset-timer",
+        "color": "brightGreen"
       }
     ]
   ],
