@@ -116,10 +116,21 @@ function ConvertTo-ReportHtml {
             # 目次から飛べるようにアンカーを振る。見出し文字列は日本語や
             # 記号を含むので、id には連番だけを使って安定させる。
             $anchor = 'sec-' + ($script:ReportSections.Count + 1)
+
+            # セクションの「重さ」を測っておく。目次に出すと、
+            # どこに中身が固まっているかを開く前に見当づけられる。
+            # 表の行数（ヘッダー行を除く）とリスト項目を項目数として数える。
+            $items = ([regex]::Matches($inner, '<tr>')).Count `
+                   - ([regex]::Matches($inner, '<thead>')).Count `
+                   + ([regex]::Matches($inner, '<li>')).Count
+
             [void]$script:ReportSections.Add(@{
                 Anchor = $anchor
                 # 目次側でもう一度エスケープしないよう、変換済みを渡す
                 Title  = $safeTitle
+                Items  = $items
+                Red    = ([regex]::Matches($inner, 'class="tag tag-red"')).Count
+                Yellow = ([regex]::Matches($inner, 'class="tag tag-yellow"')).Count
             })
             [void]$Target.Add(@"
 <div class="section" id="$anchor">

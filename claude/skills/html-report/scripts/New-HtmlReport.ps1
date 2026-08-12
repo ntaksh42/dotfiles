@@ -171,7 +171,13 @@ if ($Cards.Count -gt 0) {
 $tocHtml = ''
 if ($script:ReportSections.Count -ge 5) {
     $links = foreach ($sec in $script:ReportSections) {
-        "    <li><a href=`"#$($sec.Anchor)`">$($sec.Title)</a></li>"
+        # 項目数と重大度を添える。数が少ない節にまで数字を出すと
+        # ノイズになるので、ある程度の量があるものだけ。
+        $meta = ''
+        if ($sec.Red -gt 0)    { $meta += "<span class=`"toc-flag toc-red`">$($sec.Red)</span>" }
+        if ($sec.Yellow -gt 0) { $meta += "<span class=`"toc-flag toc-yellow`">$($sec.Yellow)</span>" }
+        if ($sec.Items -ge 4)  { $meta += "<span class=`"toc-count`">$($sec.Items)</span>" }
+        "    <li><a href=`"#$($sec.Anchor)`"><span class=`"toc-label`">$($sec.Title)</span>$meta</a></li>"
     }
     $tocHtml = @"
 <div class="toc">
@@ -181,6 +187,19 @@ $($links -join "`n")
   </ol>
 </div>
 "@
+}
+
+# ---- 重要度サマリー ------------------------------------------------------
+# 重大・注意が何件あるかは、開いた瞬間にいちばん知りたいこと。
+# 本文を読み進めて数える作業を省く。
+$severityHtml = ''
+$totalRed = ($script:ReportSections | Measure-Object -Property Red -Sum).Sum
+$totalYellow = ($script:ReportSections | Measure-Object -Property Yellow -Sum).Sum
+if ($totalRed -gt 0 -or $totalYellow -gt 0) {
+    $parts = @()
+    if ($totalRed -gt 0)    { $parts += "<span class=`"sev sev-red`">重大 $totalRed</span>" }
+    if ($totalYellow -gt 0) { $parts += "<span class=`"sev sev-yellow`">注意 $totalYellow</span>" }
+    $severityHtml = "<div class=`"severity-bar`">" + ($parts -join '') + "</div>"
 }
 
 # ---- テンプレート適用 ----------------------------------------------------
@@ -199,6 +218,7 @@ $replacements = @{
     '{{DATE}}'            = $date
     '{{DOC_ID}}'          = $docId
     '{{SUMMARY_CARDS}}'   = $cardsHtml
+    '{{SEVERITY}}'        = $severityHtml
     '{{TOC}}'             = $tocHtml
     '{{MAIN_CONTENT}}'    = $mainContent
 }
