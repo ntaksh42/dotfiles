@@ -635,6 +635,7 @@ $script:DevTools = @(
     @{ Name='gita';              Backend='pip';      Id='gita';                  Cmd='gita' }
     @{ Name='git';               Backend='winget';   Id='Git.Git';               Cmd='git' }
     @{ Name='gh';                Backend='winget';   Id='GitHub.cli';            Cmd='gh' }
+    @{ Name='Azure CLI';         Backend='winget';   Id='Microsoft.AzureCLI';    Cmd='az' }
     @{ Name='fzf';               Backend='winget';   Id='junegunn.fzf';          Cmd='fzf' }
 )
 
