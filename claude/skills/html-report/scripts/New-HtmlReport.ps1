@@ -10,7 +10,7 @@
   番号は保存先ディレクトリの既存ファイルから自動採番する（-Number 指定時はそれを使う）。
 
 .PARAMETER Kind
-  レポート種別。review / bug / investigation / research / security のいずれか。
+  レポート種別。review / bug / investigation / research / security / proposal のいずれか。
 
 .PARAMETER Title
   レポートのタイトル。ヘッダー h1 と <title> に入る。
@@ -37,7 +37,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidateSet('review', 'bug', 'investigation', 'research', 'security')]
+    [ValidateSet('review', 'bug', 'investigation', 'research', 'security', 'proposal')]
     [string]$Kind,
 
     [Parameter(Mandatory)]
@@ -61,12 +61,15 @@ $skillDir = Split-Path -Parent $scriptDir
 
 # ---- 種別ごとのテーマ ----------------------------------------------------
 # SKILL.md の色テーマ表と対応。ここを変えると全レポートの見た目が変わる。
+# OnDark / Dim は暗所用。Accent をそのまま暗所で使うと沈むので、
+# 明度を上げた同系色と、地に敷ける暗い同系色を組にして持つ。
 $themes = @{
-    review        = @{ Accent = '#1d4ed8'; Light = '#dbeafe'; Badge = 'CODE REVIEW' }
-    bug           = @{ Accent = '#dc2626'; Light = '#fee2e2'; Badge = 'BUG ANALYSIS' }
-    investigation = @{ Accent = '#7c3aed'; Light = '#ede9fe'; Badge = 'INVESTIGATION' }
-    research      = @{ Accent = '#0891b2'; Light = '#cffafe'; Badge = 'RESEARCH' }
-    security      = @{ Accent = '#ea580c'; Light = '#ffedd5'; Badge = 'SECURITY AUDIT' }
+    review        = @{ Accent = '#1d4ed8'; Light = '#dbeafe'; OnDark = '#93b4fd'; Dim = '#1e3054'; Badge = 'CODE REVIEW' }
+    bug           = @{ Accent = '#dc2626'; Light = '#fee2e2'; OnDark = '#fca5a5'; Dim = '#4c1d1d'; Badge = 'BUG ANALYSIS' }
+    investigation = @{ Accent = '#7c3aed'; Light = '#ede9fe'; OnDark = '#c4b5fd'; Dim = '#332a55'; Badge = 'INVESTIGATION' }
+    research      = @{ Accent = '#0891b2'; Light = '#cffafe'; OnDark = '#7dd3e8'; Dim = '#12414f'; Badge = 'RESEARCH' }
+    security      = @{ Accent = '#ea580c'; Light = '#ffedd5'; OnDark = '#fdba74'; Dim = '#4a2a12'; Badge = 'SECURITY AUDIT' }
+    proposal      = @{ Accent = '#0f766e'; Light = '#ccfbf1'; OnDark = '#5eead4'; Dim = '#12433f'; Badge = 'PROPOSAL' }
 }
 $theme = $themes[$Kind]
 
@@ -162,21 +165,42 @@ if ($Cards.Count -gt 0) {
     $cardsHtml = "<div class=`"summary-grid`">`n" + ($items -join "`n") + "`n</div>"
 }
 
+# ---- 目次 ----------------------------------------------------------------
+# セクションが少ないうちは、目次があっても視線が増えるだけで得がない。
+# 画面に収まらなくなる 5 個以上のときだけ出す。
+$tocHtml = ''
+if ($script:ReportSections.Count -ge 5) {
+    $links = foreach ($sec in $script:ReportSections) {
+        "    <li><a href=`"#$($sec.Anchor)`">$($sec.Title)</a></li>"
+    }
+    $tocHtml = @"
+<div class="toc">
+  <div class="toc-title">目次</div>
+  <ol>
+$($links -join "`n")
+  </ol>
+</div>
+"@
+}
+
 # ---- テンプレート適用 ----------------------------------------------------
 $templatePath = Join-Path $skillDir 'templates/base.html'
 $html = Get-Content -LiteralPath $templatePath -Raw -Encoding UTF8
 
 $date = Get-Date -Format 'yyyy-MM-dd'
 $replacements = @{
-    '{{TITLE}}'         = ConvertTo-HtmlText $Title
-    '{{ACCENT_COLOR}}'  = $theme.Accent
-    '{{ACCENT_LIGHT}}'  = $theme.Light
-    '{{BADGE_LABEL}}'   = $theme.Badge
-    '{{SUBTITLE}}'      = ConvertTo-HtmlText $Subtitle
-    '{{DATE}}'          = $date
-    '{{DOC_ID}}'        = $docId
-    '{{SUMMARY_CARDS}}' = $cardsHtml
-    '{{MAIN_CONTENT}}'  = $mainContent
+    '{{TITLE}}'           = ConvertTo-HtmlText $Title
+    '{{ACCENT_COLOR}}'    = $theme.Accent
+    '{{ACCENT_LIGHT}}'    = $theme.Light
+    '{{ACCENT_ON_DARK}}'  = $theme.OnDark
+    '{{ACCENT_DIM}}'      = $theme.Dim
+    '{{BADGE_LABEL}}'     = $theme.Badge
+    '{{SUBTITLE}}'        = ConvertTo-HtmlText $Subtitle
+    '{{DATE}}'            = $date
+    '{{DOC_ID}}'          = $docId
+    '{{SUMMARY_CARDS}}'   = $cardsHtml
+    '{{TOC}}'             = $tocHtml
+    '{{MAIN_CONTENT}}'    = $mainContent
 }
 foreach ($key in $replacements.Keys) {
     $html = $html.Replace($key, $replacements[$key])
@@ -185,10 +209,24 @@ foreach ($key in $replacements.Keys) {
 # Mermaid ブロックがある場合のみ描画スクリプトを差し込む。
 # 図を使わないレポートに CDN 依存を持ち込まないための分岐。
 if ($mainContent -match 'class="mermaid"') {
+    # 暗所では neutral テーマだと図が白飛びするので配色を切り替える。
+    # CDN に届かない環境では図が描画されないままなので、
+    # 「壊れている」のか「読み込めていない」のかが分かる注記を出す。
     $mermaidInit = @'
 <script type="module">
-  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-  mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'strict' });
+  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  try {
+    const { default: mermaid } = await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs');
+    mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'neutral', securityLevel: 'strict' });
+  } catch (e) {
+    for (const el of document.querySelectorAll('pre.mermaid')) {
+      el.classList.add('mermaid-offline');
+      const note = document.createElement('div');
+      note.className = 'mermaid-note';
+      note.textContent = '図を描画できませんでした（オフライン）。以下は図の定義です。';
+      el.parentNode.insertBefore(note, el);
+    }
+  }
 </script>
 '@
     $html = $html.Replace('</body>', "$mermaidInit`n</body>")

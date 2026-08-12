@@ -12,6 +12,7 @@ investigation = "investigations" # 調査結果 → base_dir/investigations/
 bug         = "bugs"         # バグ調査結果 → base_dir/bugs/
 research    = "research"     # リサーチ結果 → base_dir/research/
 security    = "security"     # セキュリティ監査 → base_dir/security/
+proposal    = "proposals"    # 改善提案・設計案 → base_dir/proposals/
 
 # ファイル名のプレフィックス（種別ごと）
 [output.prefixes]
@@ -20,3 +21,4 @@ investigation = "investigation"
 bug           = "bug"
 research      = "research"
 security      = "security"
+proposal      = "proposal"
