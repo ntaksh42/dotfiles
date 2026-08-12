@@ -628,7 +628,8 @@ $script:DevTools = @(
     @{ Name='delta';             Backend='winget';   Id='dandavison.delta';      Cmd='delta'; PostInstall='delta' }
     @{ Name='gsudo';             Backend='winget';   Id='gerardog.gsudo';        Cmd='gsudo' }
     @{ Name='lazygit';           Backend='winget';   Id='JesseDuffield.lazygit'; Cmd='lazygit' }
-    @{ Name='Zed';               Backend='winget';   Id='ZedIndustries.Zed';     Cmd='zed' }
+    @{ Name='VSCode';            Backend='winget';   Id='Microsoft.VisualStudioCode'; Cmd='code' }
+    @{ Name='Python';            Backend='winget';   Id='Python.Python.3.12';    Cmd='python' }
     @{ Name='PSFzf';             Backend='psmodule'; Id='PSFzf' }
     @{ Name='Terminal-Icons';    Backend='psmodule'; Id='Terminal-Icons' }
     @{ Name='gita';              Backend='pip';      Id='gita';                  Cmd='gita' }
