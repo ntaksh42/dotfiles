@@ -1,0 +1,1612 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>添削 — __TITLE_HTML__</title>
+<style>
+/* ============================================================
+   TOKENS — ref-basic-design-system tokens.css の写し。生 hex はこのブロックのみ。
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
+:root {
+  --ink: #212529; --muted: #64707C; --line: #DEE2E6; --paper: #FFFFFF; --paper-dim: #F6F8FA;
+  --accent: #2563EB; --ok: #16A34A; --warn: #D97706; --err: #DC2626;
+  --font-sans: 'IBM Plex Sans JP', 'Hiragino Kaku Gothic ProN', sans-serif; --font-mono: 'IBM Plex Mono', monospace;
+  --text-micro: 11.5px; --text-caption: 12.5px; --text-data: 13.5px; --text-body: 15px; --text-section: 18px; --text-title: 21px; --text-display: 27px; --text-stat: 34px;
+  --leading-body: 1.9; --leading-data: 1.6; --leading-heading: 1.45; --measure: 760px;
+  --tb-h: 60px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink);
+  font-family: var(--font-sans); font-weight: 400;
+  font-size: var(--text-body); line-height: var(--leading-body);
+  -webkit-font-smoothing: antialiased;
+  padding-top: var(--tb-h);
+}
+.wrap { max-width: var(--measure); margin: 0 auto; padding: 22px 24px 0; }
+a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button, input, textarea { font-family: inherit; }
+[hidden] { display: none !important; }
+.sp { flex: 1; }
+.mono { font-family: var(--font-mono); }
+.muted { color: var(--muted); }
+
+/* ---------- 固定ツールバー ---------- */
+.toolbar { position: fixed; top: 0; left: 0; right: 0; z-index: 20; background: var(--paper); border-bottom: 1px solid var(--line); }
+.tb-in { max-width: calc(var(--measure) + 60px); margin: 0 auto; padding: 8px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.tabs { display: flex; gap: 3px; flex-wrap: wrap; }
+.tab { font-size: var(--text-data); font-weight: 500; color: var(--muted); background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 4px 10px; cursor: pointer; min-height: 30px; }
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); font-weight: 700; }
+.tab.src { margin-left: 8px; }
+/* [貼り付ける文章を作る] はタブではなく主ボタン (導線)。tablist の外・右端。開いている間はリング。文言は README の案内文と揃えてあるので変えない */
+.tb-right .btn.pri { min-height: 30px; padding: 4px 14px; }
+.tb-right .btn.pri[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--paper), 0 0 0 3.5px var(--accent); }
+.tb-right { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-wrap: wrap; }
+.tb-stat { font-family: var(--font-mono); font-size: var(--text-caption); color: var(--ink); white-space: nowrap; }
+.tb-stat b { color: var(--err); font-weight: 600; }
+.tb-stat.zero b { color: var(--ink); }
+.tb-stat .sm { display: none; }
+.btn { font-size: var(--text-data); font-weight: 500; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 6px 14px; cursor: pointer; min-height: 34px; }
+.btn.pri { background: var(--accent); border-color: var(--accent); color: var(--paper); font-weight: 700; }
+.btn.sec { border-color: var(--accent); color: var(--accent); }
+.btn.danger { border-color: var(--err); color: var(--err); }
+.btn.sm { font-size: var(--text-caption); padding: 2px 10px; min-height: 26px; }
+.btn:disabled { opacity: 0.5; cursor: default; }
+
+/* ---------- 冒頭 ---------- */
+.kicker { font-family: var(--font-mono); font-size: var(--text-caption); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.conclusion { background: var(--paper-dim); border-left: 3px solid var(--accent); border-radius: 0 10px 10px 0; padding: 12px 18px; font-size: var(--text-data); line-height: 1.75; margin: 8px 0 10px; }
+/* ページの h1 は kicker 直下の 1 行 (caption 級) — 記事の h1 (27px) と競合しない */
+h1.page-h1 { font-size: var(--text-caption); font-weight: 700; line-height: 1.6; color: var(--ink); margin: 2px 0 0; }
+/* [直す] 以外のタブでは案内を 1 行に畳む (ヘッダーが毎タブ 330〜600px 居座らないように) */
+body:not([data-tab="edit"]) h1.page-h1, body:not([data-tab="edit"]) .conclusion .c-full { display: none; }
+body[data-tab="edit"] .conclusion .c-short { display: none; }
+body:not([data-tab="edit"]) .conclusion { padding: 8px 14px; margin: 8px 0 4px; }
+.conclusion b { font-weight: 700; }
+.conclusion .rd { color: var(--err); }
+.panel-note { font-size: var(--text-caption); color: var(--muted); line-height: 1.7; margin: 10px 0 8px; }
+.panel-note b { color: var(--ink); font-weight: 600; }
+.panel-note .rd { color: var(--err); }
+.panel-note .tgl { cursor: pointer; }
+.panel-note .tgl input { width: 14px; height: 14px; margin: 0 4px 0 0; vertical-align: -2px; accent-color: var(--accent); }
+.panel-note .cnt { font-family: var(--font-mono); }
+details.fold { border: 1px solid var(--line); border-radius: 10px; margin: 6px 0 10px; }
+.fold summary { padding: 7px 14px; font-weight: 500; font-size: var(--text-caption); color: var(--ink); cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.fold summary::-webkit-details-marker { display: none; }
+.fold summary::after { content: "開く +"; font-size: var(--text-caption); color: var(--accent); flex-shrink: 0; font-weight: 400; }
+.fold[open] summary::after { content: "閉じる −"; }
+.fold .body { padding: 0 14px 10px; font-size: var(--text-caption); color: var(--muted); line-height: 1.7; }
+.fold .body b { color: var(--ink); font-weight: 600; }
+.fold .body .rd { color: var(--err); }
+
+/* ---------- Markdown 描画 (共通) ---------- */
+.md { overflow-wrap: anywhere; }
+.md h1 { font-size: var(--text-display); font-weight: 700; line-height: var(--leading-heading); letter-spacing: 0.01em; margin: 6px 0 16px; }
+.md h2 { font-size: var(--text-title); font-weight: 700; line-height: var(--leading-heading); letter-spacing: 0.01em; margin: 30px 0 12px; border-left: 3px solid var(--accent); padding-left: 10px; }
+.md h3 { font-size: var(--text-section); font-weight: 700; line-height: var(--leading-heading); margin: 22px 0 8px; }
+.md h4, .md h5, .md h6 { font-size: var(--text-body); font-weight: 700; margin: 16px 0 6px; }
+.md p { margin: 0 0 14px; }
+.md ul, .md ol { margin: 0 0 14px 1.5em; }
+.md li { margin: 2px 0; }
+.md li > ul, .md li > ol { margin-bottom: 0; }
+.md blockquote { border-left: 3px solid var(--line); padding: 2px 0 2px 14px; margin: 0 0 14px; }
+.md blockquote > :last-child { margin-bottom: 0; }
+.md code { font-family: var(--font-mono); font-size: var(--text-caption); background: var(--paper-dim); border-radius: 4px; padding: 1px 5px; }
+.md pre { background: var(--paper-dim); border-radius: 8px; padding: 10px 12px; margin: 0 0 14px; overflow-x: auto; font-family: var(--font-mono); font-size: var(--text-data); line-height: var(--leading-data); white-space: pre; }
+.md pre code { background: none; padding: 0; font-size: inherit; }
+.md hr { border: 0; border-top: 1px solid var(--line); margin: 20px 0; }
+.md .tbl { overflow-x: auto; margin: 6px 0 16px; }
+.md table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: var(--text-data); line-height: var(--leading-data); }
+.md th { text-align: left; font-size: var(--text-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 700; border-bottom: 1.5px solid var(--ink); padding: 8px 10px; vertical-align: bottom; }
+.md td { border-bottom: 1px solid var(--line); padding: 9px 10px; vertical-align: top; }
+.md del { color: var(--err); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.md ins { color: var(--err); text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+.md .cmt { font-family: var(--font-mono); font-size: var(--text-micro); color: var(--muted); margin: 0 0 10px; overflow-wrap: anywhere; line-height: 1.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.md .cmt i { font-style: normal; }
+.md .ph { color: var(--muted); font-size: var(--text-caption); }
+.md .rawdiff { font-family: var(--font-mono); font-size: var(--text-caption); color: var(--muted); line-height: 1.6; margin: -6px 0 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.md .rawdiff .rd-lbl { display: block; font-size: var(--text-micro); }
+.md .rawdiff .ln { opacity: 0.7; margin-right: 6px; user-select: none; }
+.md .rawdiff .ctx { opacity: 0.7; }
+
+/* ---------- [直す] ブロック ---------- */
+#blocks { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 10px; }
+.blk { position: relative; border: 1px solid transparent; border-radius: 6px; padding: 2px 52px 0 10px; margin: 0 -11px; cursor: pointer; scroll-margin-top: calc(var(--tb-h) + 10px); }
+.blk:hover, .blk:focus-visible { border-color: var(--line); outline: none; }
+.blk:focus { outline: none; }
+.blk:focus-visible { border-color: var(--accent); }
+.blk .pen { position: absolute; top: 3px; right: 8px; font-family: var(--font-mono); font-size: var(--text-micro); color: var(--accent); opacity: 0; white-space: nowrap; }
+.blk:hover .pen, .blk:focus-visible .pen { opacity: 1; }
+.blk.changed { border-left: 3px solid var(--err); padding-left: 8px; }
+/* 直した見出しは 赤の左罫 (ブロック) と h2 の青の左罫 が二重に並ばないように */
+.blk.changed .md > h2:first-child, .dblk.changed > h2 { border-left: 0; padding-left: 0; }
+.blk .md > h1:first-child, .blk .md > h2:first-child, .blk .md > h3:first-child { margin-top: 4px; }
+.blk.t-heading { margin-top: 20px; }
+.blk.t-heading:first-of-type { margin-top: 0; }
+.blk-tools { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: var(--text-micro); color: var(--muted); min-height: 20px; margin-bottom: 2px; }
+.badge { font-family: var(--font-mono); font-size: var(--text-micro); border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; color: var(--muted); white-space: nowrap; line-height: 1.7; }
+.badge.on { color: var(--err); border-color: var(--err); }
+.blk-tools .sum { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.memo-line { font-size: var(--text-caption); color: var(--err); margin: -6px 0 12px; }
+.blk.deleted { cursor: default; border-left: 3px solid var(--err); padding: 4px 10px 4px 8px; margin: 0 -11px 12px; }
+.del-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--text-caption); color: var(--muted); }
+.del-row .warn { color: var(--warn); font-size: var(--text-caption); flex-basis: 100%; }
+.del-row .snip { text-decoration: line-through; color: var(--err); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 55%; }
+.blk.comment { padding-top: 0; }
+.blk.comment .md .cmt { margin: 0 0 12px; }
+.addstrip { position: relative; height: 24px; display: flex; align-items: center; justify-content: center; margin: -8px 0; }
+.addstrip::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--line); opacity: 0; }
+.addbtn { position: relative; z-index: 1; font-family: var(--font-mono); font-size: var(--text-micro); color: var(--accent); background: var(--paper); border: 1px dashed var(--accent); border-radius: 4px; padding: 0 8px; cursor: pointer; opacity: 0; line-height: 1.6; }
+.addstrip:hover::before, .blk:not(.editing):hover + .addstrip::before, .addstrip:focus-within::before { opacity: 1; }
+.addstrip:hover .addbtn, .blk:not(.editing):hover + .addstrip .addbtn, .addbtn:focus { opacity: 1; }
+.mini { font-family: var(--font-mono); font-size: var(--text-micro); color: var(--accent); background: none; border: 1px solid var(--accent); border-radius: 4px; padding: 0 8px; cursor: pointer; line-height: 1.8; min-height: 24px; }
+@media (hover: none) { .blk .pen { opacity: 0.8; } .addstrip { display: none; } }
+
+/* ---------- 並置ライブ編集 ---------- */
+.blk.editing { cursor: default; border-color: var(--err); padding: 8px 12px 10px; margin: 6px -13px 16px; background: var(--paper); }
+.ed-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-family: var(--font-mono); font-size: var(--text-micro); color: var(--muted); margin-bottom: 6px; }
+.ed-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+.ed-pair.stack { grid-template-columns: 1fr; }
+.ed-lbl { font-family: var(--font-mono); font-size: var(--text-micro); color: var(--muted); margin-bottom: 4px; display: flex; gap: 6px; align-items: center; min-height: 20px; flex-wrap: wrap; }
+.ed-ta { display: block; width: 100%; font-family: var(--font-sans); font-size: var(--text-body); line-height: 1.8; color: var(--ink); background: var(--paper); border: 1px solid var(--err); border-radius: 6px; padding: 8px 10px; resize: vertical; min-height: 96px; max-height: 70vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ed-ta:focus, .ed-ta:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--err); }
+.memo-in:focus, .memo-in:focus-visible, textarea.free:focus, textarea.free:focus-visible { outline: none; border-color: var(--err); box-shadow: 0 0 0 1px var(--err); }
+.ed-lbl .tip { color: var(--muted); font-family: var(--font-mono); }
+.ed-prev-body { border: 1px dashed var(--line); border-radius: 6px; padding: 8px 12px; min-height: 96px; }
+.ed-prev-body > :last-child { margin-bottom: 0; }
+.ed-prev-body h2 { margin-top: 4px; }
+.pv-btn { font-family: var(--font-mono); font-size: var(--text-micro); color: var(--muted); background: none; border: 1px solid var(--line); border-radius: 4px; padding: 0 8px; cursor: pointer; line-height: 1.7; }
+.pv-btn.on { color: var(--accent); border-color: var(--accent); }
+.ed-memo { margin-top: 8px; }
+.memo-in { display: block; width: 100%; font: inherit; font-size: var(--text-data); color: var(--err); padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); }
+.ed-actions { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.ed-grid { overflow-x: auto; border: 1px solid var(--err); border-radius: 6px; padding: 6px; }
+.ed-grid table { border-collapse: separate; border-spacing: 4px; min-width: 100%; }
+.ed-grid th { font-family: var(--font-mono); font-size: var(--text-micro); color: var(--muted); font-weight: 400; text-align: left; padding: 0 4px; white-space: nowrap; }
+.ed-grid td { padding: 0; vertical-align: top; }
+.ed-cell { display: block; width: 100%; min-width: 130px; font: inherit; font-size: var(--text-data); line-height: 1.6; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; resize: none; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ed-grid table { table-layout: fixed; width: 100%; }
+.ed-grid th:first-child { width: 52px; }
+.ed-cell.head { font-weight: 700; }
+.ed-cell:focus, .ed-cell:focus-visible { outline: none; border-color: var(--err); box-shadow: 0 0 0 1px var(--err); }
+.ed-grid .none { display: block; min-width: 130px; font-size: var(--text-caption); color: var(--warn); padding: 4px 8px; }
+details.ed-more { margin-top: 8px; }
+.ed-more summary { font-family: var(--font-mono); font-size: var(--text-micro); color: var(--accent); cursor: pointer; list-style: none; }
+.ed-more summary::-webkit-details-marker { display: none; }
+.ed-more summary::before { content: '▸ '; }
+.ed-more[open] summary::before { content: '▾ '; }
+.ed-more .ed-ta { margin-top: 6px; }
+.blk.t-table .ed-ta { font-family: var(--font-mono); font-size: var(--text-data); line-height: 1.7; white-space: pre; overflow: auto; }
+.ed-warn { font-size: var(--text-caption); color: var(--warn); line-height: 1.6; margin: 6px 0 0; }
+.ed-warn:empty { display: none; }
+
+/* ---------- [差分] [完成形] ---------- */
+.dlist { border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin: 8px 0 20px; font-size: var(--text-data); line-height: 1.7; }
+.dlist ol { margin-left: 1.4em; }
+.dlist li { margin: 2px 0; }
+.dlist .chg { color: var(--err); }
+.dlist .sepd { color: var(--muted); }
+.dblk { scroll-margin-top: calc(var(--tb-h) + 10px); }
+.dblk.changed { border-left: 3px solid var(--err); padding-left: 10px; margin-left: -13px; }
+.dtag { display: block; font-family: var(--font-mono); font-size: var(--text-micro); color: var(--err); margin-bottom: 2px; }
+.dblk.changed > h1, .dblk.changed > h2, .dblk.changed > h3 { margin-top: 2px; }
+.dblk.changed:has(> h1, > h2, > h3) { margin-top: 24px; }
+.fin-head { position: sticky; top: var(--tb-h); z-index: 5; background: var(--paper); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 4px 0 0; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: var(--text-caption); color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { font-family: inherit; font-size: var(--text-caption); font-weight: 500; color: var(--muted); background: var(--paper); border: 0; padding: 3px 12px; cursor: pointer; min-height: 28px; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { color: var(--paper); background: var(--accent); font-weight: 700; }
+.fin-head .hint { white-space: nowrap; }
+.fin-kicker { font-family: var(--font-mono); font-size: var(--text-caption); letter-spacing: 0.06em; color: var(--muted); margin: 12px 0 2px; }
+#finArticle { border-top: 0; padding-top: 4px; }
+article.paper { border-top: 1px solid var(--line); padding-top: 12px; }
+
+/* ---------- [回答] ---------- */
+.fbox { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin: 10px 0 16px; }
+.fbox h4 { font-size: var(--text-data); font-weight: 700; margin: 0 0 6px; }
+.fbox h4 span { font-family: var(--font-mono); font-size: var(--text-micro); font-weight: 400; color: var(--muted); margin-left: 6px; }
+textarea.free { display: block; width: 100%; font: inherit; font-size: var(--text-data); line-height: 1.7; color: var(--err); padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; min-height: 64px; resize: vertical; background: var(--paper); }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.status { font-family: var(--font-mono); font-size: var(--text-caption); color: var(--muted); line-height: 1.6; margin: 10px 0 0; min-height: 1.6em; overflow-wrap: anywhere; }
+.status.ok { color: var(--ink); font-weight: 600; }
+.status.ok::before { content: '✓ '; color: var(--ok); }
+.status.warn::before { content: '! '; color: var(--warn); }
+.status.stale { color: var(--warn); }
+.status.warn { color: var(--warn); font-weight: 600; }
+.out { margin-top: 12px; }
+.out .oh { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: var(--text-caption); color: var(--muted); margin-bottom: 6px; }
+.out .oh b { font-family: var(--font-mono); font-weight: 600; color: var(--ink); }
+.out textarea, textarea.srcall { display: block; width: 100%; font-family: var(--font-mono); font-size: var(--text-caption); line-height: 1.6; color: var(--ink); background: var(--paper-dim); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-height: 220px; resize: vertical; white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto; }
+textarea.srcall { background: var(--paper); min-height: 60vh; font-size: var(--text-data); line-height: 1.7; }
+
+/* ---------- footer ---------- */
+footer.end { border-top: 1px solid var(--line); margin-top: 36px; padding: 18px 0 48px; }
+.meta { font-size: var(--text-caption); color: var(--muted); line-height: var(--leading-data); overflow-wrap: anywhere; }
+.meta div { margin: 2px 0; }
+
+/* 広い画面では編集パネルと [ソース全体] を本文カラムの外へ広げる (760px の 2 分割 = 1 ペイン 330px は日本語散文に狭すぎる) */
+@media (min-width: 980px) {
+  .blk.editing { position: relative; left: 50%; transform: translateX(-50%); width: min(1160px, calc(100vw - 48px)); }
+  #tab-src .panel-inner, section#tab-src > * { }
+  #tab-src textarea.srcall { position: relative; left: 50%; transform: translateX(-50%); width: min(1160px, calc(100vw - 48px)); }
+}
+@media (max-width: 720px) {
+  .wrap { padding: 16px 14px 0; }
+  .tb-in { padding: 6px 12px; }
+  .tb-right { margin-left: 0; width: 100%; justify-content: space-between; }
+  .conclusion { padding: 10px 12px; }
+  .blk { margin: 0 -6px; padding-right: 22px; }
+  .blk .pen .lbl { display: none; }
+  .blk.editing { margin: 6px -8px 16px; padding: 8px 8px 10px; }
+  .blk.deleted { margin: 0 -6px 12px; }
+  .tb-stat .lg { display: none; }
+  .tb-stat .sm { display: inline; }
+  .md h1 { font-size: var(--text-title); }
+  /* 編集画面は 縦積み: 入力欄 → 確定/取消 → メモ → プレビュー (確定ボタンに届きやすく) */
+  .blk.editing { display: flex; flex-direction: column; }
+  .ed-pair { display: contents; }
+  .ed-head { order: 0; }
+  .ed-src { order: 1; }
+  .ed-actions { order: 2; margin-top: 8px; }
+  .ed-memo { order: 3; }
+  .ed-prev { order: 4; margin-top: 10px; }
+  .ed-head .hint { display: none; }
+  .dblk.changed { margin-left: -8px; padding-left: 5px; }
+  .btn { flex: 1 1 auto; text-align: center; }
+  .btn.sm, .btn.aux { flex: 0 0 auto; }
+  .ed-actions .sp { flex: 0 0 100%; height: 0; } /* 確定/取消 の行と 追加/削除 の行に分ける */
+  .md .tbl::before { content: '← 横にスクロールできます →'; display: block; position: sticky; left: 0; font-family: var(--font-mono); font-size: var(--text-micro); color: var(--muted); margin-bottom: 2px; }
+  /* iPhone Safari は 16px 未満の入力欄にフォーカスすると画面を拡大するので、入力欄だけ 16px にする (token 外の唯一の寸法) */
+  .ed-ta, .ed-cell, .memo-in, textarea.free, textarea.srcall, .out textarea { font-size: 16px; }
+}
+@media print {
+  .toolbar, header.top, footer.end, .fin-head, .panel-note, details.fold { display: none !important; }
+  body { padding-top: 0; }
+  .md a { color: var(--ink); text-decoration: none; }
+  article.paper { border-top: 0; padding-top: 0; }
+}
+</style>
+</head>
+<body data-tab="edit">
+<div class="toolbar" id="toolbar" role="navigation" aria-label="ツールバー">
+  <div class="tb-in">
+    <div class="tabs" role="tablist" aria-label="タブ">
+      <button class="tab" role="tab" data-tab="edit" aria-selected="true" type="button">直す</button>
+      <button class="tab" role="tab" data-tab="final" aria-selected="false" type="button">完成形</button>
+      <button class="tab" role="tab" data-tab="diff" aria-selected="false" type="button">差分</button>
+      <button class="tab src" role="tab" data-tab="src" aria-selected="false" type="button">ソース全体</button>
+    </div>
+    <div class="tb-right">
+      <span class="tb-stat zero" id="tbStat" aria-live="polite">赤入れ量 <b>0.00</b> (直された 0 / 全 0 文字)</span>
+      <button class="btn sm" id="resetDraft" type="button">下書きに戻す</button>
+      <button class="btn pri" id="genBtn" type="button" aria-pressed="false">貼り付ける文章を作る</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <header class="top">
+    <div class="kicker">添削 — <span style="text-transform:none">__LABEL_HTML__</span></div>
+    <h1 class="page-h1">__TITLE_HTML__ — 記事全体にわたって直してください</h1>
+    <div class="conclusion">
+      <span class="c-full">これは agent の下書き (記事 1 本まるごと) を読める体裁で並べたものです。直したい所を<b>クリック / タップ</b>すると、Markdown の入力欄とプレビューが開くので、書き換えて<b>「確定」</b>してください (取消 = Esc、確定 = ⌘/Ctrl+Enter。段落の追加・削除もできます)。全体への注文はいちばん下の欄に書いてください。終わったら <b>[貼り付ける文章を作る]</b> を押し、クリップボードに入った回答を Claude Code のターミナルに貼って Enter してください。</span>
+      <span class="c-short">__TITLE_HTML__ の赤入れ。直し終わったら <b>[貼り付ける文章を作る]</b> → ターミナルに貼る。</span>
+    </div>
+  </header>
+
+  <main>
+    <section id="tab-edit" class="panel" role="tabpanel" aria-label="直す">
+      <div class="panel-note"><span class="cnt" id="editCnt"></span> · <label class="tgl"><input type="checkbox" id="showRed">直した所に赤を乗せる (<span class="rd"><del>消した</del> / <ins style="text-underline-offset:3px">足した</ins></span>)</label> · <label class="tgl"><input type="checkbox" id="showCmt">メタ情報 (HTML コメント <span id="cmtN"></span> 件) を表示</label></div>
+      <details class="fold"><summary>操作の詳しい説明</summary><div class="body">ブロックにホバー / タップで「✎ 直す」が出ます。クリック / タップで開く編集画面は 左 = Markdown の入力欄、右 = 入力に追従するプレビュー (「差分」で赤マーク付き)。<b>確定</b> = ボタン or ⌘/Ctrl+Enter、<b>取消</b> = ボタン or Esc。直したブロックは左に<span class="rd">赤い罫</span>と「直された n 文字」+ 1 行の要約。表はセルごとの入力欄 (行や列を足す/消すときは「Markdown を直接直す」)。追加は編集画面の「＋ この下に段落を足す」(PC ではブロックの間の「＋ ここに段落を足す」でも)、削除は編集画面の「削除」(「元に戻す」で復活)。本文のリンクは新規タブで開きます (リンクの文言を直すときは、その周りの文字をクリック)。メタ情報 (HTML コメント) は記事には出ませんが、出力では位置ごと保持されます。</div></details>
+      <div id="blocks" aria-label="記事のブロック (クリックで編集)"></div>
+      <div class="fbox">
+        <h4>全体へのコメント <span>任意 — 記事全体への注文・方針。回答パネルの欄と同じ内容</span></h4>
+        <textarea class="free" id="overall2" placeholder="任意 (方針・気になった点など。複数行可)" aria-label="全体へのコメント (任意)"></textarea>
+      </div>
+    </section>
+
+    <section id="tab-final" class="panel" role="tabpanel" aria-label="完成形" hidden>
+      <div class="fin-head"><span class="seg" role="group" aria-label="表示する版"><button type="button" id="finAfter" aria-pressed="true">直した後</button><button type="button" id="finBefore" aria-pressed="false">元の下書き</button></span><span id="finLabel">直した後の記事 (通読用)</span><span class="sp"></span><span class="hint">印刷: ブラウザの印刷でそのまま渡せます</span></div>
+      <div class="fin-kicker" id="finKicker"></div>
+      <article class="paper md" id="finArticle"></article>
+    </section>
+
+    <section id="tab-diff" class="panel" role="tabpanel" aria-label="差分" hidden>
+      <div class="panel-note"><span style="color:var(--err)"><del>取り消し線 = 消した</del></span> / <span style="color:var(--err)"><ins style="text-underline-offset:3px">下線 = 足した</ins></span>。直したブロックだけの一覧 (クリックでその場所へ):</div>
+      <div class="dlist" id="diffList"></div>
+      <article class="paper md" id="diffArticle"></article>
+    </section>
+
+    <section id="tab-reply" class="panel" role="region" aria-label="回答" hidden>
+      <div class="fbox">
+        <h4>全体へのコメント <span>任意</span></h4>
+        <textarea class="free" id="overall" placeholder="任意 (方針・気になった点など。複数行可)" aria-label="全体へのコメント (任意)"></textarea>
+      </div>
+      <div class="row">
+        <button class="btn pri" id="genBtn2" type="button">貼り付ける文章を作る</button>
+        <button class="btn sec" id="dlMd" type="button">完成形 .md をダウンロード</button>
+      </div>
+      <div class="status" id="status" aria-live="polite"></div>
+      <div class="panel-note">作った文章は<b>クリップボード</b>に入ります。Claude Code のターミナルに貼って Enter すると、agent が直しを反映します。全体へのコメントを書き足したら、もう一度「貼り付ける文章を作る」を押してください。コピーできない環境では下の欄を「全選択」して手動でコピーします。</div>
+      <div class="out" id="out" hidden>
+        <div class="oh"><b id="outKind"></b><span>コピーできない時はここを全選択して手動でコピー →</span><button class="btn sm" id="selAll" type="button">全選択</button></div>
+        <textarea id="outText" readonly aria-label="貼り付ける文章 (全選択してコピー)"></textarea>
+      </div>
+    </section>
+
+    <section id="tab-src" class="panel" role="tabpanel" aria-label="ソース全体" hidden>
+      <div class="panel-note"><b>上級者向け:</b> 記事全体の Markdown を 1 つの欄で直せます。「反映」を押すと、ブロック分割を元の記事と再同期し、差分はブロック単位で取り直します (元の記事に無いブロックは「追加」、消えたブロックは「削除」)。⌘/Ctrl+Enter でも反映。</div>
+      <textarea class="srcall" id="srcAll" spellcheck="false" aria-label="記事全体の Markdown"></textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="btn pri" id="srcApply" type="button">反映 (ブロック分割を再同期)</button>
+        <button class="btn" id="srcRevert" type="button">取消 (現在の状態に戻す)</button>
+      </div>
+      <div class="status" id="srcStatus" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <footer class="end">
+    <div class="meta">
+      <div>使い捨ての編集画面。回答するまでの編集はこの端末にだけあります (ブラウザ内に一時保持。元の記事が変わると破棄)。</div>
+      <div id="footSrc"></div>
+    </div>
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  // ---------- 入力 (build-sheet.py が焼き込む — 記事 Markdown と逐語一致。文字列は改変しない) ----------
+  const SOURCE = __SOURCE_JSON__;
+  const SOURCE_PATH = __SOURCE_PATH_JSON__;
+  const TITLE = __TITLE_JSON__;
+  const LABEL = __LABEL_JSON__;
+  const STORE_KEY = 'review-tensaku:' + LABEL + ':' + SOURCE_PATH;
+  const CLOSING = '上の回答を反映して作業を続けてください。お任せの項目は推奨案で確定してください。';
+  const TYPE_LABEL = { heading: '見出し', paragraph: '段落', list: '箇条書き', table: '表', quote: '引用', code: 'コード', hr: '区切り線', comment: 'コメント' };
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const hash = (s) => { let h = 0; for (let i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) | 0; } return String(h); };
+  const pad3 = (n) => String(n).padStart(3, '0');
+
+  // 差分マーク用の番兵 (私用領域の文字)。Markdown に混ぜて描画し、描画後にテキストノードを del/ins に変換する
+  const D0 = '\uE000', D1 = '\uE001', I0 = '\uE002', I1 = '\uE003';
+  const SENT_RE = /[\uE000-\uE003]/g;
+  const isSent = (c) => c >= '\uE000' && c <= '\uE003';
+  const clean = (s) => s.replace(SENT_RE, '');
+
+  // ============================================================
+  // ブロック分割 (空行区切りを基本に型付き)。復元 = head + Σ(md + gap) で元ファイルと逐語一致
+  // ============================================================
+  const RE_HEADING = /^(#{1,6})(\s+|$)/;
+  const RE_FENCE = /^\s{0,3}(`{3,}|~{3,})(.*)$/;
+  const RE_HR = /^\s{0,3}(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$/;
+  const RE_QUOTE = /^\s{0,3}>/;
+  const RE_ITEM = /^(\s*)([-*+]|\d{1,9}[.)])(\s+)(.*)$/;
+  const RE_TSEP = /^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/;
+  const RE_COMMENT = /^\s{0,3}<!--/;
+  const isBlank = (l) => clean(l).trim() === '';
+
+  function lineType(cl, next) {
+    if (RE_COMMENT.test(cl)) return 'comment';
+    if (RE_FENCE.test(cl)) return 'code';
+    if (RE_HEADING.test(cl)) return 'heading';
+    if (RE_HR.test(cl)) return 'hr';
+    if (RE_QUOTE.test(cl)) return 'quote';
+    if (RE_ITEM.test(cl)) return 'list';
+    if (cl.indexOf('|') >= 0 && next != null) { const cn = clean(next); if (cn.indexOf('|') >= 0 && RE_TSEP.test(cn)) return 'table'; }
+    return 'paragraph';
+  }
+  function parseBlocks(src) {
+    const endsNL = src.endsWith('\n');
+    const lines = src.split('\n');
+    if (endsNL) lines.pop();
+    const n = lines.length;
+    const items = [];
+    let head = '';
+    let blanks = [];
+    let i = 0;
+    while (i < n) {
+      if (isBlank(lines[i])) { blanks.push(lines[i]); i++; continue; }
+      if (items.length === 0) head = blanks.map((b) => b + '\n').join('');
+      else items[items.length - 1].gap = blanks.map((b) => '\n' + b).join('') + '\n';
+      blanks = [];
+      const cl = clean(lines[i]);
+      const type = lineType(cl, i + 1 < n ? lines[i + 1] : null);
+      let j = i + 1;
+      if (type === 'code') {
+        const fence = RE_FENCE.exec(cl)[1];
+        while (j < n) {
+          const c = clean(lines[j]).trim();
+          const cm = /^(`{3,}|~{3,})\s*$/.exec(c);
+          j++;
+          if (cm && cm[1][0] === fence[0] && cm[1].length >= fence.length) break;
+        }
+      } else if (type === 'comment') {
+        if (cl.indexOf('-->') < 0) { while (j < n) { const c = clean(lines[j]); j++; if (c.indexOf('-->') >= 0) break; } }
+      } else if (type === 'heading' || type === 'hr') {
+        /* 1 行 */
+      } else if (type === 'table') {
+        while (j < n && !isBlank(lines[j]) && clean(lines[j]).indexOf('|') >= 0) j++;
+      } else if (type === 'quote') {
+        while (j < n && !isBlank(lines[j]) && RE_QUOTE.test(clean(lines[j]))) j++;
+      } else if (type === 'list') {
+        while (j < n && !isBlank(lines[j])) { const t = lineType(clean(lines[j]), j + 1 < n ? lines[j + 1] : null); if (t === 'list' || t === 'paragraph') j++; else break; }
+      } else {
+        while (j < n && !isBlank(lines[j])) { const t = lineType(clean(lines[j]), j + 1 < n ? lines[j + 1] : null); if (t === 'paragraph') j++; else break; }
+      }
+      items.push({ type, md: lines.slice(i, j).join('\n'), gap: '' });
+      i = j;
+    }
+    const tail = blanks.map((b) => '\n' + b).join('') + (endsNL ? '\n' : '');
+    if (items.length) items[items.length - 1].gap = tail; else head += tail;
+    return { head, items, endsNL };
+  }
+  const reconstruct = (P) => P.head + P.items.map((b) => b.md + b.gap).join('');
+
+  // ============================================================
+  // Markdown 描画 (自前)。番兵を含む文字列も構造検出は clean() で行い、番兵はテキストとして通す
+  // ============================================================
+  // raw から clean 換算で plen 文字ぶんの接頭辞を取り除く。接頭辞の中にあった番兵は本文の先頭に寄せる
+  function splitPrefix(raw, plen) {
+    let cnt = 0, sent = '', k = 0;
+    while (k < raw.length && cnt < plen) { const ch = raw[k]; if (isSent(ch)) sent += ch; else cnt++; k++; }
+    return sent + raw.slice(k);
+  }
+  const link = (url, inner) => '<a href="' + esc(clean(url)) + '" target="_blank" rel="noopener noreferrer">' + inner + '</a>';
+  function inline(s) {
+    const ph = [];
+    const put = (html) => { ph.push(html); return '\uF000' + (ph.length - 1) + '\uF001'; };
+    s = s.replace(/(`+)(?!`)([\s\S]*?[^`])\1(?!`)/g, (m, f, code) => put('<code>' + esc(code.replace(/^ (.+) $/, '$1')) + '</code>'));
+    s = s.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, (m, txt, url) => put(link(url, emph(esc(txt)))));
+    s = s.replace(/<(https?:\/\/[^\s<>]+)>/g, (m, url) => put(link(url, esc(url))));
+    s = s.replace(/(^|[^A-Za-z0-9\uF000\uF001])(https?:\/\/[^\s<>\uF000\uF001]+)/g, (m, pre, url) => {
+      const t = url.replace(/[.,;:!?)）」』。、]+$/, '');
+      return pre + put(link(t, esc(t))) + url.slice(t.length);
+    });
+    s = emph(esc(s));
+    s = s.replace(/ {2,}\n/g, '<br>');
+    let out = s;
+    for (let k = 0; k < 6 && out.indexOf('\uF000') >= 0; k++) out = out.replace(/\uF000(\d+)\uF001/g, (m, i) => ph[+i]);
+    return out;
+  }
+  function emph(s) {
+    s = s.replace(/\*\*(?=\S)([\s\S]*?\S)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/__(?=\S)([\s\S]*?\S)__/g, '<strong>$1</strong>');
+    s = s.replace(/(^|[^*\w])\*(?=\S)([^*\n]*?\S)\*(?!\w)/g, '$1<em>$2</em>');
+    s = s.replace(/(^|[^_\w])_(?=\S)([^_\n]*?\S)_(?!\w)/g, '$1<em>$2</em>');
+    return s;
+  }
+  function splitRow(raw) {
+    let s = raw;
+    const lm = /^[ \t\uE000-\uE003]*/.exec(s)[0];
+    const lead = lm.replace(/[ \t]/g, '');
+    s = s.slice(lm.length);
+    if (s[0] === '|') s = s.slice(1);
+    const tm = /[ \t\uE000-\uE003]*$/.exec(s)[0];
+    const trail = tm.replace(/[ \t]/g, '');
+    s = s.slice(0, s.length - tm.length);
+    if (s[s.length - 1] === '|') s = s.slice(0, -1);
+    const cells = s.replace(/\\\|/g, '\uF002').split('|').map((c) => c.trim().replace(/\uF002/g, '|'));
+    if (cells.length) { cells[0] = lead + cells[0]; cells[cells.length - 1] = cells[cells.length - 1] + trail; }
+    return cells;
+  }
+  function renderTable(lines) {
+    const head = splitRow(lines[0]);
+    const seps = splitRow(lines[1]).map((c) => clean(c).trim());
+    const align = seps.map((c) => (/^:-+:$/.test(c) ? 'center' : /^-+:$/.test(c) ? 'right' : /^:-+$/.test(c) ? 'left' : ''));
+    const cols = head.length;
+    const cell = (tag, txt, ln, col) => '<' + tag + ' data-ln="' + ln + '" data-col="' + col + '"' + (align[col] ? ' style="text-align:' + align[col] + '"' : '') + '>' + inline(txt) + '</' + tag + '>';
+    let h = '<div class="tbl"><table><thead><tr>';
+    for (let c = 0; c < cols; c++) h += cell('th', head[c], 0, c);
+    h += '</tr></thead><tbody>';
+    for (let r = 2; r < lines.length; r++) {
+      const row = splitRow(lines[r]);
+      h += '<tr>';
+      for (let c = 0; c < cols; c++) h += cell('td', row[c] == null ? '' : row[c], r, c);
+      h += '</tr>';
+    }
+    return h + '</tbody></table></div>';
+  }
+  function renderList(lines) {
+    const stack = [];
+    let root = null, lastItem = null;
+    const newLevel = (indent, ordered, start) => ({ indent, ordered, start, items: [] });
+    for (let ln = 0; ln < lines.length; ln++) {
+      const raw = lines[ln];
+      const cl = clean(raw);
+      const m = RE_ITEM.exec(cl);
+      if (!m) { if (lastItem) lastItem.text.push(clean(raw).length ? splitPrefix(raw, (/^\s*/.exec(cl) || [''])[0].length) : raw); continue; }
+      const indent = m[1].length;
+      const ordered = /\d/.test(m[2]);
+      const content = splitPrefix(raw, m[1].length + m[2].length + m[3].length);
+      while (stack.length && indent < stack[stack.length - 1].indent) stack.pop();
+      let lvl;
+      if (!stack.length) { lvl = newLevel(indent, ordered, ordered ? parseInt(m[2], 10) : 1); root = root || lvl; if (root !== lvl) root = lvl; stack.push(lvl); }
+      else if (indent > stack[stack.length - 1].indent && stack[stack.length - 1].items.length) { lvl = newLevel(indent, ordered, ordered ? parseInt(m[2], 10) : 1); const parent = stack[stack.length - 1].items; parent[parent.length - 1].sub.push(lvl); stack.push(lvl); }
+      else lvl = stack[stack.length - 1];
+      lastItem = { ln, text: [content], sub: [] };
+      lvl.items.push(lastItem);
+    }
+    if (!root) return '';
+    // 最上位レベル (最初に積んだもの) を描画。stack を全部 pop した後の再開は root に繋ぐ
+    return renderLevel(root);
+    function renderLevel(L) {
+      const tag = L.ordered ? 'ol' : 'ul';
+      let h = '<' + tag + (L.ordered && L.start !== 1 ? ' start="' + L.start + '"' : '') + '>';
+      L.items.forEach((it) => { h += '<li data-ln="' + it.ln + '">' + inline(it.text.join('\n')) + it.sub.map(renderLevel).join('') + '</li>'; });
+      return h + '</' + tag + '>';
+    }
+  }
+  function renderBlock(b, opt) {
+    const lines = b.md.split('\n');
+    switch (b.type) {
+      case 'heading': {
+        const cl = clean(lines[0]);
+        const m = RE_HEADING.exec(cl);
+        const lvl = m[1].length;
+        const content = splitPrefix(lines[0], m[0].length).replace(/\s+#+\s*$/, '');
+        return '<h' + lvl + '>' + inline(content) + '</h' + lvl + '>';
+      }
+      case 'hr': return '<hr>';
+      case 'comment': {
+        if (!opt.comments) return '';
+        const one = clean(b.md).replace(/^\s*<!--\s*/, '').replace(/\s*-->\s*$/, '').replace(/\s+/g, ' ');
+        const key = (/^[A-Za-z0-9_-]+/.exec(one) || [''])[0];
+        return '<div class="cmt">· メタ情報 <i>&lt;!-- ' + esc(key ? key + ' …' : '…') + ' --&gt; · ' + one.length + ' 文字 · 記事には出ない・出力では保持</i></div>';
+      }
+      case 'code': {
+        const fm = RE_FENCE.exec(clean(lines[0]));
+        const lang = (fm ? fm[2] : '').trim().split(/\s+/)[0];
+        let end = lines.length;
+        if (lines.length > 1) { const c = clean(lines[lines.length - 1]).trim(); const cm = /^(`{3,}|~{3,})\s*$/.exec(c); if (cm && fm && cm[1][0] === fm[1][0] && cm[1].length >= fm[1].length) end = lines.length - 1; }
+        return '<pre><code' + (lang ? ' class="lang-' + esc(lang) + '"' : '') + '>' + esc(lines.slice(1, end).join('\n')) + '</code></pre>';
+      }
+      case 'quote': {
+        const inner = lines.map((l) => { const m = /^\s{0,3}>\s?/.exec(clean(l)); return m ? splitPrefix(l, m[0].length) : l; }).join('\n');
+        return '<blockquote>' + renderMd(inner, opt) + '</blockquote>';
+      }
+      case 'table': return renderTable(lines);
+      case 'list': return renderList(lines);
+      default: return '<p>' + inline(lines.map((l) => l.replace(/^ +/, '')).join('\n')) + '</p>';
+    }
+  }
+  function renderMd(md, opt) {
+    opt = opt || {};
+    const P = parseBlocks(md);
+    return P.items.map((b) => renderBlock(b, opt)).join('');
+  }
+  function safeRender(md, opt) {
+    try { return renderMd(md, opt); } catch (e) { return '<pre>' + esc(clean(md)) + '</pre>'; }
+  }
+  // 描画後: 番兵で挟まれたテキストを del / ins 要素に包む (テキストノード単位なので入れ子は常に正しい)
+  function applyMarks(root) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    let state = null;
+    nodes.forEach((tn) => {
+      const text = tn.nodeValue;
+      if (!state && !/[\uE000-\uE003]/.test(text)) return;
+      const frag = document.createDocumentFragment();
+      let buf = '';
+      const flush = () => { if (!buf) return; if (state) { const el = document.createElement(state); el.textContent = buf; frag.appendChild(el); } else frag.appendChild(document.createTextNode(buf)); buf = ''; };
+      for (const ch of text) {
+        if (ch === D0) { flush(); state = 'del'; }
+        else if (ch === D1) { flush(); if (state === 'del') state = null; }
+        else if (ch === I0) { flush(); state = 'ins'; }
+        else if (ch === I1) { flush(); if (state === 'ins') state = null; }
+        else buf += ch;
+      }
+      flush();
+      tn.parentNode.replaceChild(frag, tn);
+    });
+  }
+
+  // ============================================================
+  // 語句単位の差分 (参考実装から移植): 文字種の連続で語句にし LCS → 併合
+  // ============================================================
+  const PARTICLES = 'とをがはにのでへも';
+  function charClass(c) {
+    if (/[々㐀-鿿豈-﫿]/.test(c)) return 'k';
+    if (/[぀-ゟ]/.test(c)) return 'h';
+    if (/[゠-ヿｦ-ﾟ]/.test(c)) return 'K';
+    if (/[A-Za-z0-9０-９Ａ-Ｚａ-ｚ]/.test(c)) return 'a';
+    return 's';
+  }
+  function tokenize(str) {
+    const out = [];
+    let cur = '', cc = null;
+    const push = () => {
+      if (!cur) return;
+      if (cc === 'h' && cur.length >= 2 && PARTICLES.indexOf(cur[cur.length - 1]) >= 0) { out.push(cur.slice(0, -1)); out.push(cur.slice(-1)); }
+      else out.push(cur);
+      cur = '';
+    };
+    for (const c of str) { const k = charClass(c); if (cur && (k !== cc || k === 's')) push(); cur += c; cc = k; }
+    push();
+    return out;
+  }
+  function diffWords(a, b) {
+    if (a === b) { const s = a ? [{ eq: a, n: 1 }] : []; s.changed = 0; return s; }
+    const A = tokenize(a), B = tokenize(b);
+    const n = A.length, m = B.length, W = m + 1;
+    const dp = new Uint16Array((n + 1) * (m + 1));
+    for (let i = n - 1; i >= 0; i--) {
+      for (let j = m - 1; j >= 0; j--) {
+        dp[i * W + j] = A[i] === B[j] ? dp[(i + 1) * W + j + 1] + 1 : Math.max(dp[(i + 1) * W + j], dp[i * W + j + 1]);
+      }
+    }
+    const ops = [];
+    let i = 0, j = 0;
+    while (i < n && j < m) {
+      if (A[i] === B[j]) { ops.push(['=', A[i]]); i++; j++; }
+      else if (dp[(i + 1) * W + j] >= dp[i * W + j + 1]) { ops.push(['-', A[i]]); i++; }
+      else { ops.push(['+', B[j]]); j++; }
+    }
+    while (i < n) ops.push(['-', A[i++]]);
+    while (j < m) ops.push(['+', B[j++]]);
+    const segs = [];
+    let eq = [], del = '', ins = '';
+    const flushC = () => { if (del || ins) { segs.push({ del, ins }); del = ''; ins = ''; } };
+    const flushE = () => { if (eq.length) { segs.push({ eq: eq.join(''), n: eq.length }); eq = []; } };
+    for (const [t, c] of ops) {
+      if (t === '=') { flushC(); eq.push(c); }
+      else { flushE(); if (t === '-') del += c; else ins += c; }
+    }
+    flushC(); flushE();
+    let raw = 0;
+    segs.forEach((s) => { if (s.eq === undefined) raw += s.del.length + s.ins.length; });
+    let merged = true;
+    while (merged) {
+      merged = false;
+      for (let k = 1; k < segs.length - 1; k++) {
+        const s = segs[k], p = segs[k - 1], q = segs[k + 1];
+        if (s.eq === undefined || p.eq !== undefined || q.eq !== undefined || s.n > 1) continue;
+        const oneSub = (!p.del !== !p.ins) && (!q.del !== !q.ins) && (!!p.del !== !!q.del);
+        if (!oneSub) continue;
+        segs.splice(k - 1, 3, { del: p.del + s.eq + q.del, ins: p.ins + s.eq + q.ins });
+        merged = true; break;
+      }
+    }
+    // 空白の境界寄せ: 挿入だけ / 削除だけの塊が空白で終わり、直前の等しい塊が同じ空白で終わるなら、
+    // 塊を左へ回して語の切れ目に合わせる (「(最優先) 」→「 (最優先)」)。文字数は変わらない
+    for (let k = 1; k < segs.length; k++) {
+      const s = segs[k], p = segs[k - 1];
+      if (s.eq !== undefined || p.eq === undefined || (!!s.del === !!s.ins)) continue;
+      const key = s.del ? 'del' : 'ins';
+      let x = s[key], pe = p.eq, moved = '';
+      while (x.length && pe.length && /\s/.test(x[x.length - 1]) && pe[pe.length - 1] === x[x.length - 1]) {
+        const c = x[x.length - 1];
+        x = c + x.slice(0, -1); pe = pe.slice(0, -1); moved = c + moved;
+      }
+      if (!moved) continue;
+      s[key] = x; p.eq = pe;
+      const q = segs[k + 1];
+      if (q && q.eq !== undefined) q.eq = moved + q.eq; else segs.splice(k + 1, 0, { eq: moved, n: 1 });
+      if (!p.eq) { segs.splice(k - 1, 1); k--; }
+    }
+    segs.changed = raw;
+    return segs;
+  }
+  const blocksOf = (segs) => segs.filter((s) => s.eq === undefined);
+  const changedChars = (segs) => segs.changed || 0;
+  const markedMd = (segs) => segs.map((s) => s.eq !== undefined ? s.eq : (s.del ? D0 + s.del + D1 : '') + (s.ins ? I0 + s.ins + I1 : '')).join('');
+  // 番兵付き Markdown のうち、変更を含む行だけを del/ins 付きの生テキストで出す (見出しレベル・箇条書き記号・URL など描画に出ない変更の受け皿)
+  function rawDiffHtml(marked, maxLines) {
+    const lines = marked.split('\n');
+    let state = null;
+    const out = [];
+    let more = 0;
+    for (let li = 0; li < lines.length; li++) {
+      const line = lines[li];
+      const idx = [];
+      for (let i = 0; i < line.length; i++) if (isSent(line[i])) idx.push(i);
+      const has = idx.length > 0 || state !== null;
+      let ws = 0, we = line.length;
+      if (has && line.length > 180) {
+        const first = state !== null ? 0 : idx[0], last = idx.length ? idx[idx.length - 1] : line.length;
+        ws = Math.max(0, first - 40); we = Math.min(line.length, last + 60);
+      }
+      let html = ws > 0 ? '…' : '', buf = '', markedAny = false;
+      const flush = () => { if (!buf) return; if (state) { html += '<' + state + '>' + esc(buf) + '</' + state + '>'; markedAny = true; } else html += esc(buf); buf = ''; };
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        const inWin = i >= ws && i < we;
+        if (ch === D0) { if (inWin) flush(); state = 'del'; }
+        else if (ch === D1) { if (inWin) flush(); state = null; }
+        else if (ch === I0) { if (inWin) flush(); state = 'ins'; }
+        else if (ch === I1) { if (inWin) flush(); state = null; }
+        else if (inWin) buf += ch;
+      }
+      flush();
+      if (we < line.length) html += '…';
+      // 番兵はあるが中身が空の行 (次行から始まる追加の起点など) は出さない — 変えていない行が並ぶと誤読の元
+      if (has && markedAny) { if (out.length < (maxLines || 6)) out.push('<span class="ln">L' + (li + 1) + '</span>' + html); else more++; }
+    }
+    if (!out.length) return '';
+    return '<div class="rawdiff"><span class="rd-lbl">Markdown の差分 (描画には出ない変更):</span>' + out.join('<br>') + (more ? '<br>… 他 ' + more + ' 行' : '') + '</div>';
+  }
+  // 正規化 2 段: stripStruct = 行頭の構造接頭辞 (- * + / 1. / # / > / |)・改行・空白を除く (残れば「中身のある」差分)。
+  // normVis = さらにインライン記法の文字も除いた「描画に見える文字」。
+  const RE_STRUCT_HEAD = /^[ \t]*(?:#{1,6}(?=[ \t]|$)|[-*+](?=[ \t]|$)|\d{1,9}[.)](?=[ \t]|$)|>|\|)/;
+  function stripStruct(str) {
+    return str.split('\n').map((l) => { let prev; do { prev = l; l = l.replace(RE_STRUCT_HEAD, ''); } while (l !== prev); return l; }).join('').replace(/\s/g, '');
+  }
+  const normVis = (str) => stripStruct(str).replace(/[`*_~|\\\[\]()!<>#]/g, '');
+  const normTxt = (str) => str.replace(/[\s`*_~|\\\[\]()!<>#]/g, '');
+  // 「描画に 1 文字も現れない」差分セグメントを拾う。構造接頭辞・改行・空白だけのセグメント (箇条書きの骨組み等) は対象外 —
+  // 中身は描画の赤で見えているので、Markdown 差分行を出さない
+  function invisibleSegs(el, segs) {
+    const out = [];
+    let domDel = '', domIns = '';
+    if (el) Array.prototype.forEach.call(el.querySelectorAll('del,ins'), (m) => { const t = normTxt(m.textContent); if (m.tagName === 'DEL') domDel += t; else domIns += t; });
+    segs.forEach((s) => {
+      if (s.eq !== undefined) return;
+      const cd = stripStruct(s.del), ci = stripStruct(s.ins);
+      if (!cd && !ci) return;
+      const vd = normVis(s.del), vi = normVis(s.ins);
+      const okD = !cd || (!!vd && domDel.indexOf(vd) >= 0);
+      const okI = !ci || (!!vi && domIns.indexOf(vi) >= 0);
+      if (!okD || !okI) out.push(s);
+    });
+    return out;
+  }
+  // 拾ったセグメントだけを 1 行ずつ、前後の文脈 (等しい部分の端) つきで出す。ブロックの全行は出さない
+  function rawSegsHtml(segs, show) {
+    if (!show.length) return '';
+    const rows = show.map((h) => {
+      const k = segs.indexOf(h);
+      const pre = k > 0 && segs[k - 1].eq !== undefined ? '<span class="ctx">…' + esc(oneLine(segs[k - 1].eq.slice(-12))) + '</span>' : '';
+      const post = k >= 0 && k + 1 < segs.length && segs[k + 1].eq !== undefined ? '<span class="ctx">' + esc(oneLine(segs[k + 1].eq.slice(0, 12))) + '…</span>' : '';
+      let mid = '';
+      if (h.del) mid += '<del>' + esc(cut(oneLine(h.del), 120)) + '</del>';
+      if (h.ins) mid += '<ins>' + esc(cut(oneLine(h.ins), 120)) + '</ins>';
+      return pre + mid + post;
+    });
+    return '<div class="rawdiff"><span class="rd-lbl">Markdown の差分 (描画には出ない変更):</span>' + rows.join('<br>') + '</div>';
+  }
+  // 描画された del/ins に現れない差分セグメントがある時だけ、そのセグメントを Markdown 差分行で足す
+  function ensureVisibleDiff(el, segs) {
+    const show = invisibleSegs(el, segs);
+    if (show.length) el.insertAdjacentHTML('beforeend', rawSegsHtml(segs, show));
+  }
+  // 差分の描画: 番兵入り Markdown を描画するのが基本。番兵を除いた合成テキストで型が変わってしまう時 (箇条書きの記号 `-`→`1.` 等) は
+  // 構造が崩れるので、直した後を素直に描画し、その下に Markdown 差分行を出す (仕様 4 の「完成形 + 差分の行」)
+  function diffRender(it, opt) {
+    const segs = segsFor(it), marked = markedMd(segs);
+    const tf = parseBlocks(it.final).items.map((b) => b.type).join(','), tm = parseBlocks(clean(marked)).items.map((b) => b.type).join(',');
+    if (tf !== tm) return { html: safeRender(it.final, opt) + rawDiffHtml(marked), raw: true };
+    return { html: safeRender(marked, opt), raw: false };
+  }
+  const oneLine = (t) => t.replace(/\n/g, '⏎');
+  const cut = (t, n) => (t.length > n ? t.slice(0, n) + '…' : t);
+  function blockText(h) {
+    const d = cut(oneLine(h.del.trim() || h.del), 40), i = cut(oneLine(h.ins.trim() || h.ins), 40);
+    if (h.del && h.ins) return '「' + d + '」→「' + i + '」';
+    if (h.del) return '「' + d + '」削除';
+    return '「' + i + '」追加';
+  }
+
+  // ============================================================
+  // 状態
+  // ============================================================
+  const ORIG = parseBlocks(SOURCE);
+  const SOURCE_HASH = hash(SOURCE);
+  const freshItems = () => ORIG.items.map((b, i) => ({ id: 'b' + pad3(i + 1), orig: i, final: b.md, gap: b.gap, deleted: false, memo: '' }));
+  const S = { items: freshItems(), head: ORIG.head, overall: '', nextNew: 1, editing: null, tab: 'edit', finShowDraft: false, outKind: null, copiedAt: null, srcDirty: false, showComments: false, showRed: true };
+  const prevModeMem = {}; // ブロック id → 編集画面のプレビュー種別 ('render' | 'diff') の記憶 (ブロック単位。全体で共有しない)
+  // 統計から外すブロック = HTML コメント (記事には出ない。分母 total_chars と揃える)
+  const isMeta = (it) => (it.orig >= 0 ? origTypeOf(it) : typeOf(it)) === 'comment';
+  const byId = (id) => S.items.find((it) => it.id === id);
+  const draftOf = (it) => (it.orig >= 0 ? ORIG.items[it.orig].md : '');
+  const origTypeOf = (it) => (it.orig >= 0 ? ORIG.items[it.orig].type : null);
+  // ブロック内の型 (空行で複数の塊になっていれば全部、重複なし)。JSON の type は先頭の型 (仕様の enum)、画面のラベルは全部を「段落 + 見出し」のように出す
+  function typesOf(it) {
+    if (it.deleted) return [origTypeOf(it) || 'paragraph'];
+    if (it.final.trim()) { const p = parseBlocks(it.final); if (p.items.length) { const ts = []; p.items.forEach((b) => { if (ts.indexOf(b.type) < 0) ts.push(b.type); }); return ts; } }
+    return [origTypeOf(it) || 'paragraph'];
+  }
+  const typeOf = (it) => typesOf(it)[0];
+  const typeLabelOf = (it) => typesOf(it).map((t) => TYPE_LABEL[t]).join(' + ');
+  const newId = () => 'n' + pad3(S.nextNew++);
+  const segCache = new Map();
+  function segsFor(it) {
+    const d = draftOf(it), f = it.deleted ? '' : it.final;
+    const c = segCache.get(it.id);
+    if (c && c.d === d && c.f === f) return c.segs;
+    const segs = diffWords(d, f);
+    segCache.set(it.id, { d, f, segs });
+    return segs;
+  }
+  const changedOf = (it) => changedChars(segsFor(it));
+  function finalMarkdown() {
+    const body = S.head + S.items.filter((it) => !it.deleted).map((it) => it.final + it.gap).join('');
+    return body.replace(/\s+$/, '') + (ORIG.endsNL ? '\n' : '');
+  }
+  function stats() {
+    let ch = 0, tot = 0, bc = 0;
+    S.items.forEach((it) => {
+      const c = changedOf(it);
+      if (c > 0) bc++;
+      if (isMeta(it)) return; // コメントの変更は赤入れ量に数えない (ブロックのバッジ・JSON の diff には出る)
+      ch += c;
+      if (it.orig >= 0) tot += draftOf(it).length;
+    });
+    return { changed_chars: ch, total_chars: tot, ratio: tot ? Math.min(1, Math.round((ch / tot) * 10000) / 10000) : 0, blocks_changed: bc, blocks_total: S.items.length };
+  }
+
+  // ---------- 保存 (localStorage — reload で消えない。ソースが変われば破棄。「下書きに戻す」で消去) ----------
+  function save() {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify({ h: SOURCE_HASH, items: S.items.map((it) => ({ id: it.id, orig: it.orig, final: it.final, gap: it.gap, deleted: it.deleted, memo: it.memo })), head: S.head, overall: S.overall, nextNew: S.nextNew, tab: S.tab, finShowDraft: S.finShowDraft, showComments: S.showComments, showRed: S.showRed }));
+    } catch (e) { /* private mode 等 */ }
+  }
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return;
+      const o = JSON.parse(raw);
+      if (!o || o.h !== SOURCE_HASH || !Array.isArray(o.items)) return;
+      const items = [];
+      const seen = new Set();
+      o.items.forEach((x) => {
+        if (!x || typeof x.id !== 'string' || typeof x.final !== 'string' || seen.has(x.id)) return;
+        const orig = Number.isInteger(x.orig) && x.orig >= 0 && x.orig < ORIG.items.length ? x.orig : -1;
+        if (orig < 0 && !x.final) return;
+        seen.add(x.id);
+        items.push({ id: x.id, orig, final: x.final, gap: typeof x.gap === 'string' ? x.gap : '\n\n', deleted: !!x.deleted && orig >= 0, memo: typeof x.memo === 'string' ? x.memo : '' });
+      });
+      const origs = new Set(items.filter((it) => it.orig >= 0).map((it) => it.orig));
+      if (origs.size !== ORIG.items.length) return;
+      S.items = items;
+      S.head = typeof o.head === 'string' ? o.head : ORIG.head;
+      S.overall = typeof o.overall === 'string' ? o.overall : '';
+      S.nextNew = Number.isInteger(o.nextNew) ? o.nextNew : 1;
+      if (typeof o.tab === 'string' && ['edit', 'final', 'diff', 'reply', 'src'].indexOf(o.tab) >= 0) S.tab = o.tab;
+      S.finShowDraft = !!o.finShowDraft;
+      S.showComments = !!o.showComments;
+      if (typeof o.showRed === 'boolean') S.showRed = o.showRed;
+    } catch (e) { /* 壊れていれば無視 */ }
+  }
+  function clearStore() { try { localStorage.removeItem(STORE_KEY); } catch (e) { /* noop */ } }
+
+  // ============================================================
+  // [直す] タブ
+  // ============================================================
+  const host = $('blocks');
+  const snippet = (s, n) => { const t = clean(s).replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n) + '…' : t; };
+  const addStrip = (afterId) => '<div class="addstrip"><button type="button" class="addbtn" data-after="' + (afterId || '') + '">＋ ここに段落を足す</button></div>';
+  // 直した所の 1 行要約 ([差分] タブの一覧と同じ生成物)
+  function changeSummary(it) {
+    if (it.deleted) return 'ブロックごと削除';
+    if (it.orig < 0) return 'ブロックを追加';
+    const hs = blocksOf(segsFor(it));
+    return hs.slice(0, 3).map(blockText).join(' / ') + (hs.length > 3 ? ' / …' : '');
+  }
+  function blockHtml(it) {
+    const n = changedOf(it), t = typeOf(it), tl = typeLabelOf(it);
+    const red = n > 0 && S.showRed && t !== 'comment';
+    let inner = '', raw = false, lnok = true;
+    if (red) {
+      if (it.orig < 0) inner = safeRender(I0 + it.final + I1, { comments: true });
+      else { const r = diffRender(it, { comments: true }); inner = r.html; raw = r.raw; lnok = raw || markedMd(segsFor(it)).split('\n').length === it.final.split('\n').length; }
+    } else inner = safeRender(it.final, { comments: true });
+    // コメントは描画に出ない — 直した中身は Markdown 差分行 (そのセグメントだけ) で見せる
+    if (t === 'comment' && n > 0 && S.showRed) inner += rawSegsHtml(segsFor(it), invisibleSegs(null, segsFor(it)));
+    let h = '<section class="blk t-' + t + (n ? ' changed' : '') + (t === 'comment' ? ' comment' : '') + '" data-id="' + it.id + '" tabindex="0" title="クリックで直す (' + it.id + ' · ' + tl + ')"' + (red ? ' data-diff="1"' + (raw ? ' data-raw="1"' : '') + (lnok ? '' : ' data-lnoff="1"') : '') + '>';
+    if (n) h += '<div class="blk-tools"><span>' + it.id + ' · ' + tl + '</span><span class="badge on">直された ' + n + ' 文字</span><span class="sum" title="' + esc(changeSummary(it)) + '">' + esc(changeSummary(it)) + '</span></div>';
+    h += '<span class="pen">✎<span class="lbl"> 直す</span></span>';
+    h += '<div class="md">' + inner + '</div>';
+    if (it.memo.trim()) h += '<div class="memo-line">メモ: ' + esc(it.memo.trim()) + '</div>';
+    return h + '</section>';
+  }
+  // 削除したブロックの節 (直前の見出しから次の見出しまで) に、残っている本文ブロックが無いか
+  const headingLevel = (it) => { const m = RE_HEADING.exec(clean(it.final).split('\n')[0] || ''); return m ? m[1].length : 0; };
+  function sectionNowEmpty(it) {
+    const idx = S.items.indexOf(it);
+    if (idx < 0 || typeOf(it) === 'heading') return false;
+    let hi = -1;
+    for (let k = idx - 1; k >= 0; k--) { const x = S.items[k]; if (!x.deleted && typeOf(x) === 'heading') { hi = k; break; } }
+    if (hi < 0) return false;
+    for (let k = hi + 1; k < S.items.length; k++) {
+      const x = S.items[k];
+      if (x.deleted) continue;
+      const t = typeOf(x);
+      if (t === 'heading') break;
+      if (t !== 'comment') return false;
+    }
+    return true;
+  }
+  function deletedHtml(it) {
+    const n = changedOf(it);
+    const warn = sectionNowEmpty(it) ? '<span class="warn">この節は空になります (見出しも消すなら見出しをクリックして削除)</span>' : '';
+    return '<section class="blk deleted" data-id="' + it.id + '"><div class="del-row"><span class="badge on">削除 · 直された ' + n + ' 文字</span><span>' + it.id + ' · ' + typeLabelOf(it) + '</span><span class="snip">' + esc(snippet(draftOf(it), 80)) + '</span><button type="button" class="mini" data-act="undelete">元に戻す</button>' + warn + '</div></section>';
+  }
+  function buildEditor(it) {
+    const sec = document.createElement('section');
+    sec.className = 'blk editing';
+    sec.dataset.id = it.id;
+    const t = typeOf(it);
+    const isTable = t === 'table';
+    sec.classList.add('t-' + t);
+    const tip = isTable ? '行や列を足す / 消すときは下の「Markdown を直接直す」' : t === 'list' ? '項目: 行頭の - / 1. は残す (1 行 = 1 項目)' : t === 'quote' ? '引用: 行頭の > は残す' : '';
+    const srcHtml = isTable
+      ? '<div class="ed-lbl">表のセル (ここを書き換える)<span class="tip">· ' + esc(tip) + '</span></div><div class="ed-grid" id="edGrid" role="group" aria-label="表のセル"></div><details class="ed-more" id="edMore"><summary>Markdown を直接直す (行・列の追加や削除)</summary><textarea class="ed-ta" id="edTa" spellcheck="false" wrap="off" aria-label="表の Markdown を書き換える"></textarea></details>'
+      : '<div class="ed-lbl">Markdown (ここを書き換える)' + (tip ? '<span class="tip">· ' + esc(tip) + '</span>' : '') + '</div><textarea class="ed-ta" id="edTa" spellcheck="false" aria-label="ブロックの Markdown を書き換える"></textarea>';
+    sec.innerHTML = '<div class="ed-head"><span id="edType">' + it.id + ' · ' + typeLabelOf(it) + (it.orig < 0 ? ' · 追加' : '') + '</span><span class="badge" id="edBadge"></span><span class="sp"></span><span class="hint">Esc = 取消 · ⌘/Ctrl+Enter = 確定</span></div>'
+      + '<div class="ed-pair' + (isTable ? ' stack' : '') + '"><div class="ed-src">' + srcHtml + '<div class="ed-warn" id="edWarn" aria-live="polite"></div></div>'
+      + '<div class="ed-prev"><div class="ed-lbl"><button type="button" class="pv-btn" data-mode="render">プレビュー</button><button type="button" class="pv-btn" data-mode="diff">差分</button><span class="sp"></span><span>入力に追従</span></div><div class="ed-prev-body md" id="edPrev"></div></div></div>'
+      + '<div class="ed-memo"><input type="text" class="memo-in" id="edMemo" placeholder="一言メモ (任意)" aria-label="一言メモ (任意)"></div>'
+      + '<div class="ed-actions"><button type="button" class="btn pri" data-act="commit">確定</button><button type="button" class="btn" data-act="cancel">取消</button><span class="sp"></span><button type="button" class="btn aux" data-act="addbelow">＋ この下に段落を足す</button><button type="button" class="btn aux" data-act="delete">削除</button></div>';
+    const ta = sec.querySelector('#edTa');
+    ta.value = it.final;
+    const memo = sec.querySelector('#edMemo');
+    memo.value = it.memo;
+    if (isTable) { buildGrid(sec, it); const more = sec.querySelector('#edMore'); more.addEventListener('toggle', () => { if (more.open) autosize(ta); }); }
+    ta.addEventListener('input', () => { it.final = ta.value.replace(/\r\n?/g, '\n'); autosize(ta); if (isTable) buildGrid(sec, it); refreshPreview(); afterChange(); });
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+      else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); commitEdit(); }
+    });
+    memo.addEventListener('input', () => { it.memo = memo.value; afterChange(); });
+    memo.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); commitEdit(); } });
+    // 編集画面のどこにフォーカスがあっても (ボタン・畳み・セル) Esc = 取消 / ⌘/Ctrl+Enter = 確定
+    sec.addEventListener('keydown', (e) => {
+      if (e.defaultPrevented) return;
+      if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+      else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); commitEdit(); }
+    });
+    return sec;
+  }
+  function autosize(ta) { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight + 2, Math.round(window.innerHeight * 0.7)) + 'px'; }
+  // 表の 1 行のセル範囲 [s, t) の一覧 (先頭・末尾の | は除く。\| はセル内の文字として扱う)
+  function cellRanges(line) {
+    let i = 0;
+    while (i < line.length && (line[i] === ' ' || line[i] === '\t')) i++;
+    if (line[i] === '|') i++;
+    let end = line.length;
+    while (end > i && (line[end - 1] === ' ' || line[end - 1] === '\t')) end--;
+    if (end > i && line[end - 1] === '|' && line[end - 2] !== '\\') end--;
+    const out = [];
+    let start = i;
+    for (let k = i; k <= end; k++) {
+      if (k === end || (line[k] === '|' && line[k - 1] !== '\\')) {
+        let s2 = start, t2 = k;
+        while (s2 < t2 && line[s2] === ' ') s2++;
+        while (t2 > s2 && line[t2 - 1] === ' ') t2--;
+        out.push([s2, t2]);
+        start = k + 1;
+      }
+    }
+    return out;
+  }
+  const unescCell = (t) => t.replace(/\\\|/g, '|');
+  const escCell = (t) => t.replace(/\|/g, '\\|');
+  // 表の構造の注意 (列数ずれ・区切り行の欠け)。空文字 = 問題なし
+  function tableWarn(md) {
+    const lines = md.split('\n');
+    if (lines.length < 2) return '';
+    if (!RE_TSEP.test(lines[1])) return '2 行目が区切り行 (| --- | --- |) になっていないため、表として描画されません。';
+    const cols = cellRanges(lines[0]).length;
+    const bad = [];
+    for (let r = 2; r < lines.length; r++) { if (!lines[r].trim()) continue; const n = cellRanges(lines[r]).length; if (n !== cols) bad.push((r + 1) + ' 行目 ' + n + ' 列'); }
+    return bad.length ? '列数が揃っていません — ' + bad.join(' / ') + ' (見出しは ' + cols + ' 列)。行頭・行末の | と区切りの | を確かめてください。' : '';
+  }
+  const fitCell = (el) => { el.style.height = 'auto'; el.style.height = (el.scrollHeight + 2) + 'px'; };
+  const fitGrid = (sec) => { Array.prototype.forEach.call(sec.querySelectorAll('.ed-cell'), fitCell); };
+  function buildGrid(sec, it) {
+    const grid = sec.querySelector('#edGrid');
+    if (!grid) return;
+    const lines = it.final.split('\n');
+    if (lines.length < 2 || !RE_TSEP.test(lines[1])) { grid.innerHTML = '<span class="none">表として読めません (2 行目の区切り行を確認)。下の Markdown で直せます。</span>'; return; }
+    const cols = cellRanges(lines[0]).length;
+    let h = '<table><thead><tr><th></th>';
+    for (let c = 0; c < cols; c++) h += '<th>' + (c + 1) + ' 列目</th>';
+    h += '</tr></thead><tbody>';
+    for (let r = 0; r < lines.length; r++) {
+      if (r === 1 || !lines[r].trim()) continue;
+      const rg = cellRanges(lines[r]);
+      h += '<tr><th>' + (r === 0 ? '見出し' : (r + 1) + ' 行目') + '</th>';
+      const n = Math.max(cols, rg.length);
+      for (let c = 0; c < n; c++) {
+        if (c < rg.length) h += '<td><textarea rows="1" class="ed-cell' + (r === 0 ? ' head' : '') + '" data-ln="' + r + '" data-col="' + c + '" aria-label="' + (r + 1) + ' 行 ' + (c + 1) + ' 列" spellcheck="false">' + esc(unescCell(lines[r].slice(rg[c][0], rg[c][1]))) + '</textarea></td>';
+        else h += '<td><span class="none">(セル無し)</span></td>';
+      }
+      h += '</tr>';
+    }
+    grid.innerHTML = h + '</tbody></table>';
+    const fit = fitCell;
+    if (grid.isConnected) fitGrid(sec);
+    grid.oninput = (e) => {
+      const inp = e.target.closest('.ed-cell');
+      if (!inp) return;
+      if (inp.value.indexOf('\n') >= 0) inp.value = inp.value.replace(/\n/g, ' '); // セルは 1 行
+      fit(inp);
+      const ln = +inp.dataset.ln, col = +inp.dataset.col;
+      const ls = it.final.split('\n');
+      if (ln >= ls.length) return;
+      const rg = cellRanges(ls[ln]);
+      if (col >= rg.length) return;
+      const [s0, t0] = rg[col];
+      ls[ln] = ls[ln].slice(0, s0) + escCell(inp.value) + ls[ln].slice(t0);
+      it.final = ls.join('\n');
+      const ta = sec.querySelector('#edTa'); if (ta) { ta.value = it.final; }
+      refreshPreview(); afterChange();
+    };
+    grid.onkeydown = (e) => {
+      if (!e.target.classList.contains('ed-cell')) return;
+      if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+      else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); commitEdit(); }
+      else if (e.key === 'Enter') { // セル内では改行しない: 同じ列の次の行へ
+        e.preventDefault();
+        const cells = Array.prototype.slice.call(grid.querySelectorAll('.ed-cell[data-col="' + e.target.dataset.col + '"]'));
+        const k = cells.indexOf(e.target);
+        if (k >= 0 && k + 1 < cells.length) { cells[k + 1].focus(); cells[k + 1].select(); }
+      }
+    };
+  }
+  // 編集中の構造の注意: 元の型が消えた (見出しの # を消した等) / 表の列数ずれ
+  function structWarn(it) {
+    if (!it.final.trim()) return '';
+    const ot = origTypeOf(it);
+    const ts = typesOf(it);
+    if (ot && ot !== 'paragraph' && ot !== 'comment' && ts.indexOf(ot) < 0) return '元は「' + TYPE_LABEL[ot] + '」でしたが、いまは「' + ts.map((x) => TYPE_LABEL[x]).join(' + ') + '」として描画されます (行頭の記号を確かめてください)。';
+    if (ts[0] === 'table') return tableWarn(it.final);
+    return '';
+  }
+  function refreshPreview() {
+    if (!S.editing) return;
+    const it = byId(S.editing.id);
+    const body = $('edPrev'), badge = $('edBadge');
+    if (!it || !body) return;
+    const mode = S.editing.prevMode || 'render';
+    Array.prototype.forEach.call(document.querySelectorAll('.pv-btn'), (b) => b.classList.toggle('on', b.dataset.mode === mode));
+    if (!it.final.trim()) { body.innerHTML = '<span class="ph">(空 — このまま確定するとブロックは削除されます)</span>'; }
+    else if (mode === 'diff') { const r = diffRender(it, { comments: true }); body.innerHTML = r.html; applyMarks(body); if (!r.raw) ensureVisibleDiff(body, segsFor(it)); }
+    else body.innerHTML = safeRender(it.final, { comments: true });
+    const warn = $('edWarn'); if (warn) warn.textContent = structWarn(it);
+    const n = changedOf(it);
+    if (badge) { badge.className = 'badge' + (n ? ' on' : ''); badge.textContent = n ? '直された ' + n + ' 文字' : '無修正'; }
+    const tl = $('edType');
+    if (tl) tl.textContent = it.id + ' · ' + typeLabelOf(it) + (it.orig < 0 ? ' · 追加' : '');
+  }
+  function renderEditTab() {
+    const parts = [addStrip('')];
+    S.items.forEach((it) => {
+      if (S.editing && S.editing.id === it.id) parts.push('<div id="edSlot"></div>');
+      else if (it.deleted) parts.push(deletedHtml(it));
+      else if (!S.showComments && typeOf(it) === 'comment' && !changedOf(it)) return; // メタ情報は既定で出さない (トグルで表示。直したものは出す)
+      else parts.push(blockHtml(it));
+      parts.push(addStrip(it.id));
+    });
+    host.innerHTML = parts.join('');
+    Array.prototype.forEach.call(host.querySelectorAll('.blk[data-diff="1"]'), (sec) => {
+      const md = sec.querySelector('.md'); const it = byId(sec.dataset.id);
+      if (!md || !it) return;
+      applyMarks(md);
+      if (it.orig >= 0 && !sec.dataset.raw) ensureVisibleDiff(md, segsFor(it));
+    });
+    if (S.editing) {
+      const it = byId(S.editing.id);
+      const slot = $('edSlot');
+      if (it && slot) { const sec = buildEditor(it); slot.replaceWith(sec); autosize($('edTa')); fitGrid(sec); refreshPreview(); }
+      else S.editing = null;
+    }
+  }
+  // クリック位置 → textarea のキャレット位置のヒント (行 / 表セル / 周辺テキスト)
+  function caretHintFromEvent(e, blkEl) {
+    const hint = {};
+    const cell = e.target.closest && e.target.closest('td[data-ln],th[data-ln]');
+    const li = e.target.closest && e.target.closest('li[data-ln]');
+    if (blkEl.dataset.lnoff) { /* 赤乗せ描画で行がずれている: 行番号は当てにしない */ }
+    else if (cell) { hint.ln = +cell.dataset.ln; hint.col = +cell.dataset.col; }
+    else if (li) { hint.ln = +li.dataset.ln; }
+    let node = null, off = 0;
+    try {
+      if (document.caretRangeFromPoint) { const r = document.caretRangeFromPoint(e.clientX, e.clientY); if (r) { node = r.startContainer; off = r.startOffset; } }
+      else if (document.caretPositionFromPoint) { const p = document.caretPositionFromPoint(e.clientX, e.clientY); if (p) { node = p.offsetNode; off = p.offset; } }
+    } catch (err) { node = null; }
+    if (node && node.nodeType === 3 && blkEl.contains(node)) {
+      const t = node.nodeValue; const a = Math.max(0, off - 6);
+      hint.snip = t.slice(a, Math.min(t.length, off + 6)); hint.snipOff = off - a;
+    }
+    return hint;
+  }
+  function cellRange(line, col) {
+    let i = 0;
+    while (i < line.length && (line[i] === ' ' || line[i] === '\t')) i++;
+    if (line[i] === '|') i++;
+    let c = 0;
+    while (i <= line.length) {
+      let e = line.indexOf('|', i); if (e < 0) e = line.length;
+      if (c === col) { let s = i, t = e; while (s < t && line[s] === ' ') s++; while (t > s && line[t - 1] === ' ') t--; return [s, t]; }
+      c++; i = e + 1;
+    }
+    return null;
+  }
+  function caretFromHint(md, hint) {
+    let rs = 0, re = md.length, sel = false;
+    if (hint && hint.ln != null) {
+      const lines = md.split('\n');
+      if (hint.ln < lines.length) {
+        rs = 0; for (let k = 0; k < hint.ln; k++) rs += lines[k].length + 1;
+        re = rs + lines[hint.ln].length;
+        if (hint.col != null) { const cr = cellRange(lines[hint.ln], hint.col); if (cr) { re = rs + cr[1]; rs = rs + cr[0]; sel = true; } }
+      }
+    }
+    if (hint && hint.snip) {
+      const region = md.slice(rs, re);
+      let idx = region.indexOf(hint.snip);
+      let so = hint.snipOff;
+      if (idx < 0 && hint.snip.length > 4) { const s2 = hint.snip.slice(2, -2); idx = region.indexOf(s2); so = hint.snipOff - 2; }
+      if (idx >= 0) { const p = rs + idx + Math.max(0, so); return { start: p, end: p }; }
+    }
+    return { start: rs, end: sel ? re : rs };
+  }
+  function openEdit(id, hint) {
+    if (S.editing) { if (S.editing.id === id) return; commitEdit(true); }
+    const it = byId(id);
+    if (!it || it.deleted) return;
+    // 未修正ブロックは常に「プレビュー」既定。修正済みはブロック単位の記憶 (無ければ「差分」)
+    S.editing = { id, before: it.final, beforeMemo: it.memo, isNew: false, prevMode: changedOf(it) ? (prevModeMem[id] || 'diff') : 'render' };
+    renderEditTab();
+    const sec = host.querySelector('.blk.editing'), ta = $('edTa');
+    if (!ta) return;
+    const cellIn = hint && hint.col != null && sec ? sec.querySelector('.ed-cell[data-ln="' + hint.ln + '"][data-col="' + hint.col + '"]') : null;
+    if (cellIn) { try { cellIn.focus({ preventScroll: true }); cellIn.select(); } catch (e) { cellIn.focus(); } }
+    else if (sec && sec.querySelector('#edGrid')) { const first = sec.querySelector('.ed-cell'); if (first) { try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); } } }
+    else {
+      const pos = caretFromHint(it.final, hint);
+      try { ta.focus({ preventScroll: true }); ta.setSelectionRange(pos.start, pos.end); } catch (e) { ta.focus(); }
+    }
+    if (sec) sec.scrollIntoView({ block: 'nearest' });
+  }
+  function commitEdit(silent) {
+    const ed = S.editing;
+    if (!ed) return;
+    const it = byId(ed.id);
+    S.editing = null;
+    if (it && !it.final.trim()) {
+      if (it.orig >= 0) { it.deleted = true; it.final = draftOf(it); }
+      else S.items = S.items.filter((x) => x.id !== it.id);
+    }
+    afterChange();
+    if (!silent) { renderEditTab(); unfocus(); }
+  }
+  function cancelEdit() {
+    const ed = S.editing;
+    if (!ed) return;
+    const it = byId(ed.id);
+    S.editing = null;
+    if (it) {
+      if (ed.isNew) S.items = S.items.filter((x) => x.id !== it.id);
+      else { it.final = ed.before; it.memo = ed.beforeMemo; }
+    }
+    afterChange();
+    renderEditTab();
+    unfocus();
+  }
+  // 確定/取消の後にブロックへ focus を残さない (編集待ちに見えるため)。枠と ✎ は :hover / :focus-visible のみ
+  function unfocus() { const ae = document.activeElement; if (ae && ae !== document.body && ae.blur) ae.blur(); }
+  function deleteBlock(id) {
+    const it = byId(id);
+    if (!it) return;
+    if (S.editing && S.editing.id === id) S.editing = null;
+    if (it.orig >= 0) { it.deleted = true; it.final = draftOf(it); }
+    else S.items = S.items.filter((x) => x.id !== id);
+    afterChange();
+    renderEditTab();
+  }
+  function undeleteBlock(id) {
+    const it = byId(id);
+    if (!it) return;
+    it.deleted = false;
+    if (!it.final) it.final = draftOf(it);
+    afterChange();
+    renderEditTab();
+    unfocus();
+  }
+  function addBlockAfter(afterId) {
+    if (S.editing) {
+      const k0 = afterId ? S.items.findIndex((x) => x.id === afterId) : -1;
+      const predId = k0 > 0 ? S.items[k0 - 1].id : null;
+      commitEdit(true);
+      if (afterId && !byId(afterId)) afterId = predId || '';
+    }
+    let pos = 0;
+    if (afterId) { const k = S.items.findIndex((x) => x.id === afterId); pos = k >= 0 ? k + 1 : S.items.length; }
+    const it = { id: newId(), orig: -1, final: '', gap: '\n\n', deleted: false, memo: '' };
+    S.items.splice(pos, 0, it);
+    if (pos > 0 && S.items[pos - 1].gap.length < 2) S.items[pos - 1].gap = '\n\n';
+    S.editing = { id: it.id, before: '', beforeMemo: '', isNew: true, prevMode: 'render' };
+    renderEditTab();
+    const sec = host.querySelector('.blk.editing'), ta = $('edTa');
+    if (ta) { ta.focus({ preventScroll: true }); }
+    if (sec) sec.scrollIntoView({ block: 'nearest' });
+  }
+  host.addEventListener('click', (e) => {
+    const act = e.target.closest('[data-act]');
+    if (act) {
+      const sec = act.closest('.blk'); const id = sec ? sec.dataset.id : null;
+      const a = act.dataset.act;
+      if (a === 'commit') commitEdit();
+      else if (a === 'cancel') cancelEdit();
+      else if (a === 'delete') deleteBlock(id);
+      else if (a === 'undelete') undeleteBlock(id);
+      else if (a === 'addbelow') addBlockAfter(id);
+      return;
+    }
+    const add = e.target.closest('.addbtn');
+    if (add) { addBlockAfter(add.dataset.after); return; }
+    const pv = e.target.closest('.pv-btn');
+    if (pv) { if (S.editing) { S.editing.prevMode = pv.dataset.mode; prevModeMem[S.editing.id] = pv.dataset.mode; } refreshPreview(); return; }
+    const blk = e.target.closest('.blk');
+    if (!blk || blk.classList.contains('editing') || blk.classList.contains('deleted')) return;
+    if (e.target.closest('a[href]')) return; // 本文のリンクはそのまま開く (target=_blank)。文言を直すときは周りの文字をクリック
+    openEdit(blk.dataset.id, caretHintFromEvent(e, blk));
+  });
+  host.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || !e.target.classList || !e.target.classList.contains('blk')) return;
+    if (e.target.classList.contains('editing') || e.target.classList.contains('deleted')) return;
+    e.preventDefault();
+    openEdit(e.target.dataset.id);
+  });
+
+  // ============================================================
+  // [差分] [完成形]
+  // ============================================================
+  function renderDiffTab() {
+    const list = [], parts = [];
+    S.items.forEach((it) => {
+      const n = changedOf(it);
+      const t = typeOf(it);
+      if (n) {
+        const segs = segsFor(it);
+        const chg = it.deleted ? 'ブロックごと削除' : it.orig < 0 ? 'ブロックを追加' : blocksOf(segs).slice(0, 4).map((h) => esc(blockText(h))).join('<span class="sepd"> / </span>') + (blocksOf(segs).length > 4 ? '<span class="sepd"> / …</span>' : '');
+        list.push('<li><a href="#dblk-' + it.id + '" data-jump="' + it.id + '"><span class="mono">' + it.id + '</span> ' + typeLabelOf(it) + ' — 直された ' + n + ' 文字</a>' + (t === 'comment' ? ' <span class="muted">(コメント · 描画では非表示)</span>' : '') + ' <span class="chg">' + chg + '</span></li>');
+      }
+      if (t === 'comment') {
+        // コメントは描画に出ない — 直した時だけ、変わったセグメントを Markdown 差分行で出す (一覧からのジャンプ先にもなる)
+        if (n) parts.push('<div class="dblk changed" id="dblk-' + it.id + '"><span class="dtag">' + it.id + ' · ' + typeLabelOf(it) + ' · 直された ' + n + ' 文字' + (it.deleted ? ' · 削除' : it.orig < 0 ? ' · 追加' : '') + ' · 描画では非表示</span>' + rawSegsHtml(segsFor(it), invisibleSegs(null, segsFor(it))) + '</div>');
+        return;
+      }
+      if (!n) { parts.push('<div class="dblk" id="dblk-' + it.id + '">' + safeRender(it.final) + '</div>'); return; }
+      let html, raw = false;
+      if (it.deleted) html = safeRender(D0 + draftOf(it) + D1);
+      else if (it.orig < 0) html = safeRender(I0 + it.final + I1);
+      else { const r = diffRender(it, {}); html = r.html; raw = r.raw; }
+      parts.push('<div class="dblk changed" id="dblk-' + it.id + '"' + (raw ? ' data-raw="1"' : '') + '><span class="dtag">' + it.id + ' · ' + typeLabelOf(it) + ' · 直された ' + n + ' 文字' + (it.deleted ? ' · 削除' : it.orig < 0 ? ' · 追加' : '') + '</span>' + html + '</div>');
+    });
+    $('diffList').innerHTML = list.length ? '<ol>' + list.join('') + '</ol>' : '<span class="muted">まだ直した所はありません。</span>';
+    const art = $('diffArticle');
+    art.innerHTML = parts.join('');
+    applyMarks(art);
+    // 描画に赤が乗らない変更 (見出しレベル・箇条書き記号・URL など) は Markdown 差分行で見せる
+    Array.prototype.forEach.call(art.querySelectorAll('.dblk.changed'), (el) => {
+      const it = byId(el.id.slice(5));
+      if (!it || it.deleted || it.orig < 0 || el.dataset.raw || typeOf(it) === 'comment') return;
+      ensureVisibleDiff(el, segsFor(it));
+    });
+  }
+  $('diffList').addEventListener('click', (e) => {
+    const a = e.target.closest('a[data-jump]');
+    if (!a) return;
+    e.preventDefault();
+    const el = $('dblk-' + a.dataset.jump);
+    if (el) { el.scrollIntoView({ block: 'start' }); }
+  });
+  function renderFinalTab() {
+    const st = stats();
+    $('finArticle').innerHTML = safeRender(S.finShowDraft ? SOURCE : finalMarkdown());
+    $('finAfter').setAttribute('aria-pressed', S.finShowDraft ? 'false' : 'true');
+    $('finBefore').setAttribute('aria-pressed', S.finShowDraft ? 'true' : 'false');
+    $('finLabel').textContent = S.finShowDraft ? '元の下書き — 直す前 (赤入れ前の状態)' : '直した後の記事 (通読用)';
+    $('finKicker').textContent = S.finShowDraft ? '元の下書き — 直す前 · ' + TITLE : '直した後 — 直したブロック ' + st.blocks_changed + ' · 赤入れ量 ' + (st.ratio * 100).toFixed(2) + '%';
+  }
+  $('finAfter').addEventListener('click', () => { if (!S.finShowDraft) return; S.finShowDraft = false; renderFinalTab(); save(); });
+  $('finBefore').addEventListener('click', () => { if (S.finShowDraft) return; S.finShowDraft = true; renderFinalTab(); save(); });
+
+  // ============================================================
+  // [ソース全体] — 記事全文を 1 つの textarea で直し、反映時にブロック分割を再同期
+  // ============================================================
+  function bigrams(s) {
+    const m = new Map();
+    const t = s.length > 4000 ? s.slice(0, 4000) : s;
+    for (let i = 0; i + 1 < t.length; i++) { const g = t.slice(i, i + 2); m.set(g, (m.get(g) || 0) + 1); }
+    return m;
+  }
+  const bgCache = new Map();
+  const bg = (s) => { let m = bgCache.get(s); if (!m) { m = bigrams(s); bgCache.set(s, m); } return m; };
+  function sim(a, b) {
+    if (a === b) return 1;
+    const A = bg(a), B = bg(b);
+    let inter = 0, na = 0, nb = 0;
+    A.forEach((v, k) => { na += v; if (B.has(k)) inter += Math.min(v, B.get(k)); });
+    B.forEach((v) => { nb += v; });
+    return na + nb ? (2 * inter) / (na + nb) : 0;
+  }
+  function lcsPairs(A, B, eq) {
+    const n = A.length, m = B.length;
+    const dp = [];
+    for (let i = 0; i <= n; i++) dp.push(new Uint16Array(m + 1));
+    for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) dp[i][j] = eq(A[i], B[j]) ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    const pairs = [];
+    let i = 0, j = 0;
+    while (i < n && j < m) { if (eq(A[i], B[j])) { pairs.push([i, j]); i++; j++; } else if (dp[i + 1][j] >= dp[i][j + 1]) i++; else j++; }
+    return pairs;
+  }
+  function realign(P) {
+    const N = P.items;
+    const vis = S.items.filter((it) => !it.deleted);
+    const A = vis.map((it) => it.final), B = N.map((b) => b.md);
+    const exact = lcsPairs(A, B, (a, b) => a === b);
+    const result = [];
+    let pi = 0, pj = 0;
+    exact.concat([[A.length, B.length]]).forEach(([ai, aj]) => {
+      const ra = [], rb = [];
+      for (let x = pi; x < ai; x++) ra.push(x);
+      for (let y = pj; y < aj; y++) rb.push(y);
+      if (ra.length && rb.length) {
+        const sub = lcsPairs(ra.map((x) => A[x]), rb.map((y) => B[y]), (a, b) => sim(a, b) >= 0.5);
+        let x = 0, y = 0;
+        sub.concat([[ra.length, rb.length]]).forEach(([si, sj]) => {
+          while (x < si) result.push([ra[x++], -1]);
+          while (y < sj) result.push([-1, rb[y++]]);
+          if (si < ra.length) { result.push([ra[si], rb[sj]]); x = si + 1; y = sj + 1; }
+        });
+      } else { ra.forEach((x) => result.push([x, -1])); rb.forEach((y) => result.push([-1, y])); }
+      if (ai < A.length) result.push([ai, aj]);
+      pi = ai + 1; pj = aj + 1;
+    });
+    const counts = { changed: 0, added: 0, deleted: 0 };
+    const newItems = [];
+    result.forEach(([i, j]) => {
+      if (i >= 0 && j >= 0) { const it = vis[i]; if (it.final !== B[j]) counts.changed++; it.final = B[j]; it.gap = N[j].gap; newItems.push(it); }
+      else if (i >= 0) { const it = vis[i]; counts.deleted++; if (it.orig >= 0) { it.deleted = true; it.final = draftOf(it); newItems.push(it); } }
+      else { newItems.push({ id: newId(), orig: -1, final: B[j], gap: N[j].gap, deleted: false, memo: '' }); counts.added++; }
+    });
+    S.items.forEach((it, idx) => {
+      if (!it.deleted || newItems.indexOf(it) >= 0) return;
+      let predId = null;
+      for (let k = idx - 1; k >= 0; k--) { if (!S.items[k].deleted) { predId = S.items[k].id; break; } }
+      let at = 0;
+      if (predId) { const p = newItems.findIndex((x) => x.id === predId); at = p >= 0 ? p + 1 : 0; }
+      newItems.splice(at, 0, it);
+    });
+    S.items = newItems;
+    S.head = P.head;
+    return counts;
+  }
+  function refreshSrc(force) {
+    if (S.srcDirty && !force) return;
+    $('srcAll').value = finalMarkdown();
+    S.srcDirty = false;
+  }
+  function applySource() {
+    if (S.editing) commitEdit(true);
+    const text = $('srcAll').value.replace(/\r\n?/g, '\n');
+    const r = realign(parseBlocks(text));
+    S.srcDirty = false;
+    afterChange();
+    renderEditTab();
+    $('srcAll').value = finalMarkdown();
+    const el = $('srcStatus');
+    el.textContent = '反映しました — 変更 ' + r.changed + ' / 追加 ' + r.added + ' / 削除 ' + r.deleted + ' ブロック (差分はブロック単位で取り直し。[直す] [差分] タブで確認できます)';
+    el.className = 'status ok';
+  }
+  $('srcAll').addEventListener('input', () => { S.srcDirty = true; const el = $('srcStatus'); el.textContent = '未反映の変更があります — 「反映」を押すとブロック分割を再同期します'; el.className = 'status stale'; });
+  $('srcAll').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); applySource(); } });
+  $('srcApply').addEventListener('click', applySource);
+  $('srcRevert').addEventListener('click', () => { refreshSrc(true); const el = $('srcStatus'); el.textContent = '現在の状態に戻しました'; el.className = 'status'; });
+
+  // ============================================================
+  // [回答] — 【レビュー回答】固定形 (references/reply-format.md) を組み立てる
+  // ============================================================
+  const quote = (t) => '「' + cut(oneLine(t.trim() || t), 80) + '」';
+  // 段落ごとの語単位差分行。番号 = 元の記事のブロック番号 (画面の b001 = 段落 1)。追加は完成形での位置
+  function diffLines() {
+    const lines = [];
+    const finalPos = new Map();
+    S.items.filter((it) => !it.deleted).forEach((it, k) => finalPos.set(it.id, k + 1));
+    S.items.forEach((it) => {
+      const n = changedOf(it);
+      if (!n) return;
+      let line;
+      if (it.deleted) line = '- 段落 ' + (it.orig + 1) + ': (削除)';
+      else if (it.orig < 0) line = '- 段落 ' + finalPos.get(it.id) + ': (追加) ' + quote(it.final);
+      else {
+        // 純粋な挿入 / 削除は、直前の等しい語を数文字添えて「工夫を」→「工夫を三つ」の形にする (「」→「三つ」では場所が分からない)
+        const all = segsFor(it);
+        const segs = blocksOf(all).map((h) => {
+          let d = h.del, i = h.ins;
+          if (!d || !i) { const k = all.indexOf(h); const ctx = k > 0 && all[k - 1].eq !== undefined ? all[k - 1].eq.slice(-6) : ''; d = ctx + d; i = ctx + i; }
+          return quote(d) + '→' + quote(i);
+        });
+        line = '- 段落 ' + (it.orig + 1) + ': ' + segs.join(' / ');
+      }
+      if (it.memo.trim()) line += ' (メモ: ' + oneLine(it.memo.trim()) + ')';
+      lines.push(line);
+    });
+    return lines;
+  }
+  function replyText() {
+    const parts = ['【レビュー回答】' + LABEL];
+    const memo = S.overall.trim();
+    if (memo) parts.push('全体へのコメント: ' + memo);
+    parts.push('## 添削');
+    const dl = diffLines();
+    parts.push(dl.length ? dl.join('\n') : '- 変更なし');
+    const md = finalMarkdown().replace(/\s+$/, '');
+    const fence = md.indexOf('```') >= 0 ? '````' : '```';
+    parts.push(fence + 'markdown\n' + md + '\n' + fence);
+    parts.push('---');
+    parts.push(CLOSING);
+    return parts.join('\n') + '\n';
+  }
+  function renderOut() {
+    if (!S.outKind) return;
+    $('out').hidden = false;
+    $('outKind').textContent = '貼り付ける文章';
+    $('outText').value = replyText();
+  }
+  function setStatus(msg, cls) {
+    const el = $('status');
+    el.textContent = msg;
+    el.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  async function copyText(text) {
+    let done = false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext !== false) { await navigator.clipboard.writeText(text); done = true; }
+    } catch (e) { done = false; }
+    if (!done) {
+      try {
+        const ta = $('outText');
+        ta.focus(); ta.select(); ta.setSelectionRange(0, ta.value.length);
+        done = document.execCommand('copy');
+      } catch (e) { done = false; }
+    }
+    return done;
+  }
+  async function generateReply() {
+    if (S.editing) commitEdit(true);
+    if (S.tab !== 'reply') setTab('reply');
+    S.outKind = 'reply';
+    renderOut();
+    const text = $('outText').value;
+    const st = stats();
+    const done = await copyText(text);
+    S.copiedAt = Date.now();
+    const head = '貼り付ける文章を作りました (直したブロック ' + st.blocks_changed + ' · ' + text.length + ' 文字)';
+    if (done) setStatus(head + ' — クリップボードにコピー済み。Claude Code のターミナルに貼って Enter してください', 'ok');
+    else setStatus(head + ' — 自動コピーできませんでした。下の欄を「全選択」してコピーし、ターミナルに貼ってください', 'warn');
+  }
+  function genLabel() {
+    return '貼り付ける文章を作る';
+  }
+  function selectOut() {
+    const ta = $('outText');
+    ta.focus(); ta.select();
+    try { ta.setSelectionRange(0, ta.value.length); } catch (e) { /* noop */ }
+  }
+  // 保険: 完成形 Markdown をファイルとして保存 (貼り付けが長すぎる・クリップボードが使えない時)
+  function downloadName() {
+    const base = (SOURCE_PATH.split(/[\\/]/).pop() || 'article.md').replace(/\.(md|markdown|txt)$/i, '');
+    return (base || 'article') + '-tensaku.md';
+  }
+  function downloadMd() {
+    if (S.editing) commitEdit(true);
+    const name = downloadName();
+    const blob = new Blob([finalMarkdown()], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setStatus('完成形をダウンロードしました: ' + name + ' — 貼り付ける文章と一緒に、このファイルの置き場所を agent に伝えてください', 'ok');
+  }
+  // 全体へのコメントは 2 か所 (直すタブの末尾 #overall2 と回答パネル #overall) — 同じ値を持つ
+  const syncOverall = (v) => { S.overall = v; ['overall', 'overall2'].forEach((id) => { const el = $(id); if (el && el.value !== v) el.value = v; }); };
+  $('overall').addEventListener('input', (e) => { syncOverall(e.target.value); afterChange(); });
+  $('overall2').addEventListener('input', (e) => { syncOverall(e.target.value); afterChange(); });
+  $('genBtn').addEventListener('click', generateReply);
+  $('genBtn2').addEventListener('click', generateReply);
+  $('dlMd').addEventListener('click', downloadMd);
+  $('selAll').addEventListener('click', selectOut);
+
+  // ============================================================
+  // 共通: 集計・タブ・保存・下書きに戻す
+  // ============================================================
+  function renderStats() {
+    const s = stats();
+    const el = $('tbStat');
+    el.classList.toggle('zero', s.changed_chars === 0);
+    const pct = (s.ratio * 100).toFixed(2) + '%';
+    el.innerHTML = '赤入れ量 <b>' + pct + '</b> <span class="lg">(直された ' + s.changed_chars + ' / 全 ' + s.total_chars + ' 文字)</span><span class="sm">(' + s.changed_chars + ' / ' + s.total_chars + ' 字)</span>';
+    el.title = '直された文字数 ÷ 記事の全文字数 (100% で頭打ち)。非表示の HTML コメントは分子・分母とも数えない (コメントの変更はブロックのバッジと差分行には出る)。直したブロック ' + s.blocks_changed + ' / ' + s.blocks_total;
+  }
+  function afterChange() {
+    renderStats();
+    save();
+    if (S.tab === 'diff') renderDiffTab();
+    if (S.tab === 'final') renderFinalTab();
+    if (S.outKind) {
+      renderOut();
+      if (S.copiedAt) { setStatus('コピー後に内容が変わりました — もう一度「' + genLabel() + '」を押してください', 'stale'); S.copiedAt = null; }
+    }
+  }
+  function setTab(name) {
+    if (S.editing) commitEdit(true);
+    S.tab = name;
+    document.body.dataset.tab = name;
+    Array.prototype.forEach.call(document.querySelectorAll('.tab'), (b) => b.setAttribute('aria-selected', b.dataset.tab === name ? 'true' : 'false'));
+    $('genBtn').setAttribute('aria-pressed', name === 'reply' ? 'true' : 'false');
+    ['edit', 'final', 'diff', 'reply', 'src'].forEach((k) => { $('tab-' + k).hidden = k !== name; });
+    if (name === 'edit') renderEditTab();
+    if (name === 'diff') renderDiffTab();
+    if (name === 'final') renderFinalTab();
+    if (name === 'reply') renderOut();
+    if (name === 'src') refreshSrc(false);
+    save();
+    window.scrollTo(0, 0);
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'), (b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
+  function resetAll() {
+    if (!confirmReset()) return;
+    S.items = freshItems();
+    S.head = ORIG.head;
+    S.overall = ''; S.nextNew = 1; S.editing = null; S.finShowDraft = false; S.srcDirty = false;
+    S.outKind = null; S.copiedAt = null;
+    segCache.clear();
+    clearStore();
+    syncOverall('');
+    $('out').hidden = true; $('outText').value = '';
+    setStatus('下書きに戻しました', '');
+    $('srcStatus').textContent = ''; $('srcStatus').className = 'status';
+    renderStats();
+    setTab(S.tab);
+    if (S.tab === 'src') refreshSrc(true);
+    if (S.tab !== 'edit') renderEditTab();
+  }
+  function confirmReset() {
+    return window.confirm('下書きの状態に戻します。書き換え・追加・削除・メモは全部消えます。よろしいですか？');
+  }
+  $('resetDraft').addEventListener('click', resetAll);
+  function layout() {
+    const h = $('toolbar').offsetHeight;
+    document.documentElement.style.setProperty('--tb-h', h + 'px');
+  }
+  window.addEventListener('resize', layout);
+  if (window.ResizeObserver) { try { new ResizeObserver(() => layout()).observe($('toolbar')); } catch (e) { /* noop */ } }
+
+  // ---------- 起動 ----------
+  load();
+  const st0 = stats();
+  const nComments = ORIG.items.filter((b) => b.type === 'comment').length;
+  $('editCnt').textContent = '全 ' + st0.total_chars + ' 文字 · ' + ORIG.items.length + ' ブロック';
+  $('cmtN').textContent = String(nComments);
+  $('showCmt').checked = S.showComments;
+  $('showCmt').addEventListener('change', (e) => { S.showComments = !!e.target.checked; save(); renderEditTab(); });
+  $('showRed').checked = S.showRed;
+  $('showRed').addEventListener('change', (e) => { S.showRed = !!e.target.checked; save(); renderEditTab(); });
+  $('footSrc').textContent = '出所: ' + SOURCE_PATH + ' — ' + TITLE + ' (agent 生成) · 全 ' + st0.total_chars + ' 文字 · ' + ORIG.items.length + ' ブロック (うち HTML コメント ' + nComments + ' — 記事には出ない・出力では保持)。ラベル: ' + LABEL + '。';
+  syncOverall(S.overall);
+  layout();
+  renderStats();
+  renderEditTab();
+  setTab(S.tab);
+  if (S.tab !== 'edit') renderEditTab();
+  setTimeout(layout, 300);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout, () => {});
+  // 検証用フック (テストからの機械確認のみ。UI からは使わない)
+  window.__tensaku = { reconstruct: () => reconstruct(ORIG), source: () => SOURCE, finalMarkdown, replyText, diffLines, parseBlocks, renderMd, blocks: () => ORIG.items.map((b) => b.type) };
+})();
+</script>
+</body>
+</html>

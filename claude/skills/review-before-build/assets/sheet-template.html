@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- review-sheet-format: v3 -->
+<!--
+  review sheet template (標準モード) — シートの規約 v3 のシート + 回答フォーム、HTML 1 枚で自己完結。
+  使い方: ./review/<topic>-01.html としてコピーし、TODO を埋める。
+  - 上半分 (#akSheet) = シート。骨格は固定: 結論 → 全体図 SVG (赤①②③) → 短い説明 (現物スクショ/モック) → 対比表 → 問いカード → 畳み付録
+  - 下半分 (#akForm) = 回答フォーム。問いカード (.qcard、判断材料) と回答ブロック (.q、答える場所) は別部品
+  - .q の radio name は q1, q2, … で script の QUESTIONS と同期する (ズレた問いは無言で「お任せ」扱いになる)
+  - DRAFT_KEY / DOC はシートごとに一意な固定文字列 (crypto.randomUUID は使わない — file:// 以外で undefined)
+  - 相対 URL 禁止 (画像は https 絶対 URL か data URI)。外部 JS ライブラリ禁止。Google Fonts は絶対 URL なので合法
+  - 色は 7 トークンのみ。赤 = 提案・訂正・論点の専任 / 青 = 導線 (リンク・ボタン・summary) の専任 / 残りは無彩色
+  - 回答は [貼り付ける文章を作る] → クリップボード + textarea。人が Claude Code のターミナルに貼る (形は references/reply-format.md)
+  - 回答フォームの選択肢にも絵 (.thumb) を付ける。人はシートを読んでからフォームで答える — フォームで絵が消えると想像で補わせることになる
+-->
+<title><!-- TODO: タイトル (主張) --> — レビュー</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#212529;--muted:#64707C;--line:#DEE2E6;--paper:#FFFFFF;--paper-dim:#F6F8FA;--accent:#2563EB;--red:#DC2626}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans JP','Hiragino Kaku Gothic ProN','Hiragino Sans',-apple-system,sans-serif;font-size:14.5px;line-height:1.9;margin:0;border-top:3px solid var(--red);padding:0 16px 40px}
+main{max-width:760px;margin:0 auto}
+.kicker{font-family:'IBM Plex Mono',Menlo,monospace;font-size:12.5px;letter-spacing:.08em;color:var(--red);font-weight:600}
+h1{font-size:25px;line-height:1.45;margin:8px 0 12px}
+h2{font-size:19px;line-height:1.45;margin:30px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+h3{font-size:15px;line-height:1.5;margin:0 0 8px}
+p{margin:8px 0}
+a{color:var(--accent)}
+.concl{border:1px solid var(--line);border-left:3px solid var(--red);border-radius:10px;padding:14px 18px}
+.red{color:var(--red)}
+.m{color:var(--muted);font-size:12.5px;line-height:1.7}
+.mono{font-family:'IBM Plex Mono',Menlo,monospace;font-size:13.5px}
+.gl{font-size:12.5px;color:var(--muted);line-height:1.75;border-left:2px solid var(--line);padding-left:10px;margin:8px 0}
+.btn{display:inline-block;border:1px solid var(--accent);color:var(--accent);background:var(--paper);border-radius:8px;padding:4px 14px;font-size:13px;text-decoration:none;cursor:pointer;font-family:inherit;line-height:1.7}
+.btn:hover{background:var(--paper-dim)}
+figure{margin:14px 0 6px}
+figcaption{font-size:12.5px;color:var(--muted);line-height:1.6;padding-top:4px}
+svg{max-width:100%;height:auto;display:block}
+table{border-collapse:collapse;width:100%;font-size:13.5px;line-height:1.6;margin:8px 0}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{font-size:11.5px;letter-spacing:.06em;color:var(--muted);font-weight:500;white-space:nowrap;border-bottom:1.5px solid var(--ink)}
+td.n{font-family:'IBM Plex Mono',Menlo,monospace;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+details{border:1px solid var(--line);border-radius:10px;padding:10px 16px;margin:10px 0}
+summary{cursor:pointer;color:var(--accent);font-weight:500;font-size:13.5px}
+/* 問いカード (自己完結 — シート側の判断材料。答える場所は下の .q) */
+.qcard{border:1px solid var(--line);border-left:3px solid var(--red);border-radius:10px;padding:12px 16px;margin:12px 0}
+.qcard .qt{font-weight:700;margin:0 0 6px}
+.qcard ul{margin:4px 0;padding-left:1.3em}.qcard li{margin:4px 0}
+.rec{font-family:'IBM Plex Mono',Menlo,monospace;font-size:11px;color:var(--red);border:1px solid var(--red);border-radius:4px;padding:0 5px;margin-left:4px;white-space:nowrap}
+/* overlay 注記 (赤を画像の上に乗せる部品 — 座標は画像に対する %) */
+.shotwrap{position:relative;line-height:0;margin:8px 0 4px}
+.shotwrap img{width:100%;border:1px solid var(--line);border-radius:8px;display:block}
+.shotwrap .mark{position:absolute;transform:translate(-50%,-50%);width:26px;height:26px;border:2.5px solid var(--red);border-radius:50%;background:rgba(255,255,255,.78);color:var(--red);font:600 13px/21px 'IBM Plex Mono',Menlo,monospace;text-align:center}
+.shotwrap .lbl{position:absolute;transform:translateX(-50%);background:var(--red);color:#fff;font:700 11px/1.5 sans-serif;padding:2px 8px;border-radius:4px;white-space:nowrap}
+/* A/B 対比 (choice の対立軸を並べる部品) */
+.ab{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ab figure{margin:0}.ab figcaption{font-size:12.5px;color:var(--muted);line-height:1.6;padding-top:4px}
+@media (max-width:640px){.ab{grid-template-columns:1fr}}
+del{color:var(--muted)}
+footer{margin-top:28px;border-top:1px solid var(--line);padding-top:10px}
+
+
+/* ---- シート ---- */
+#akSheet{position:relative;padding-top:8px}
+
+/* ---- 回答フォーム ---- */
+#akForm{margin-top:36px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:12px 0;background:var(--paper)}
+.q label{display:block;border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin:6px 0;cursor:pointer;line-height:1.7}
+.q label:has(input:checked){border-color:var(--red);background:rgba(220,38,38,.06)}
+.q input[type=radio]{margin:0 8px 0 0;accent-color:#DC2626;vertical-align:-1px}
+.q .opt-d{color:var(--muted);font-size:12.5px;margin:2px 0 0 22px;line-height:1.6}
+/* 選択肢の絵 (.thumb) — 見た目が違う選択肢には、シート本文の .ab / SVG と同じ絵をここにも置く。無彩色枝、選択中はラベルと同じ淡赤 */
+.q label .thumb{display:flex;flex-direction:column;justify-content:center;min-height:120px;margin:8px 0 2px 22px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--paper-dim)}
+.q label .thumb svg{width:100%;height:150px;max-width:100%}
+.q label .thumb img{display:block;max-width:100%;max-height:160px;margin:0 auto}
+.q label .thumb figcaption{font-size:12px;color:var(--muted);line-height:1.5;padding-top:4px}
+.q label:has(input:checked) .thumb{border-color:var(--red);background:rgba(220,38,38,.04)}
+textarea{width:100%;min-height:54px;margin-top:8px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);font-family:inherit;font-size:13.5px;line-height:1.7;resize:vertical}
+textarea:focus{outline:none;border-color:var(--red)}
+.redpen textarea{min-height:110px}
+.clearsel{display:inline-block;margin-top:8px;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline}
+.sendbar{position:sticky;bottom:0;background:linear-gradient(rgba(255,255,255,0),var(--paper) 30%);padding:20px 0 12px;text-align:center}
+#genBtn{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:11px 32px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit}
+#genBtn:hover{filter:brightness(.95)}
+.status{margin-top:8px;font-size:12.5px;color:var(--muted);min-height:18px}
+.status.ok{color:var(--ink)}.status.err{color:var(--muted)}
+#out{display:none;font-family:'IBM Plex Mono',Menlo,monospace;font-size:12.5px;min-height:170px;margin-top:10px;text-align:left}
+@media print{.akbar,#akForm{display:none}summary{color:var(--ink)}details{border:none;padding:0}details[open] summary{display:none}}
+</style></head>
+<body><main>
+
+
+<!-- ================= シート (提案領域) ================= -->
+<section id="akSheet">
+
+<div class="kicker">✎ REVIEW — <!-- TODO: YYYY-MM-DD --></div>
+<h1><!-- TODO: タイトル — 内容の要約でなく主張 (言い切り) --></h1>
+<div class="concl"><b>結論:</b> <!-- TODO: 3 文以内、1 文も短く。何をどこに、なぜ。ここで読むのをやめても判断に要る情報が揃う形 --></div>
+<div class="gl"><b>このシートで使う言葉</b>: <!-- TODO: 読者が知らない語だけ 1 行ずつ定義。無ければこの div ごと削除 --></div>
+
+<!-- TODO (任意): 動く論点 (操作感・頻度) があるときだけ。モックを ./review/mock/ に置き、絶対パスの file:// URL で。無ければ削除 -->
+<!-- <p><a class="btn" href="file:///ABS/PATH/review/mock/index.html" target="_blank">▶ モックを触って確認</a></p> -->
+
+<!-- 全体図: 問い 3 つ以上または h2 節 3 つ以上なら必須。インライン SVG で題材の全体像を描き、問いが刺さる場所に赤の ①②③ を打つ -->
+<figure>
+<!-- TODO: インライン SVG (viewBox 720 幅推奨)。図の中の 1 行目は主張型タイトル。赤 #DC2626 は提案・論点だけに使い、現状は無彩色 -->
+<svg viewBox="0 0 720 200" role="img" aria-label="TODO: 全体図の説明">
+  <style>
+    .bt{font:600 12px 'IBM Plex Sans JP',sans-serif;fill:#212529}
+    .bl{font:400 11px 'IBM Plex Sans JP',sans-serif;fill:#64707C}
+    .rd{font:600 11px 'IBM Plex Sans JP',sans-serif;fill:#DC2626}
+    .num{font:600 12px 'IBM Plex Mono',monospace;fill:#DC2626}
+    .box{fill:#F6F8FA;stroke:#DEE2E6;stroke-width:1}
+    .boxr{fill:#FFF5F5;stroke:#DC2626;stroke-width:1.4}
+  </style>
+  <text x="20" y="20" class="bt">TODO: 図の主張 (1 行目)</text>
+  <rect x="20" y="40" width="200" height="60" rx="6" class="box"/><text x="32" y="74" class="bl">現状の部品</text>
+  <rect x="260" y="40" width="200" height="60" rx="6" class="boxr"/><text x="272" y="74" class="rd">提案で変わる部品</text>
+  <circle cx="446" cy="52" r="11" fill="none" stroke="#DC2626" stroke-width="2"/><text x="442" y="56" class="num">1</text>
+</svg>
+<figcaption>図 1 — 何を見るか: <!-- TODO: 赤の ①②③ が問 1〜3 の刺さる場所 --></figcaption>
+</figure>
+
+<h2><!-- TODO: 短い説明の見出し (主張型) --></h2>
+<p><!-- TODO: 1 段落 1 トピック・2〜4 文。提案する変更・論点は <span class="red">赤の注記</span> で示し、詳細は畳みへ --></p>
+
+<!-- 現物スクショ / モック: 既存画面に加えるなら必ず現物再現。①②③ は画像の上に赤 overlay で乗せる (座標は画像に対する %)。
+     画像は https 絶対 URL か data URI (相対 URL 禁止)。ゼロからの構想なら .shotwrap ごと削除して図解だけでよい -->
+<div class="shotwrap">
+  <img src="data:image/png;base64,TODO" alt="TODO: 現行画面のスクショ">
+  <span class="mark" style="left:20%;top:30%">1</span>
+  <span class="lbl" style="left:20%;top:36%">TODO: ① の変更</span>
+  <span class="mark" style="left:60%;top:50%">2</span>
+  <span class="lbl" style="left:60%;top:56%">TODO: ② の変更</span>
+</div>
+<p class="m">図 2 — <!-- TODO: 何を見るか --></p>
+
+<!-- 案の対比: 2 案以上 × 2 観点以上は表 1 枚を標準にする。行 = 案、列 = 観点、セル 1〜2 文 -->
+<table>
+<tr><th>案</th><th><!-- TODO: 観点 1 --></th><th><!-- TODO: 観点 2 --></th></tr>
+<tr><td>A. <!-- TODO: 案 --></td><td><!-- TODO: 1〜2 文 --></td><td><!-- TODO --></td></tr>
+<tr><td>B. <!-- TODO: 案 --></td><td><!-- TODO --></td><td><!-- TODO --></td></tr>
+</table>
+
+<h2>決めてほしいこと (<!-- TODO: N --> 問 — 未回答は推奨で進める)</h2>
+
+<!-- 問いカード = 判断材料 (自己完結: 問い 1 行 + 各選択肢の利点/代償 1 行ずつ + 判断に要る数値の再掲 + 推奨)。
+     非推奨の選択肢にも「選ぶ理由 (利点)」を 1 行。答える場所は下の #akForm の .q (番号を揃える) -->
+<div class="qcard"><p class="qt">問 1. <!-- TODO: 問い --></p><ul>
+<li><b>A. <!-- TODO: 案 --></b><span class="rec">推奨</span> — 利点: <!-- TODO: 1 行 -->。代償: <!-- TODO: 1 行 -->。</li>
+<li>B. <!-- TODO: 案 --> — 利点: <!-- TODO: 1 行 -->。代償: <!-- TODO: 1 行 -->。</li>
+</ul>
+<p class="m">根拠: <!-- TODO: file:line か実行結果の引用 (事実を人に聞かない) --></p>
+</div>
+
+<!-- TODO: 問 2, 問 3 … (3±1 問。5 問以上並べない) -->
+
+<!-- 畳み付録: 比較の詳細・落とした案・実測ログ。summary は中身と分量を予告する文言 (「詳細」「その他」は禁止)。核心の判断材料は畳まない -->
+<details><summary><!-- TODO: 例「検討して落とした 4 案と採点表 (表 1 枚)」 --></summary>
+<p class="m"><!-- TODO --></p>
+</details>
+
+<!-- TODO (2 枚目以降のみ): 前のシートで撤回した案を <del>取り消し線</del> で残す -->
+
+<footer class="m"><!-- TODO: このシートの出所 (何を見て書いたか) -->。回答は下のフォームから。未回答の問は推奨案で確定する。</footer>
+
+</section>
+<!-- ================= シートここまで ================= -->
+
+<!-- ================= 回答フォーム ================= -->
+<section id="akForm">
+<h2>回答 (未回答 = お任せ = 推奨案で確定)</h2>
+<p class="m">上の問いカードを見て選ぶ。迷う問いは未選択のままでよい。書き終えたら一番下の [貼り付ける文章を作る] を押し、出たテキストを Claude Code のターミナルに貼って Enter。</p>
+
+<!-- TODO: .q ブロックを問いカードと同じ数だけ。name は q1, q2, … で script の QUESTIONS と同期 -->
+<!-- TODO: 選択肢の絵 (.thumb) — 見た目が違う選択肢には必ず絵を付ける。シート本文の .ab / SVG と同じ絵を再利用 (コピー) する
+     (インライン SVG か data URI の img か、シートと同じ DOM 再現。相対 URL 禁止)。方針・優先度など見た目の無い選択肢には付けない (figure ごと削除) -->
+<div class="q" data-qid="q1">
+  <h3>Q1. <!-- TODO: 問い (問いカードと同文) --></h3>
+  <label><input type="radio" name="q1" value="A"><b>A. <!-- TODO: 案 --></b><span class="rec">推奨</span>
+    <div class="opt-d"><!-- TODO: 選ぶとどうなるか 1 行 --></div>
+    <figure class="thumb"><!-- TODO: シート本文の A の絵をコピー (例: 上の .ab の <svg> をそのまま) --></figure></label>
+  <label><input type="radio" name="q1" value="B"><b>B. <!-- TODO: 案 --></b>
+    <div class="opt-d"><!-- TODO --></div>
+    <figure class="thumb"><!-- TODO: シート本文の B の絵をコピー --></figure></label>
+  <textarea name="q1_note" placeholder="補足 (任意)"></textarea>
+</div>
+
+
+<h2>全体へのコメント</h2>
+<div class="q redpen">
+  <p class="m" style="margin-top:0">訂正・追加要望・「そもそも」の指摘はここへ。複数行でよい。</p>
+  <textarea name="global_note" placeholder=""></textarea>
+</div>
+
+<div class="sendbar">
+  <button id="genBtn" type="button" onclick="generatePrompt()">貼り付ける文章を作る</button>
+  <div id="status" class="status"></div>
+  <textarea id="out" readonly onclick="this.select()"></textarea>
+</div>
+</section>
+
+</main>
+<script>
+// TODO: 質問 id → 見出し (回答プロンプトの行になる。.q の radio name と同期)
+var QUESTIONS = {
+  q1: "Q1. "
+};
+// TODO: シートごとに一意な固定キー (例: "review-settings-01")。使い回すと別のシートの下書きが復元される
+var DRAFT_KEY = "review-draft-CHANGE-ME";
+// TODO: 回答プロンプトの見出しに入るラベル (例: "settings-01")
+var DOC = "CHANGE-ME";
+
+/* ---------- 下書き (radio・textarea) ---------- */
+function saveDraft() {
+  try {
+    var d = {};
+    document.querySelectorAll("#akForm input[type=radio]:checked").forEach(function (el) { d[el.name] = el.value; });
+    document.querySelectorAll("#akForm textarea").forEach(function (el) {
+      if (el.id !== "out" && el.name && el.value) d[el.name] = el.value;
+    });
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+  } catch (e) {}
+}
+function loadDraft() {
+  try {
+    var d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "{}");
+    Object.keys(d).forEach(function (k) {
+      if (k === "pins") return;   // 別部品の下書き (部品が無ければ無視)
+      try {
+        // radio の値は英数のみ。textarea の値 (改行や引用符入り) をセレクタに埋め込まない
+        if (!/_note$/.test(k) && k !== "global_note" && /^[A-Za-z0-9]+$/.test(String(d[k]))) {
+          var r = document.querySelector('#akForm input[name="' + k + '"][value="' + d[k] + '"]');
+          if (r) { r.checked = true; return; }
+        }
+        var t = document.querySelector('#akForm textarea[name="' + k + '"]');
+        if (t) t.value = d[k];
+      } catch (e) {}
+    });
+  } catch (e) {}
+}
+document.getElementById("akForm").addEventListener("change", saveDraft);
+document.getElementById("akForm").addEventListener("input", saveDraft);
+
+// 各質問に「選択を解除」を付ける (誤クリックの取り消し = お任せに戻す)
+document.querySelectorAll("#akForm .q[data-qid]").forEach(function (q) {
+  var radios = q.querySelectorAll("input[type=radio]");
+  if (!radios.length) return;
+  var a = document.createElement("a");
+  a.textContent = "選択を解除 (お任せに戻す)";
+  a.className = "clearsel";
+  a.onclick = function () { radios.forEach(function (r) { r.checked = false; }); saveDraft(); };
+  q.appendChild(a);
+});
+
+
+/* ---------- 回答プロンプト (references/reply-format.md の固定形) ---------- */
+function oneLine(s) { return s.trim().replace(/\s*\n\s*/g, " "); }
+function buildPrompt() {
+  var lines = ["【レビュー回答】" + DOC];
+  Object.keys(QUESTIONS).forEach(function (qid) {
+    var choiceEl = document.querySelector('#akForm input[name="' + qid + '"]:checked');
+    var noteEl = document.querySelector('#akForm textarea[name="' + qid + '_note"]');
+    var note = noteEl ? noteEl.value.trim() : "";
+    var line = QUESTIONS[qid] + ": ";
+    if (choiceEl) {
+      var lab = choiceEl.closest("label");
+      var b = lab ? lab.querySelector("b") : null;
+      var lbl = b ? b.innerText.trim() : "";
+      // 太字が "A. 選択肢" 形式なら先頭の記号を剥がす (A — A. の重複防止)
+      lbl = lbl.replace(new RegExp("^" + choiceEl.value + "[.．]\\s*"), "");
+      line += choiceEl.value + " — " + (lbl || choiceEl.value);
+    } else {
+      line += "(未選択 = お任せ)";
+    }
+    if (note) line += " / 補足: " + oneLine(note);
+    lines.push(line);
+  });
+  var g = document.querySelector('#akForm textarea[name="global_note"]');
+  var gv = g ? g.value.trim() : "";
+  lines.push("全体へのコメント: " + (gv || "(なし)"));
+  lines.push("---");
+  lines.push("上の回答を反映して作業を続けてください。お任せの項目は推奨案で確定してください。");
+  return lines.join("\n");
+}
+function generatePrompt() {
+  var text = buildPrompt();
+  copyPrompt(text, "");
+}
+function copyPrompt(text, prefix) {
+  var out = document.getElementById("out");
+  out.style.display = "block";
+  out.value = text;
+  var done = function (copied) {
+    setStatus(prefix + (copied
+      ? "✓ コピーしました — Claude Code のターミナルに貼り付けて Enter"
+      : "下のテキストを選択してコピーし、Claude Code に貼り付けてください"), copied ? "ok" : "err");
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+  } else {
+    try { out.select(); done(document.execCommand("copy")); } catch (e) { done(false); }
+  }
+}
+function setStatus(msg, cls) {
+  var el = document.getElementById("status");
+  el.textContent = msg;
+  el.className = "status " + cls;
+}
+
+
+loadDraft();
+</script>
+</body>
+</html>
