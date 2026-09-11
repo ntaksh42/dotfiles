@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>指摘モードの kit テンプレート — 原稿を差し替えて使う</title>
+<!-- 実装前レビュー 指摘モード kit v1 (公開版)。file:// 単独で完結 — サーバ不要・外部 JS 不要。
+     回答は [貼り付ける文章を作る] → クリップボード + textarea → 人が Claude Code に貼る (references/reply-format.md の固定形)
+     ボタン文言 (「コメント一覧」「貼り付ける文章を作る」) は README の案内文と揃えてあるので変えない -->
+<style>
+/* ── 見本原稿用の最小様式 — 実戦では原稿側の様式をそのまま使い、この block は捨ててよい ── */
+body{margin:0;color:#212529;font-family:'Hiragino Kaku Gothic ProN',system-ui,sans-serif;font-size:15px;line-height:1.95}
+article{max-width:760px;margin:0 auto;padding:18px 16px 60px}
+article h1{font-size:26px;line-height:1.5}
+article h2{font-size:20px;line-height:1.5;margin-top:40px;border-bottom:1px solid #DEE2E6;padding-bottom:6px}
+article pre{background:#F6F8FA;border:1px solid #DEE2E6;border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.6;overflow-x:auto}
+article code{font-family:ui-monospace,Menlo,monospace;font-size:.92em}
+article blockquote{margin:16px 0;padding:8px 16px;border-left:3px solid #DEE2E6;color:#495057}
+article figure{margin:16px 0;border:1px dashed #DEE2E6;border-radius:8px;padding:24px;text-align:center;color:#64707C}
+article table{border-collapse:collapse;font-size:14px}
+article th,article td{border:1px solid #DEE2E6;padding:6px 10px;text-align:left}
+</style>
+</head>
+<body data-shiteki="shiteki-SLUG">
+<!-- data-shiteki = 案件ごとに一意な固定文字列 (下書きの localStorage キー兼、回答 1 行目の <label>)。
+     同じ値を使い回すと別案件の下書きが復元されるので、案件ごとに変える -->
+<!-- ═══════════ 指摘層 (前半): 原稿へ移植する時はこのブロックを body 先頭へ ═══════════ -->
+<div class="ak-ui" id="akTop">
+  <div class="ak-topbar">
+    <span class="ak-brand">&#9998; 指摘モード</span>
+    <span class="ak-hint-inline" id="akHint">段落をタップ / 文字をなぞって「ここをこうして」</span>
+    <span class="ak-count" id="akCount">0</span>
+    <button class="ak-btn ak-ghost" id="akListBtn" type="button">コメント一覧</button>
+    <button class="ak-btn ak-primary" id="akGenBtn" type="button">貼り付ける文章を作る</button>
+  </div>
+</div>
+<div class="ak-ui ak-qs" id="akQs">
+  <div class="ak-qs-head">&#9998; 先に決めてほしいこと <span class="ak-qs-sub">(そのままでもOK = 推奨で進みます)</span></div>
+  <!-- 問いは 3±1 問・radio name はグループごとに一意 (q1, q2, …)・既定 checked = 推奨。
+       .ak-qt の先頭「N. 」は回答行の Qn になる。各選択肢の <b> が回答行の「A — <選択肢>」に載る。
+       「別案」の選択肢は置かない — どれも選ばないなら「選ばずにこちらへ任せる」、別の案は全体コメントへ (script が各 qcard に付ける) -->
+  <div class="ak-qcard"><p class="ak-qt">1. この記事の長さはどうしますか</p>
+    <label><input type="radio" name="q1" value="A" checked> <b>A.</b> このまま (約 1,200 字 — 読み切りやすい) <span class="ak-rec">推奨</span></label>
+    <label><input type="radio" name="q1" value="B"> <b>B.</b> 失敗例の節を足して 2 倍にする (説得力は増すが読了率が下がる)</label>
+  </div>
+  <div class="ak-qcard"><p class="ak-qt">2. コード例の言語は</p>
+    <label><input type="radio" name="q2" value="A" checked> <b>A.</b> bash だけ (記事の主題に集中できる) <span class="ak-rec">推奨</span></label>
+    <label><input type="radio" name="q2" value="B"> <b>B.</b> bash + Python の 2 本 (読者層は広がるが本文が 1 節増える)</label>
+  </div>
+</div>
+<!-- ═══════════ 指摘層 (前半) ここまで ═══════════ -->
+
+<article>
+<!-- ★ ここから下が原稿 — 実戦では丸ごと差し替える。原稿の HTML には手を入れない (層が上に重なるだけ)。
+     開催中は原稿を変えない — ブロック番号 (#N) は DOM 順の連番なので、差し替えると回答の番号がずれる -->
+<h1>小さなシェルスクリプトにも set -euo pipefail を付ける理由</h1>
+<p>数行のシェルスクリプトは「動けばいい」と思いがちです。しかし失敗を黙って通す設定のまま育つと、あとで原因を追うのに何倍も時間がかかります。この記事では、最初の 1 行で防げる 3 種類の事故を紹介します。</p>
+<h2>1. コマンドの失敗を見逃す (-e)</h2>
+<p>既定のシェルは、途中のコマンドが失敗しても次の行へ進みます。ビルドが失敗したのにデプロイまで走ってしまう、という事故はほぼこれが原因です。</p>
+<pre><code>#!/usr/bin/env bash
+set -euo pipefail
+make build      # ここで失敗したら
+./deploy.sh     # ここは走らない</code></pre>
+<p><code>-e</code> を付けると、失敗したコマンドの直後でスクリプト全体が止まります。止まる場所が失敗した場所と一致するので、ログを上から読む必要がありません。</p>
+<h2>2. 未定義の変数を空文字として使う (-u)</h2>
+<p>変数名を 1 文字打ち間違えると、シェルはそれを「空の文字列」として扱います。<code>rm -rf "$BUILD_DIR/"</code> のつもりが <code>rm -rf "/"</code> になる、という有名な事故がこの型です。</p>
+<p><code>-u</code> を付けると、未定義の変数を参照した時点でエラーになります。打ち間違いは実行前ではなく実行時に見つかりますが、それでも何も起きないよりはずっと早い発見です。</p>
+<h2>3. パイプの途中の失敗を隠す (-o pipefail)</h2>
+<p>パイプでつないだコマンド列の終了ステータスは、既定では最後のコマンドのものだけです。<code>curl</code> が失敗しても、後ろの <code>grep</code> が成功すれば全体は成功扱いになります。</p>
+<blockquote>パイプの左側は「素材の取得」、右側は「加工」であることが多い。素材の取得が失敗したら、加工が成功しても意味がない。</blockquote>
+<p><code>-o pipefail</code> を付けると、パイプ内のどれか 1 つでも失敗すれば全体が失敗になります。</p>
+<h2>まとめ</h2>
+<ul>
+<li><code>-e</code>: 失敗したら止まる</li>
+<li><code>-u</code>: 未定義の変数はエラー</li>
+<li><code>-o pipefail</code>: パイプの途中の失敗も失敗</li>
+</ul>
+<p>3 つとも 1 行で済みます。次に新しいスクリプトを作るときは、shebang の次の行に書いてから本文を書き始めてください。</p>
+</article>
+
+<!-- ═══════════ 指摘層 (後半): 原稿へ移植する時はこのブロックを body 末尾へ ═══════════ -->
+<style>
+.ak-ui{font-family:'Hiragino Kaku Gothic ProN',system-ui,sans-serif;font-size:14px;line-height:1.7;color:#212529}
+body{padding-top:52px}
+.ak-topbar{position:fixed;top:0;left:0;right:0;z-index:9000;background:#fff;border-bottom:2px solid #DC2626;display:flex;align-items:center;gap:10px;padding:8px 14px;box-shadow:0 1px 6px rgba(0,0,0,.06)}
+.ak-brand{color:#DC2626;font-weight:700;white-space:nowrap}
+.ak-hint-inline{color:#64707C;font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ak-count{background:#DC2626;color:#fff;border-radius:999px;min-width:22px;height:22px;line-height:22px;text-align:center;font-size:12px;font-weight:700;padding:0 6px}
+.ak-btn{border-radius:8px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid #DEE2E6;background:#fff;color:#212529;white-space:nowrap}
+.ak-ghost:hover{background:#F6F8FA}
+.ak-primary{background:#DC2626;border-color:#DC2626;color:#fff}
+.ak-qs{max-width:760px;margin:14px auto 26px;padding:14px 16px;border:1.5px solid #DC2626;border-radius:12px;background:#FFF9F9}
+.ak-qs-head{font-weight:700;color:#DC2626;margin-bottom:6px}
+.ak-qs-sub{font-weight:400;color:#64707C;font-size:12px}
+.ak-qcard{border-top:1px solid #F1D6D6;padding:8px 0}
+.ak-qt{font-weight:700;margin:0 0 4px}
+.ak-qcard label{display:block;padding:3px 0;font-size:13.5px;cursor:pointer}
+.ak-rec{font-size:10.5px;color:#DC2626;border:1px solid #DC2626;border-radius:4px;padding:0 5px;margin-left:4px;white-space:nowrap}
+.ak-clearsel{display:inline-block;color:#2563EB;font-size:12px;cursor:pointer;margin-top:2px;text-decoration:none}
+.ak-hoverable{position:relative}
+.ak-hoverable:hover{outline:1.5px dashed #DC262666;outline-offset:4px;cursor:pointer}
+.ak-hoverable::after{content:"#" attr(data-blk);position:absolute;right:-4px;top:-13px;font-size:10.5px;line-height:1.4;color:#DC2626;background:#fff;border:1px solid #DC262666;border-radius:4px;padding:0 4px;font-family:ui-monospace,Menlo,monospace;pointer-events:none;display:none}
+.ak-hoverable:hover::after{display:block} /* ブロック番号 — 回答の #N と原稿を突き合わせるための表示 (指摘済みはピンが同じ番号を常時表示) */
+.ak-marked{background:#FFF5F5;box-shadow:inset 3px 0 0 #DC2626}
+.ak-pin{position:absolute;top:-10px;left:-34px;z-index:800;background:#DC2626;color:#fff;border-radius:999px;min-width:22px;height:22px;line-height:22px;text-align:center;font-size:12px;font-weight:700;padding:0 5px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.ak-selbtn{position:absolute;z-index:9500;background:#DC2626;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3);display:none}
+.ak-shade{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9600;display:none}
+.ak-sheet{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(720px,100%);z-index:9700;background:#fff;border-radius:14px 14px 0 0;box-shadow:0 -4px 24px rgba(0,0,0,.25);padding:14px 16px calc(14px + env(safe-area-inset-bottom));display:none;box-sizing:border-box}
+.ak-sheet .ak-target{font-size:12.5px;color:#64707C;margin:0 0 8px;max-height:3.2em;overflow:hidden}
+.ak-sheet .ak-target b{color:#DC2626}
+.ak-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.ak-chip{border:1px solid #DEE2E6;border-radius:999px;padding:4px 12px;font-size:12.5px;cursor:pointer;background:#fff;color:#212529}
+.ak-chip.on{background:#DC2626;border-color:#DC2626;color:#fff}
+.ak-ta{width:100%;box-sizing:border-box;border:1px solid #DEE2E6;border-radius:8px;padding:8px 10px;font-size:16px;font-family:inherit;min-height:64px;resize:vertical}
+.ak-row{display:flex;gap:8px;margin-top:10px;align-items:center}
+.ak-row .sp{flex:1}
+.ak-danger{color:#DC2626;border-color:#DC2626;background:#fff}
+.ak-drawer{position:fixed;top:0;right:0;bottom:0;width:min(420px,100%);z-index:9700;background:#fff;box-shadow:-4px 0 24px rgba(0,0,0,.2);display:none;flex-direction:column}
+.ak-drawer.open{display:flex}
+.ak-dhead{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid #DEE2E6;font-weight:700}
+.ak-dbody{flex:1;overflow-y:auto;padding:10px 14px}
+.ak-item{border:1px solid #DEE2E6;border-left:3px solid #DC2626;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:13px}
+.ak-item .q{color:#64707C;font-size:12px;margin:0 0 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ak-item .n{margin:0;white-space:pre-wrap}
+.ak-item .chipname{color:#DC2626;font-weight:700;margin-right:6px}
+.ak-item .ops{margin-top:4px;display:flex;gap:10px}
+.ak-item .ops a{color:#2563EB;font-size:12px;cursor:pointer;text-decoration:none}
+.ak-dfoot{border-top:1px solid #DEE2E6;padding:10px 14px}
+.ak-dfoot .ak-ta{min-height:48px} /* font-size は 16px を継承 — 16px 未満は iOS Safari が focus で自動ズームする */
+.ak-out{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(720px,100%);z-index:9800;background:#fff;border-radius:14px 14px 0 0;box-shadow:0 -4px 24px rgba(0,0,0,.25);padding:14px 16px calc(14px + env(safe-area-inset-bottom));display:none;box-sizing:border-box}
+.ak-out .ak-status{font-size:13px;margin:0 0 8px;color:#64707C}
+.ak-out .ak-status.ok{color:#0F7B3F;font-weight:700}
+.ak-out .ak-status.err{color:#DC2626;font-weight:700}
+.ak-out textarea{width:100%;box-sizing:border-box;height:36vh;border:2px solid #DC2626;border-radius:8px;padding:8px;font-size:12.5px;font-family:ui-monospace,Menlo,monospace;line-height:1.5;resize:vertical}
+.ak-toast{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:9900;background:#212529;color:#fff;border-radius:10px;padding:10px 18px;font-size:13.5px;display:none}
+.ak-sent{background:#0F7B3F}
+@media (max-width:640px){.ak-hint-inline{display:none}.ak-pin{left:-6px}}
+@media print{.ak-ui,.ak-pin,.ak-selbtn,.ak-hoverable::after{display:none!important}}
+</style>
+<div class="ak-ui">
+  <button class="ak-selbtn" id="akSelBtn" type="button">&#9998; 選択範囲にコメント</button>
+  <div class="ak-shade" id="akShade"></div>
+  <div class="ak-sheet ak-ui" id="akSheet">
+    <p class="ak-target" id="akTarget"></p>
+    <div class="ak-chips" id="akChips"></div>
+    <textarea class="ak-ta" id="akNote" placeholder="ここをこうして (自由に書く — チップだけでもOK)"></textarea>
+    <div class="ak-row">
+      <button class="ak-btn ak-danger" id="akDel" type="button" style="display:none">削除</button>
+      <span class="sp"></span>
+      <button class="ak-btn ak-ghost" id="akCancel" type="button">キャンセル</button>
+      <button class="ak-btn ak-primary" id="akSave" type="button">保存</button>
+    </div>
+  </div>
+  <div class="ak-drawer ak-ui" id="akDrawer">
+    <div class="ak-dhead">コメント一覧 <span class="ak-count" id="akCount2">0</span><span class="sp" style="flex:1"></span><button class="ak-btn ak-ghost" id="akClose" type="button">閉じる</button></div>
+    <div class="ak-dbody" id="akItems"></div>
+    <div class="ak-dfoot">
+      <textarea class="ak-ta" id="akComment" placeholder="全体へのコメント (別案・方向の注文など何でも)"></textarea>
+      <div class="ak-row">
+        <span class="sp"></span>
+        <button class="ak-btn ak-primary" id="akGenBtn2" type="button">貼り付ける文章を作る</button>
+      </div>
+    </div>
+  </div>
+  <div class="ak-out ak-ui" id="akOut">
+    <p class="ak-status" id="akStatus"></p>
+    <textarea id="akOutText" readonly spellcheck="false"></textarea>
+    <div class="ak-row">
+      <button class="ak-btn ak-ghost" id="akOutCopy" type="button">もう一度コピー</button>
+      <span class="sp"></span>
+      <button class="ak-btn ak-ghost" id="akOutClose" type="button">閉じる</button>
+    </div>
+  </div>
+  <div class="ak-toast" id="akToast"></div>
+</div>
+<script>
+(function(){
+"use strict";
+var KIND=document.body.dataset.shiteki||"shiteki";           /* 案件の固定文字列 — body の data-shiteki で指定。回答 1 行目の label にもなる */
+var LS=KIND+"-v1";                                          /* localStorage キー (下書きの永続) */
+var CHIPS=["削る","短くする","言い換える","事実を確認","図を直す","順序を入れ替える","ここは良い"];
+var SEL="p,h2,h3,li,figure,blockquote,pre,aside,table";     /* 指摘対象のブロック要素 */
+var QUOTE_LEN=40;                                           /* 回答行に載せる引用の長さ (なぞった文字列の先頭) */
+var blocks=[].slice.call(document.querySelectorAll(SEL)).filter(function(el){return !el.closest(".ak-ui")});
+blocks.forEach(function(el,i){el.dataset.ak=i;el.dataset.blk=i+1;el.classList.add("ak-hoverable")}); /* data-blk = 1 起算の DOM 順 (回答の #N) */
+var S={annos:[],comment:""};
+try{var saved=JSON.parse(localStorage.getItem(LS)||"null");if(saved&&saved.annos){S=saved}}catch(e){}
+var editing=null, cur=null, lastSel=null;
+function $(id){return document.getElementById(id)}
+function cleanText(el){ /* ピン (指摘番号) が innerText に混入しないようクローンから除いて取る */
+  if(!el||!el.cloneNode)return (el&&el.innerText)||"";
+  var c=el.cloneNode(true);[].slice.call(c.querySelectorAll(".ak-pin")).forEach(function(p){p.remove()});
+  return (c.innerText||c.textContent||"")}
+function excerpt(el,n){var t=cleanText(el).replace(/\s+/g," ").trim();return t.length>n?t.slice(0,n)+"…":t}
+function persist(){S.comment=$("akComment").value;try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}}
+function counts(){$("akCount").textContent=S.annos.length;$("akCount2").textContent=S.annos.length}
+function sectionOf(el){var t=el;while(t){if(t.tagName==="H2")return cleanText(t).replace(/\s+/g," ").trim();t=t.previousElementSibling||t.parentElement}return""}
+function renderPins(){
+  document.querySelectorAll(".ak-pin").forEach(function(p){p.remove()});
+  blocks.forEach(function(b){b.classList.remove("ak-marked")});
+  var by={};S.annos.forEach(function(a){by[a.block]=(by[a.block]||0)+1});
+  Object.keys(by).forEach(function(k){var b=blocks[+k];if(!b)return;b.classList.add("ak-marked");
+    var pin=document.createElement("span");pin.className="ak-pin ak-ui";pin.textContent="#"+(+k+1)+(by[k]>1?"×"+by[k]:""); /* ピン = ブロック番号 (回答の #N と同じ) */
+    pin.addEventListener("click",function(e){e.stopPropagation();openDrawer()});b.appendChild(pin)});
+  counts();persist();renderItems();
+}
+function renderItems(){
+  var box=$("akItems");box.innerHTML="";
+  if(!S.annos.length){box.innerHTML='<p style="color:#64707C;font-size:13px">まだ指摘はありません。本文の段落をタップするか、文字をなぞってください。</p>';return}
+  S.annos.forEach(function(a,i){
+    var d=document.createElement("div");d.className="ak-item";
+    var q=document.createElement("p");q.className="q";q.textContent="#"+(a.block+1)+" "+(a.quote?"「"+a.quote.slice(0,40)+"…」":excerpt(blocks[a.block]||{innerText:""},40));d.appendChild(q);
+    var n=document.createElement("p");n.className="n";
+    if(a.chip){var c=document.createElement("span");c.className="chipname";c.textContent="["+a.chip+"]";n.appendChild(c)}
+    n.appendChild(document.createTextNode(a.note||""));d.appendChild(n);
+    var ops=document.createElement("div");ops.className="ops";
+    [["該当箇所へ",function(){closeDrawer();var b=blocks[a.block];if(b){b.scrollIntoView({behavior:"smooth",block:"center"})}}],
+     ["編集",function(){closeDrawer();openSheet({block:a.block,quote:a.quote},i)}],
+     ["削除",function(){S.annos.splice(i,1);renderPins()}]].forEach(function(op){
+      var el=document.createElement("a");el.textContent=op[0];el.addEventListener("click",op[1]);ops.appendChild(el)});
+    d.appendChild(ops);box.appendChild(d);
+  });
+}
+var chipVal=null;
+function buildChips(){var c=$("akChips");c.innerHTML="";CHIPS.forEach(function(name){
+  var b=document.createElement("button");b.type="button";b.className="ak-chip";b.textContent=name;
+  b.addEventListener("click",function(){chipVal=(chipVal===name)?null:name;
+    c.querySelectorAll(".ak-chip").forEach(function(x){x.classList.toggle("on",x.textContent===chipVal)})});
+  c.appendChild(b)})}
+function openSheet(target,editIdx){
+  cur=target;editing=(editIdx==null?null:editIdx);
+  var a=(editing!=null)?S.annos[editing]:null;
+  chipVal=a?a.chip:null;buildChips();
+  $("akChips").querySelectorAll(".ak-chip").forEach(function(x){x.classList.toggle("on",x.textContent===chipVal)});
+  $("akNote").value=a?(a.note||""):"";
+  var b=blocks[target.block];
+  var tg=$("akTarget");tg.textContent=""; /* 原稿由来のテキストなので innerHTML 連結禁止 (pre のコード例が実行・崩壊する) */
+  tg.appendChild(document.createTextNode("#"+(target.block+1)+" "));
+  if(target.quote){tg.appendChild(document.createTextNode("選択: "));
+    var em=document.createElement("b");em.textContent="「"+target.quote.slice(0,80)+"」";tg.appendChild(em)}
+  else{tg.appendChild(document.createTextNode("対象: 「"+excerpt(b||{innerText:""},60)+"」"))}
+  $("akDel").style.display=(editing!=null)?"":"none";
+  $("akShade").style.display="block";
+  $("akSheet").style.display="block";
+  setTimeout(function(){$("akNote").focus()},50);
+}
+function closeSheet(){$("akShade").style.display="none";$("akSheet").style.display="none";cur=null;editing=null}
+function openDrawer(){renderItems();$("akComment").value=S.comment||"";$("akDrawer").classList.add("open")}
+function closeDrawer(){persist();$("akDrawer").classList.remove("open")}
+function toast(msg,ok){var t=$("akToast");t.textContent=msg;t.classList.toggle("ak-sent",!!ok);
+  t.style.display="block";setTimeout(function(){t.style.display="none"},2600)}
+$("akSave").addEventListener("click",function(){
+  var note=$("akNote").value.trim();
+  if(!note&&!chipVal){toast("チップを選ぶか、ひとこと書いてください");return}
+  var b=blocks[cur.block];
+  var rec={block:cur.block,quote:cur.quote||null,chip:chipVal,note:note,
+    excerpt:excerpt(b||{innerText:""},80),section:sectionOf(b)||"",ts:new Date().toISOString()};
+  if(editing!=null){S.annos[editing]=Object.assign(S.annos[editing],rec)}else{S.annos.push(rec)}
+  closeSheet();renderPins();
+});
+$("akDel").addEventListener("click",function(){if(editing!=null){S.annos.splice(editing,1)}closeSheet();renderPins()});
+$("akCancel").addEventListener("click",closeSheet);
+$("akShade").addEventListener("click",closeSheet);
+$("akListBtn").addEventListener("click",openDrawer);
+$("akClose").addEventListener("click",closeDrawer);
+document.addEventListener("click",function(e){
+  if(e.target.closest(".ak-ui,.ak-pin"))return;
+  if(e.target.closest("a,button,summary,input,textarea,label,select"))return;
+  var sel=window.getSelection();if(sel&&!sel.isCollapsed)return;
+  var b=e.target.closest(SEL);if(!b||b.dataset.ak==null)return;
+  openSheet({block:+b.dataset.ak,quote:null},null);
+});
+document.addEventListener("selectionchange",function(){
+  var sel=window.getSelection();var btn=$("akSelBtn");
+  if(!sel||sel.isCollapsed||!sel.rangeCount){btn.style.display="none";return}
+  var r=sel.getRangeAt(0);var node=r.commonAncestorContainer;
+  var el=node.nodeType===1?node:node.parentElement;
+  if(!el||el.closest(".ak-ui")){btn.style.display="none";return}
+  var b=el.closest(SEL);if(!b||b.dataset.ak==null){btn.style.display="none";return}
+  var text=sel.toString().replace(/\s+/g," ").trim();
+  if(text.length<2){btn.style.display="none";return}
+  lastSel={block:+b.dataset.ak,quote:text.slice(0,300)};
+  var rect=r.getBoundingClientRect();
+  btn.style.display="block";
+  btn.style.top=(window.scrollY+rect.bottom+8)+"px";
+  btn.style.left=Math.max(8,Math.min(window.scrollX+rect.left,window.innerWidth-140))+"px";
+});
+$("akSelBtn").addEventListener("mousedown",function(e){e.preventDefault()});
+$("akSelBtn").addEventListener("click",function(){this.style.display="none";if(lastSel)openSheet(lastSel,null)});
+/* ── 設問 (#akQs): 各 qcard に「選択を解除 (お任せに戻す)」を付ける。radio の変更は下書きに保存 ── */
+function qcards(){return [].slice.call(document.querySelectorAll("#akQs .ak-qcard"))}
+qcards().forEach(function(q){
+  var radios=[].slice.call(q.querySelectorAll('input[type="radio"]'));if(!radios.length)return;
+  var a=document.createElement("a");a.className="ak-clearsel";a.textContent="選ばずにこちらへ任せる (解除。別の案は全体コメントへ)";
+  a.addEventListener("click",function(){radios.forEach(function(r){r.checked=false});persistChoices()});
+  q.appendChild(a);
+  radios.forEach(function(r){r.addEventListener("change",persistChoices)});
+});
+function persistChoices(){S.choices=readChoices();persist()}
+function readChoices(){var out={};qcards().forEach(function(q){
+  var r=q.querySelector('input[type="radio"]');if(!r)return;
+  var on=q.querySelector('input[type="radio"]:checked');out[r.name]=on?on.value:null});return out}
+function restoreChoices(){ /* 下書きに choices があれば radio を復元 (無ければ既定 checked = 推奨のまま) */
+  if(!S.choices)return;
+  qcards().forEach(function(q){var r=q.querySelector('input[type="radio"]');if(!r||!(r.name in S.choices))return;
+    var v=S.choices[r.name];
+    [].slice.call(q.querySelectorAll('input[type="radio"]')).forEach(function(x){x.checked=(v!=null&&x.value===v)})});
+}
+/* ── 回答プロンプト (references/reply-format.md の固定形) ── */
+function questionLines(){
+  var lines=[];
+  qcards().forEach(function(q,i){
+    var r=q.querySelector('input[type="radio"]');if(!r)return;
+    var qt=q.querySelector(".ak-qt");
+    var title=(qt?qt.textContent:"").replace(/\s+/g," ").trim().replace(/^\d+[.．]\s*/,"");
+    var line="Q"+(i+1)+". "+title+": ";
+    var on=q.querySelector('input[type="radio"]:checked');
+    if(on){var lab=on.closest("label");var b=lab?lab.querySelector("b"):null;
+      var txt=(lab?lab.textContent:"").replace(/\s+/g," ").trim();
+      txt=txt.replace(/\s*推奨\s*$/,"");                        /* 末尾の「推奨」バッジを外す */
+      if(b){txt=txt.replace(new RegExp("^"+on.value+"[.．]\\s*"),"")}  /* 「A.」の重複防止 */
+      line+=on.value+" — "+(txt||on.value)}
+    else{line+="(未選択 = お任せ)"}
+    lines.push(line);
+  });
+  return lines;
+}
+function annoLines(){
+  var list=S.annos.map(function(a,i){return {a:a,i:i}});
+  list.sort(function(x,y){return (x.a.block-y.a.block)||(x.i-y.i)});  /* 原稿の DOM 順、同一ブロック内は付けた順 */
+  return list.map(function(e){var a=e.a;var s="#"+(a.block+1);
+    if(a.chip)s+=" ["+a.chip+"]";
+    if(a.quote){var q=a.quote.replace(/\s+/g," ").trim();s+=" 「"+(q.length>QUOTE_LEN?q.slice(0,QUOTE_LEN)+"…":q)+"」"}
+    if(a.note)s+=" "+a.note.replace(/\s*\n\s*/g," ").trim();
+    return s});
+}
+function buildPrompt(){
+  persist();
+  var lines=["【レビュー回答】"+KIND];
+  lines=lines.concat(questionLines());
+  var c=($("akComment").value||"").trim();
+  lines.push("全体へのコメント: "+(c||"(なし)"));
+  var an=annoLines();
+  if(an.length){lines.push("## 指摘");lines=lines.concat(an)}   /* 指摘 0 件なら節ごと出さない */
+  lines.push("---");
+  lines.push("上の回答を反映して作業を続けてください。お任せの項目は推奨案で確定してください。");
+  return lines.join("\n");
+}
+function setStatus(msg,cls){var el=$("akStatus");el.textContent=msg;el.className="ak-status "+(cls||"")}
+function copyText(text,done){
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){done(true)},function(){legacyCopy(text,done)});return}
+  legacyCopy(text,done);
+}
+function legacyCopy(text,done){var ta=$("akOutText");var ok=false;
+  try{ta.focus();ta.select();ta.setSelectionRange(0,text.length);ok=document.execCommand("copy")}catch(e){}
+  done(!!ok)}
+function generatePrompt(){
+  closeDrawer();closeSheet();
+  var text=buildPrompt();
+  copyPrompt(text,"");
+}
+function copyPrompt(text,prefix){
+  var ta=$("akOutText");ta.value=text;
+  $("akOut").style.display="block";
+  copyText(text,function(copied){
+    setStatus(prefix+(copied?"コピーしました — Claude Code のターミナルに貼り付けて Enter"
+                            :"下のテキストを選択してコピーし、Claude Code に貼り付けてください"),copied?"ok":"err");
+    if(!copied){try{ta.focus();ta.select()}catch(e){}}
+  });
+}
+$("akGenBtn").addEventListener("click",generatePrompt);
+$("akGenBtn2").addEventListener("click",generatePrompt);
+$("akOutCopy").addEventListener("click",function(){var t=$("akOutText").value;copyText(t,function(ok){
+  setStatus(ok?"コピーしました — Claude Code のターミナルに貼り付けて Enter":"コピーできませんでした — テキストを選択して手動でコピーしてください",ok?"ok":"err")})});
+$("akOutClose").addEventListener("click",function(){$("akOut").style.display="none"});
+$("akComment").addEventListener("input",persist);
+$("akComment").value=S.comment||""; /* persist() が空値で上書きする前に復元する — リロード耐性の要 */
+restoreChoices();
+buildChips();renderPins();
+})();
+</script>
+<!-- ═══════════ 指摘層 (後半) ここまで ═══════════ -->
+</body>
+</html>
