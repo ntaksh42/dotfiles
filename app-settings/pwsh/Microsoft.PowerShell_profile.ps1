@@ -233,8 +233,57 @@ function gf {
     git fetch --all --prune @args
     git pack-refs --all
 }
+# core.ignorecase=true な NTFS では、リモートの Foo.cs とローカルの foo.cs が
+# 同一パスに解決されるため pull が "would be overwritten by merge" で止まる。
+# fetch 済みの upstream ツリーと作業ツリーを突き合わせ、大文字小文字だけが違う
+# ファイルを .git/case-conflict-backup/ へ退避してから pull を続行する。
+# (削除ではなく退避なのは、ローカル側に未コミットの中身が残る場合があるため)
+function Resolve-GitCaseCollision {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Upstream)
+
+    $remote = @{}
+    foreach ($path in (git ls-tree -r --name-only $Upstream)) {
+        if ($path) { $remote[$path.ToLowerInvariant()] = $path }
+    }
+    if ($remote.Count -eq 0) { return }
+
+    # ローカル側の候補: 追跡ファイルと未追跡ファイル。パスがリモートと大文字小文字
+    # だけ違うものが衝突する。
+    $local = @(
+        git ls-files
+        git ls-files --others --exclude-standard
+    ) | Where-Object { $_ } | Sort-Object -Unique
+
+    $backupDir = $null
+    foreach ($path in $local) {
+        $match = $remote[$path.ToLowerInvariant()]
+        if (-not $match -or $match -ceq $path) { continue }
+
+        if (-not $backupDir) {
+            $gitDir = (git rev-parse --absolute-git-dir).Trim()
+            $backupDir = Join-Path $gitDir ('case-conflict-backup\{0}' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
+        }
+        $src = Join-Path (git rev-parse --show-toplevel).Trim() ($path -replace '/', '\')
+        $dest = Join-Path $backupDir ($path -replace '/', '\')
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dest) | Out-Null
+        Move-Item -LiteralPath $src -Destination $dest -Force -ErrorAction SilentlyContinue
+        # 追跡ファイルなら、退避で消えた分をインデックスからも落として pull を通す。
+        git rm --cached --quiet -- $path 2>$null
+        Write-Host "  [fix] $path -> $match (退避: $dest)" -ForegroundColor Yellow
+    }
+}
+
 function gpl {
     git pack-refs --all
+
+    # 衝突判定には fetch 済みの upstream が要る。pull 前に取得しておく。
+    git fetch --prune --quiet
+    $upstream = (git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null)
+    if ($LASTEXITCODE -eq 0 -and $upstream) {
+        Resolve-GitCaseCollision -Upstream $upstream.Trim()
+    }
+
     git pull @args
     git pack-refs --all
 }
@@ -1049,7 +1098,7 @@ $script:ProfileHelp = [ordered]@{
         @{ Cmd = 'gb'; Desc = 'git branch' }
         @{ Cmd = 'gd / gds'; Desc = 'git diff / git diff --staged' }
         @{ Cmd = 'gp / gpf'; Desc = 'git push / push --force-with-lease' }
-        @{ Cmd = 'gpl / gf'; Desc = 'git pull / fetch --all --prune (大文字小文字違いブランチの ref 衝突対策込み)' }
+        @{ Cmd = 'gpl / gf'; Desc = 'git pull / fetch --all --prune (大文字小文字違いの ref・ファイルパス衝突を自動解決)' }
         @{ Cmd = 'gsta/gstp/gstl'; Desc = 'git stash push/pop/list' }
         @{ Cmd = 'gcm <msg>'; Desc = 'git commit -m' }
         @{ Cmd = 'gco [branch]'; Desc = 'checkout (引数なしは fzf で選択)' }
