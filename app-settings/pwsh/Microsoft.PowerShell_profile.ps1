@@ -720,7 +720,8 @@ $script:DevTools = @(
     @{ Name = 'Files'; Backend = 'winget'; Id = 'FilesCommunity.Files' }
     @{ Name = 'Everything'; Backend = 'winget'; Id = 'voidtools.Everything' }
     @{ Name = 'PC Manager'; Backend = 'msstore'; Id = '9PM860492SZD' }
-    @{ Name = 'Waypoint'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/waypoint/main/installer/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\waypoint\waypoint.exe') }
+    @{ Name = 'Waypoint'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/waypoint/main/installer/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\waypoint\waypoint.exe'); Args = @('-Silent') }
+    @{ Name = 'Windows-Operation-Cli'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/Windows-Operation-Cli/main/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\windows-operation-cli\windows-operation-cli.exe') }
     @{ Name = 'starship'; Backend = 'winget'; Id = 'Starship.Starship'; Cmd = 'starship' }
     @{ Name = 'zoxide'; Backend = 'winget'; Id = 'ajeetdsouza.zoxide'; Cmd = 'zoxide' }
     @{ Name = 'eza'; Backend = 'winget'; Id = 'eza-community.eza'; Cmd = 'eza' }
@@ -869,9 +870,11 @@ function Install-DevTools {
                 }
                 'psmodule' { Install-Module $t.Id -Scope CurrentUser -Force -AcceptLicense }
                 'script' {
-                    $installerPath = Join-Path $env:TEMP 'waypoint-install.ps1'
+                    $installerName = $t.Name -replace '[^A-Za-z0-9._-]', '-'
+                    $installerPath = Join-Path $env:TEMP "$installerName-install.ps1"
                     Invoke-WebRequest -Uri $t.Id -OutFile $installerPath
-                    & $installerPath -Silent
+                    if ($t.Args) { & $installerPath @($t.Args) }
+                    else { & $installerPath }
                 }
                 'remote-config' {
                     $content = Get-DotfilesRemoteConfig $t
