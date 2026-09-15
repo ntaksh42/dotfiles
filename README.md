@@ -37,16 +37,22 @@ notepad ~/.gitconfig.local
 ## ステータスライン設定
 
 `claude/settings.template.json` の `statusLine` は `npx -y ccstatusline@latest`
-を呼び出します。ccstatusline はレイアウト設定を `~/ccstatusline-config.json`
-から読み込むため、管理元の
-`app-settings/ccstatusline/ccstatusline-config.json` をホーム直下に配置します。
+を呼び出します。ccstatusline はレイアウト設定を
+`~/.config/ccstatusline/settings.json` から読み込みます。この設定は
+`app-settings/ccstatusline/settings.json` を管理元として `Install-DevTools`
+（remote-config バックエンド）が配置・更新します。
 
 ```powershell
-Copy-Item app-settings/ccstatusline/ccstatusline-config.json ~/ccstatusline-config.json
+Install-DevTools
 ```
 
+ccstatusline はTUI上での編集で設定ファイル自身を書き換えるため、
+`Install-DevTools` は配置済みの設定と管理元の内容が異なる場合、差分を表示した
+上で上書き可否を確認します（手元での編集を誤って消さないよう、この確認は
+`-Force` を付けても省略されません）。
+
 配置後は Claude Code を再起動すると、モデル・コンテキスト使用率・git ブランチ・
-セッション使用量の 3 行構成が反映されます。
+セッション使用量などの構成が反映されます。
 
 ## セットアップ手順
 

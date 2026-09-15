@@ -835,6 +835,9 @@ function Show-DevEnv {
 # Install missing catalog tools. Script-backed tools (e.g. Waypoint) have no winget/PSGallery
 # update path, so an already-installed one is re-run here too to pull the latest version
 # instead of being skipped (idempotent; confirm unless -Force).
+# remote-config の既存ファイル上書きは、ccstatusline のようにアプリ自身が書き換える
+# 生きた設定を壊しうるため、-Force でも確認とJSON検証は省略しない
+# （-Force が省略するのは冒頭の一括インストール確認と delta 導入後の確認のみ）。
 function Install-DevTools {
     [CmdletBinding()]
     param([switch]$Force)
@@ -878,13 +881,23 @@ function Install-DevTools {
                 }
                 'remote-config' {
                     $content = Get-DotfilesRemoteConfig $t
+                    # 取得内容がJSON宛先なのに壊れている場合、既存の生きた設定を
+                    # 壊れたJSONで上書きしてしまう事故（例: StripCommentLines の
+                    # 設定ミスで先頭行が欠落）を防ぐため、書き込み前に検証する。
+                    if ($t.Dest -like '*.json') {
+                        try { $null = $content | ConvertFrom-Json }
+                        catch {
+                            throw "取得した $($t.RepoPath) が不正なJSONのため中断しました（$($_.Exception.Message)）。$($t.Dest) は変更していません。"
+                        }
+                    }
                     $destDir = Split-Path -Parent $t.Dest
                     if ($destDir -and -not (Test-Path -LiteralPath $destDir)) {
                         New-Item -ItemType Directory -Force -Path $destDir | Out-Null
                     }
                     $skip = $false
                     $existed = Test-Path -LiteralPath $t.Dest -PathType Leaf
-                    if (-not $Force -and $existed) {
+                    # 既存ファイルがある場合の上書き確認は -Force でも省略しない。
+                    if ($existed) {
                         Write-Host "  差分 (ローカル -> リポジトリ):" -ForegroundColor Cyan
                         Show-DotfilesRemoteConfigDiff -Tool $t -RemoteContent $content | Write-Host
                         $cfg = Read-Host "  $($t.Dest) は既に存在します。上書きしますか? (y/N)"
