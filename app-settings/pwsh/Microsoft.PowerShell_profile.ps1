@@ -720,8 +720,8 @@ $script:DevTools = @(
     @{ Name = 'Files'; Backend = 'winget'; Id = 'FilesCommunity.Files' }
     @{ Name = 'Everything'; Backend = 'winget'; Id = 'voidtools.Everything' }
     @{ Name = 'PC Manager'; Backend = 'msstore'; Id = '9PM860492SZD' }
-    @{ Name = 'Waypoint'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/waypoint/main/installer/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\waypoint\waypoint.exe'); Args = @('-Silent') }
-    @{ Name = 'Windows-Operation-Cli'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/Windows-Operation-Cli/main/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\windows-operation-cli\windows-operation-cli.exe'); Args = @('-FromRelease') }
+    @{ Name = 'Waypoint'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/waypoint/main/installer/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\waypoint\waypoint.exe'); Args = @{ Silent = $true } }
+    @{ Name = 'Windows-Operation-Cli'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/Windows-Operation-Cli/main/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\windows-operation-cli\windows-operation-cli.exe'); Args = @{ FromRelease = $true } }
     @{ Name = 'starship'; Backend = 'winget'; Id = 'Starship.Starship'; Cmd = 'starship' }
     @{ Name = 'zoxide'; Backend = 'winget'; Id = 'ajeetdsouza.zoxide'; Cmd = 'zoxide' }
     @{ Name = 'eza'; Backend = 'winget'; Id = 'eza-community.eza'; Cmd = 'eza' }
@@ -876,7 +876,9 @@ function Install-DevTools {
                     $installerName = $t.Name -replace '[^A-Za-z0-9._-]', '-'
                     $installerPath = Join-Path $env:TEMP "$installerName-install.ps1"
                     Invoke-WebRequest -Uri $t.Id -OutFile $installerPath
-                    if ($t.Args) { & $installerPath @($t.Args) }
+                    # Splat as a hashtable: an array of '-Flag' strings is passed
+                    # positionally, so switches never bind by name.
+                    if ($t.Args) { $installerArgs = $t.Args; & $installerPath @installerArgs }
                     else { & $installerPath }
                 }
                 'remote-config' {
