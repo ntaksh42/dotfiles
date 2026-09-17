@@ -731,7 +731,7 @@ $script:DevTools = @(
     @{ Name = 'Everything'; Backend = 'winget'; Id = 'voidtools.Everything' }
     @{ Name = 'PC Manager'; Backend = 'msstore'; Id = '9PM860492SZD' }
     @{ Name = 'Waypoint'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/waypoint/main/installer/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\waypoint\waypoint.exe'); Args = @{ Silent = $true }; RebootRequiredExitCode = 3010 }
-    @{ Name = 'Windows-Operation-Cli'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/Windows-Operation-Cli/main/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\windows-operation-cli\windows-operation-cli.exe'); Args = @{ FromRelease = $true }; StopProcesses = @('windows-operation-cli') }
+    @{ Name = 'Windows-Operation-Cli'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/Windows-Operation-Cli/main/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\windows-operation-cli\windows-operation-cli.exe'); Args = @{ FromRelease = $true }; StopProcesses = @('windows-operation-cli'); RequiredCommand = 'claude' }
     @{ Name = 'starship'; Backend = 'winget'; Id = 'Starship.Starship'; Cmd = 'starship' }
     @{ Name = 'zoxide'; Backend = 'winget'; Id = 'ajeetdsouza.zoxide'; Cmd = 'zoxide' }
     @{ Name = 'eza'; Backend = 'winget'; Id = 'eza-community.eza'; Cmd = 'eza' }
@@ -811,7 +811,11 @@ function Test-ToolInstalled {
     switch ($Tool.Backend) {
         'psmodule' { return [bool](Get-Module -ListAvailable -Name $Tool.Id) }
         'pip' { return (Test-Cmd $Tool.Cmd) }
-        'script' { return (Test-Path -LiteralPath $Tool.Path -PathType Leaf) }
+        'script' {
+            if (-not (Test-Path -LiteralPath $Tool.Path -PathType Leaf)) { return $false }
+            if ($Tool.RequiredCommand -and -not (Get-Command $Tool.RequiredCommand -ErrorAction Ignore)) { return $false }
+            return $true
+        }
         'remote-config' {
             if (-not (Test-Path -LiteralPath $Tool.Dest -PathType Leaf)) { return $false }
             try {
@@ -922,6 +926,9 @@ function Install-DevTools {
                         else {
                             throw
                         }
+                    }
+                    if ($t.RequiredCommand -and -not (Get-Command $t.RequiredCommand -ErrorAction Ignore)) {
+                        throw "$($t.Name) requires '$($t.RequiredCommand)' to register its MCP server."
                     }
                 }
                 'remote-config' {
