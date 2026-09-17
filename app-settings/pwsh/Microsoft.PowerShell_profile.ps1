@@ -22,6 +22,16 @@ function Test-Cmd {
     $script:_cmdCache[$Name]
 }
 
+# Native commands signal failures through $LASTEXITCODE rather than PowerShell
+# exceptions. Convert those failures into terminating errors for callers.
+function Assert-NativeCommandSucceeded {
+    param([Parameter(Mandatory)][string]$Command)
+
+    if ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0) {
+        throw "$Command failed with exit code $LASTEXITCODE."
+    }
+}
+
 # Cache a tool's shell-init output to a file and dot-source that instead of
 # spawning the tool on every startup. Regenerates when the exe is newer.
 function Get-InitCache {
@@ -720,8 +730,8 @@ $script:DevTools = @(
     @{ Name = 'Files'; Backend = 'winget'; Id = 'FilesCommunity.Files' }
     @{ Name = 'Everything'; Backend = 'winget'; Id = 'voidtools.Everything' }
     @{ Name = 'PC Manager'; Backend = 'msstore'; Id = '9PM860492SZD' }
-    @{ Name = 'Waypoint'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/waypoint/main/installer/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\waypoint\waypoint.exe'); Args = @{ Silent = $true } }
-    @{ Name = 'Windows-Operation-Cli'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/Windows-Operation-Cli/main/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\windows-operation-cli\windows-operation-cli.exe'); Args = @{ FromRelease = $true } }
+    @{ Name = 'Waypoint'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/waypoint/main/installer/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\waypoint\waypoint.exe'); Args = @{ Silent = $true }; RebootRequiredExitCode = 3010 }
+    @{ Name = 'Windows-Operation-Cli'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/Windows-Operation-Cli/main/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\windows-operation-cli\windows-operation-cli.exe'); Args = @{ FromRelease = $true }; StopProcesses = @('windows-operation-cli') }
     @{ Name = 'starship'; Backend = 'winget'; Id = 'Starship.Starship'; Cmd = 'starship' }
     @{ Name = 'zoxide'; Backend = 'winget'; Id = 'ajeetdsouza.zoxide'; Cmd = 'zoxide' }
     @{ Name = 'eza'; Backend = 'winget'; Id = 'eza-community.eza'; Cmd = 'eza' }
@@ -787,6 +797,7 @@ function Install-PythonIfMissing {
     if ((Test-Cmd python) -or (Test-Cmd pip)) { return $true }
     Write-Host 'Python/pip not found; installing Python via winget...' -ForegroundColor Green
     winget install --id Python.Python.3.12 --exact --source winget --accept-package-agreements --accept-source-agreements
+    Assert-NativeCommandSucceeded 'winget install Python.Python.3.12'
     refreshenv
     $script:_cmdCache.Remove('python'); $script:_cmdCache.Remove('pip')
     if ((Test-Cmd python) -or (Test-Cmd pip)) { return $true }
@@ -862,24 +873,56 @@ function Install-DevTools {
         $action = if ($toUpdate -contains $t) { 'Updating' } else { 'Installing' }
         Write-Host "$action $($t.Name)..." -ForegroundColor Green
         $ok = $false
+        $rebootRequired = $false
         try {
             switch ($t.Backend) {
-                'winget' { winget install --id $t.Id --exact --source winget --accept-package-agreements --accept-source-agreements }
-                'msstore' { winget install --id $t.Id --source msstore --accept-package-agreements --accept-source-agreements }
+                'winget' {
+                    winget install --id $t.Id --exact --source winget --accept-package-agreements --accept-source-agreements
+                    Assert-NativeCommandSucceeded "winget install $($t.Id)"
+                }
+                'msstore' {
+                    winget install --id $t.Id --source msstore --accept-package-agreements --accept-source-agreements
+                    Assert-NativeCommandSucceeded "winget install $($t.Id)"
+                }
                 'pip' {
                     if (-not (Install-PythonIfMissing)) { throw 'Python/pip not found and could not be installed' }
-                    if (Test-Cmd pip) { pip install --user $t.Id }
-                    else { python -m pip install --user $t.Id }
+                    if (Test-Cmd pip) {
+                        pip install --user $t.Id
+                        Assert-NativeCommandSucceeded "pip install $($t.Id)"
+                    }
+                    else {
+                        python -m pip install --user $t.Id
+                        Assert-NativeCommandSucceeded "python -m pip install $($t.Id)"
+                    }
                 }
                 'psmodule' { Install-Module $t.Id -Scope CurrentUser -Force -AcceptLicense }
                 'script' {
+                    foreach ($processName in @($t.StopProcesses)) {
+                        if (-not $processName) { continue }
+                        $processes = @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
+                        if ($processes.Count -eq 0) { continue }
+                        Write-Host "  Stopping running $processName process(es)..." -ForegroundColor Gray
+                        $processes | Stop-Process -Force -ErrorAction Stop
+                        Wait-Process -Id $processes.Id -ErrorAction SilentlyContinue
+                    }
                     $installerName = $t.Name -replace '[^A-Za-z0-9._-]', '-'
                     $installerPath = Join-Path $env:TEMP "$installerName-install.ps1"
                     Invoke-WebRequest -Uri $t.Id -OutFile $installerPath
                     # Splat as a hashtable: an array of '-Flag' strings is passed
                     # positionally, so switches never bind by name.
-                    if ($t.Args) { $installerArgs = $t.Args; & $installerPath @installerArgs }
-                    else { & $installerPath }
+                    try {
+                        if ($t.Args) { $installerArgs = $t.Args; & $installerPath @installerArgs }
+                        else { & $installerPath }
+                    }
+                    catch {
+                        if ($t.RebootRequiredExitCode -and $_.Exception.Message -match "exit code $($t.RebootRequiredExitCode)") {
+                            $rebootRequired = $true
+                            Write-Warning "  Installed successfully, but Windows must be restarted before using $($t.Name)."
+                        }
+                        else {
+                            throw
+                        }
+                    }
                 }
                 'remote-config' {
                     $content = Get-DotfilesRemoteConfig $t
@@ -923,7 +966,8 @@ function Install-DevTools {
         catch {
             Write-Warning "  Failed: $($_.Exception.Message)"
         }
-        $results += [PSCustomObject]@{ Tool = $t.Name; Action = $action; Result = if ($ok) { 'OK' } else { 'FAILED' } }
+        $result = if (-not $ok) { 'FAILED' } elseif ($rebootRequired) { 'RESTART REQUIRED' } else { 'OK' }
+        $results += [PSCustomObject]@{ Tool = $t.Name; Action = $action; Result = $result }
 
         # Post-install: delta -> configure git pager (with confirmation)
         if ($ok -and $t.PostInstall -eq 'delta') {
