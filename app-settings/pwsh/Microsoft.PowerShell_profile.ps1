@@ -699,6 +699,17 @@ function ccr { claude --resume @args }
 # --- codex ---
 # 既定は ~/.codex/config.toml (on-request / workspace-write)。
 # 以下は安全度と推論強度を起動時に切り替えるためのプリセット。
+function codex {
+    $nativeOnly = @('exec', 'review', 'cloud', 'mcp', 'completion', 'login', 'logout', 'features', 'app-server')
+    $firstArg = if ($args.Count -gt 0) { [string]$args[0] } else { '' }
+    $nativeCodex = Join-Path $env:APPDATA 'npm\codex.cmd'
+    $wrapper = Join-Path $env:LOCALAPPDATA 'CodexStatusline\codex-wt.ps1'
+    if ($firstArg -in $nativeOnly -or $firstArg -in @('--help', '-h', '--version', '-V') -or -not (Test-Path -LiteralPath $wrapper)) {
+        & $nativeCodex @args
+        return
+    }
+    & $wrapper @args
+}
 function cx { codex @args }
 function cxr { codex -s read-only -a untrusted @args }
 function cxa { codex -a never -s workspace-write @args }
@@ -732,6 +743,7 @@ $script:DevTools = @(
     @{ Name = 'PC Manager'; Backend = 'msstore'; Id = '9PM860492SZD' }
     @{ Name = 'Waypoint'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/waypoint/main/installer/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\waypoint\waypoint.exe'); Args = @{ Silent = $true }; RebootRequiredExitCode = 3010 }
     @{ Name = 'Windows-Operation-Cli'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/Windows-Operation-Cli/main/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\windows-operation-cli\windows-operation-cli.exe'); Args = @{ FromRelease = $true }; StopProcesses = @('windows-operation-cli'); RequiredCommand = 'claude' }
+    @{ Name = 'Codex statusline'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-CodexStatusline.ps1"; Path = (Join-Path $env:LOCALAPPDATA 'CodexStatusline\codex-wt.ps1') }
     @{ Name = 'starship'; Backend = 'winget'; Id = 'Starship.Starship'; Cmd = 'starship' }
     @{ Name = 'zoxide'; Backend = 'winget'; Id = 'ajeetdsouza.zoxide'; Cmd = 'zoxide' }
     @{ Name = 'eza'; Backend = 'winget'; Id = 'eza-community.eza'; Cmd = 'eza' }

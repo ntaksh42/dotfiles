@@ -54,6 +54,23 @@ ccstatusline はTUI上での編集で設定ファイル自身を書き換える�
 配置後は Claude Code を再起動すると、モデル・コンテキスト使用率・git ブランチ・
 セッション使用量などの構成が反映されます。
 
+## Codex ステータスライン
+
+`Install-DevTools` は Codex 用の Windows Terminal ステータスラインも
+`%LOCALAPPDATA%\CodexStatusline` に配置します。PowerShell プロファイルを同期・再読み込み後、
+通常どおり `codex` を起動すると、下側 18% のペインにモデル、推論強度、コンテキスト、
+git 状態、セッション/週次の使用量を表示します。
+
+```powershell
+pwsh -File tools\Sync-AppSettings.ps1
+. $PROFILE
+Install-DevTools
+codex
+```
+
+`codex exec`、`codex review`、ログインや App Server などの非対話コマンドは、ステータスラインを
+開かず通常の Codex CLI を実行します。Python、Windows Terminal、Codex CLI が必要です。
+
 ## セットアップ手順
 
 ### 1. リポジトリをクローン
