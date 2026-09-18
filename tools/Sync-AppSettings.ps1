@@ -31,6 +31,7 @@ $pwsh7Profile = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'PowerSh
 # 同期マッピング: リポジトリ管理元（repo 相対） <-> 実環境の配置先
 $mappings = @(
     @{ Repo = "app-settings\pwsh\Microsoft.PowerShell_profile.ps1"; Env = $pwsh7Profile }
+    @{ Repo = "app-settings\starship\starship.toml"; Env = Join-Path $HOME ".config\starship.toml" }
 )
 
 foreach ($m in $mappings) {

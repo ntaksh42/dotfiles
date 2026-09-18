@@ -27,31 +27,32 @@ symbol = ""                  # グリフを使わない
 style = "bold purple"
 format = "[$branch]($style) "
 
-# 作業状況: git 標準記号 (+ ! ? ✘ » = $) にカウントを添えて色分け表示 (緊急度で色を統一)。
-#   危険/要対応 = bold red (=conflict, ✘del) / 要コミット = yellow系 (!mod, »mv)
-#   安全/進捗 = green系 (+add, ⇡ahead) / 情報 = 青系 (?new, $stash) / 要 pull = yellow (⇣behind)
-#   +N ステージ済み / !N 変更 / ?N 未追跡 / ✘N 削除 / »N リネーム
-#   $N stash / =N 競合 / ⇡N ahead / ⇣N behind
+# 作業状況: git diff --stat に近い +/-/~ 系の記号にカウントを添えて表示。
+#   +N ステージ済み (bold green) / ~N 未ステージの変更 (yellow)
+#   -N 削除 (bold red)           / ?N 未追跡 (blue)
+#   !N 競合 (bold red)           / ⇡N ahead (green) / ⇣N behind (yellow)
+# リネーム・stash は表示頻度が低く記号を覚える負担の方が大きいため出さない
+# (必要なら git status で確認する)。
 #
 # ローカルの変更は [] の中、リモートとの同期状態 (⇡⇣) は [] の外に置く。
 # 記号を読まずに「括弧の中に何かあるか」だけで未コミットの有無が判る。
-#   例: main [!3 +2 ?1 ] ⇡1  / クリーン時は括弧ごと消えて main のみ
+#   例: main [+2 ~3 ?1 ] ⇡1  / クリーン時は括弧ごと消えて main のみ
 # 項目間の区切りは各変数の末尾空白で付ける ($all_status は連結のみで trim できないため、
-# 閉じ括弧の直前に空白 1 個が残る: [!1 +1 ?1 ] 。先頭側に寄せると [ !1 … となり更に目立つ)。
-# format で変数を個別に並べ、緊急度順 (競合→削除→変更→改名→ステージ→未追跡→stash) に固定。
+# 閉じ括弧の直前に空白 1 個が残る: [+1 ~1 ?1 ] 。先頭側に寄せると [ +1 … となり更に目立つ)。
+# format で変数を個別に並べ、緊急度順 (競合→削除→変更→ステージ→未追跡) に固定。
 # format は TOML リテラル文字列 ('...') にする。基本文字列だと \[ が不正なエスケープになる。
 [git_status]
-conflicted = "[=${count}](bold red) "
+conflicted = "[!${count}](bold red) "
 ahead      = "[⇡${count}](green)"
 behind     = "[⇣${count}](yellow)"
 diverged   = "[⇡${ahead_count}⇣${behind_count}](bold red)"
 untracked  = "[?${count}](blue) "
-stashed    = "[\\$${count}](cyan) "
-modified   = "[!${count}](yellow) "
+stashed    = ""
+modified   = "[~${count}](yellow) "
 staged     = "[+${count}](bold green) "
-renamed    = "[»${count}](bold yellow) "
-deleted    = "[✘${count}](bold red) "
-format = '([\[](dimmed white)[$conflicted$deleted$modified$renamed$staged$untracked$stashed]()[\]](dimmed white) )([$ahead_behind]() )'
+renamed    = ""
+deleted    = "[-${count}](bold red) "
+format = '([\[](dimmed white)[$conflicted$deleted$modified$staged$untracked]()[\]](dimmed white) )([$ahead_behind]() )'
 
 # rebase / merge / cherry-pick / bisect の途中状態を表示 (進捗付き)
 [git_state]
