@@ -702,7 +702,8 @@ function ccr { claude --resume @args }
 function codex {
     $nativeOnly = @('exec', 'review', 'cloud', 'mcp', 'completion', 'login', 'logout', 'features', 'app-server')
     $firstArg = if ($args.Count -gt 0) { [string]$args[0] } else { '' }
-    $nativeCodex = Join-Path $env:APPDATA 'npm\codex.cmd'
+    $nativeCodex = (Get-Command codex.cmd -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+    if (-not $nativeCodex) { $nativeCodex = Join-Path $env:APPDATA 'npm\codex.cmd' }
     $wrapper = Join-Path $env:LOCALAPPDATA 'CodexStatusline\codex-wt.ps1'
     if ($firstArg -in $nativeOnly -or $firstArg -in @('--help', '-h', '--version', '-V') -or -not (Test-Path -LiteralPath $wrapper)) {
         & $nativeCodex @args
