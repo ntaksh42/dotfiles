@@ -804,6 +804,38 @@ function Show-DotfilesRemoteConfigDiff {
     }
 }
 
+# リポジトリ版のプロファイルで現在のプロファイルを更新する（差分表示 -> 確認 -> バックアップ -> 上書き -> 再読込）。
+# 上書き先は $PROFILE（クローンから dot-source している場合に管理元ファイルを潰さないため）。
+function Update-Profile {
+    [CmdletBinding()]
+    param([switch]$Force)
+
+    $tool = @{
+        RepoPath = 'app-settings/pwsh/Microsoft.PowerShell_profile.ps1'
+        Dest     = $PROFILE.CurrentUserCurrentHost
+    }
+    $content = Get-DotfilesRemoteConfig $tool
+    if (Test-Path -LiteralPath $tool.Dest -PathType Leaf) {
+        if ((Get-Content -LiteralPath $tool.Dest -Raw) -eq $content) {
+            Write-Host 'Profile is up to date.' -ForegroundColor Green
+            return
+        }
+        if (-not $Force) {
+            Show-DotfilesRemoteConfigDiff -Tool $tool -RemoteContent $content | Write-Host
+            if ((Read-Host "$($tool.Dest) を上書きしますか? (y/N)") -notmatch '^(y|yes)$') { Write-Host 'Aborted.'; return }
+        }
+        $backup = "$($tool.Dest).backup.$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+        Copy-Item -LiteralPath $tool.Dest -Destination $backup -Force
+        Write-Host "バックアップ: $backup" -ForegroundColor Gray
+    }
+    else {
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $tool.Dest) | Out-Null
+    }
+    Set-Content -LiteralPath $tool.Dest -Value $content -NoNewline -Encoding UTF8
+    Write-Host 'Profile updated. Reloading...' -ForegroundColor Green
+    . $tool.Dest
+}
+
 # Ensure Python/pip is available; install via winget if missing. Returns $true on success.
 function Install-PythonIfMissing {
     if ((Test-Cmd python) -or (Test-Cmd pip)) { return $true }
@@ -1170,6 +1202,7 @@ $script:ProfileHelp = [ordered]@{
         @{ Cmd = 'reload'; Desc = 'プロファイルを再読込' }
         @{ Cmd = 'Measure-ProfileStartup'; Desc = 'プロファイル起動時間を別プロセスで計測' }
         @{ Cmd = 'profile'; Desc = 'プロファイルを編集 (code/notepad)' }
+        @{ Cmd = 'Update-Profile [-Force]'; Desc = 'GitHub 上のリポジトリ版でプロファイルを更新 (差分確認・バックアップ・再読込)' }
     )
     'Git / GitHub'          = @(
         @{ Cmd = 'gs'; Desc = 'git status -sb' }
