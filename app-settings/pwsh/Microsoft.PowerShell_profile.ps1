@@ -709,6 +709,10 @@ function codex {
         & $nativeCodex @args
         return
     }
+    if ($env:WT_SESSION) {
+        & $wrapper -InternalCurrentWindow @args
+        return
+    }
     & $wrapper @args
 }
 function cx { codex @args }

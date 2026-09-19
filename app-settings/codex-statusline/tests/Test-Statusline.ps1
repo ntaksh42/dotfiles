@@ -48,8 +48,9 @@ function Get-Binding {
 $header
 [pscustomobject]@{
     CodexArgs = @(`$CodexArgs | Where-Object { `$null -ne `$_ })
-    ArgsFile  = `$ArgsFile
-    WindowId  = `$WindowId
+    ArgsFile  = `$InternalArgsFile
+    StopFile  = `$InternalStopFile
+    CurrentWindow = `$InternalCurrentWindow
 } | ConvertTo-Json -Compress
 "@ | Set-Content -LiteralPath $probe -Encoding utf8
     try {
@@ -60,7 +61,7 @@ $header
     }
 }
 
-# 位置引数が内部用の $ArgsFile に吸われ、codex に渡らないまま
+# 位置引数が内部用の $InternalArgsFile に吸われ、codex に渡らないまま
 # 「引数ファイルが見つかりません: resume」と警告が出ていた。
 Test-Case 'cx resume --last: 位置引数が CodexArgs に入る' {
     $b = Get-Binding @('resume', '--last')
@@ -74,12 +75,17 @@ Test-Case 'cx -s read-only: フラグが内部パラメータに吸われない'
 
 Test-Case '引数なし: CodexArgs は空・内部パラメータも空' {
     $b = Get-Binding @()
-    $b.CodexArgs.Count -eq 0 -and -not $b.ArgsFile -and -not $b.WindowId
+    $b.CodexArgs.Count -eq 0 -and -not $b.ArgsFile -and -not $b.StopFile
 }
 
 Test-Case '内部の受け渡しは名前付きで束縛できる' {
-    $b = Get-Binding @('-ArgsFile', 'C:\tmp\a.json', '-WindowId', 'codex-1')
-    $b.ArgsFile -eq 'C:\tmp\a.json' -and $b.WindowId -eq 'codex-1' -and $b.CodexArgs.Count -eq 0
+    $b = Get-Binding @('-InternalArgsFile', 'C:\tmp\a.json', '-InternalStopFile', 'codex-1')
+    $b.ArgsFile -eq 'C:\tmp\a.json' -and $b.StopFile -eq 'codex-1' -and $b.CodexArgs.Count -eq 0
+}
+
+Test-Case '現在のタブを使う内部指定は名前付きで束縛できる' {
+    $b = Get-Binding @('-InternalCurrentWindow', '-s', 'read-only')
+    $b.CurrentWindow -and ($b.CodexArgs -join ' ') -eq '-s read-only'
 }
 
 # ---------------------------------------------------------------------------
@@ -115,32 +121,35 @@ Test-Case '空配列も JSON 往復できる（引数なし起動）' {
 # codex-wt.ps1: 窓の指定と終了コード
 # ---------------------------------------------------------------------------
 
-# 第 1 段は採番した名前で窓を作る（-w new だと窓を特定できない）。
-Test-Case '第 1 段は採番した窓名で new-tab する' {
+# 窓を作る wt 呼び出しの中で split-pane まで済ませる。あとから別プロセスで
+# -w を使って窓を指し直すと、-w 0 が「直近に使われた窓」を指すため、codex と
+# 無関係な窓にペインが出てしまう（実機で再現）。
+Test-Case '新規ウィンドウ時は new-tab と split-pane を 1 回の wt 呼び出しで繋ぐ' {
     $text = Get-Content -LiteralPath $wrapper -Raw
-    ($text -match '\$windowName\s*=') -and ($text -match '-w\s+\$windowName\s+new-tab') -and ($text -notmatch '-w\s+new\s+new-tab')
+    ($text -match "'new-tab'") -and ($text -match "'split-pane'") -and
+    ($text -match "(?m)^\s*';'\s*$")
 }
 
-# 第 2 段はその窓の中で動いているため、自分の窓を名前で指し直すと
-# wt がその窓を別途呼び出しに行き、ペインが出ないことがある。
-# 現在の窓を指す -w 0 を使う。
-Test-Case '第 2 段は現在の窓 (-w 0) に split-pane する' {
+# 第 2 段は split-pane を一切呼ばない（呼ぶと窓を取り違える）。
+Test-Case '現在のタブ用の split-pane は明示指定時だけ使う' {
     $text = Get-Content -LiteralPath $wrapper -Raw
-    ($text -match '-w\s+0\s+split-pane') -and ($text -notmatch '-w\s+\$WindowId\s+split-pane')
+    ($text -match 'if \(\$InternalCurrentWindow\) \{') -and
+    ($text -match '& \$wt -w 0 split-pane')
 }
 
 # $env:WT_SESSION は「Windows Terminal の中にいる」ことしか示さないため、
 # これを分岐条件にすると、既に開いているタブで cx を叩いただけで
 # そこにステータスラインのペインが割り込んでいた。
-Test-Case '再起動の判定は WT_SESSION ではなく WindowId で行う' {
+Test-Case '再起動の判定は WT_SESSION ではなく StopFile で行う' {
     $text = Get-Content -LiteralPath $wrapper -Raw
-    ($text -match '(?m)^if \(-not \$WindowId\) \{') -and ($text -notmatch 'if \(-not \$env:WT_SESSION\)')
+    ($text -match '(?m)^if \(-not \$InternalStopFile\) \{') -and ($text -notmatch 'if \(-not \$env:WT_SESSION\)')
 }
 
-# WindowId が無い経路で split-pane に到達すると症状が再発するため、
-# '0' へのフォールバックが残っていないことを固定する。
-Test-Case "窓指定に '0' フォールバックが残っていない" {
-    (Get-Content -LiteralPath $wrapper -Raw) -notmatch "else\s*\{\s*'0'\s*\}"
+# 窓指定の '0' フォールバックが残っていると、codex と無関係な窓に
+# ペインが出る症状が再発する。
+Test-Case "窓指定の '0' は現在のタブ用のみに限定する" {
+    $text = Get-Content -LiteralPath $wrapper -Raw
+    ([regex]::Matches($text, '-w 0 split-pane')).Count -eq 1
 }
 
 # codex 起動が throw すると $exitCode が未代入のまま finally を抜け、
@@ -183,23 +192,32 @@ $($match.Value)
     }
 }
 
-# 実際に wt でタブを起動し、第 2 段が動いて引数ファイルを消費するまでを見る。
-# ファイル内容の照合だけでは、起動経路が壊れていても pass してしまう。
-Test-Case '実際に wt タブが起動し、第 2 段が引数ファイルを消費する' {
+# 第 1 段が組み立てる argv と同じ形で wt を起動し、上下**両方**のペインが
+# 実際にプロセスを起こすことを見る。ファイル内容の照合だけでは、
+# split-pane が黙って何も作らなくても pass してしまう（実際に取り逃した）。
+Test-Case '1 回の wt 呼び出しで上下 2 つのペインが起動する' {
     $wtExe = (Get-Command wt.exe -ErrorAction SilentlyContinue).Source
     if (-not $wtExe) { throw 'wt.exe が無い' }
-    $handoff = Join-Path ([System.IO.Path]::GetTempPath()) "codex-args-probe-$([guid]::NewGuid().ToString('N')).json"
-    ConvertTo-Json -InputObject @(@('--version')) -Depth 3 | Set-Content -LiteralPath $handoff -Encoding utf8
-    $window = "codex-selftest-$([guid]::NewGuid().ToString('N').Substring(0, 6))"
-    & $wtExe -w $window new-tab -d $env:TEMP --title CodexSelfTest `
-        $pwshExe -NoProfile -File $wrapper -ArgsFile $handoff -WindowId $window
-    $deadline = (Get-Date).AddSeconds(15)
-    while ((Get-Date) -lt $deadline -and (Test-Path -LiteralPath $handoff)) {
+    $tag = [guid]::NewGuid().ToString('N').Substring(0, 8)
+    $top = Join-Path ([System.IO.Path]::GetTempPath()) "pane-top-$tag.txt"
+    $bottom = Join-Path ([System.IO.Path]::GetTempPath()) "pane-bottom-$tag.txt"
+    $argv = @(
+        '-w', 'new'
+        'new-tab', '-d', $env:TEMP, '--title', 'CodexSelfTest'
+        $pwshExe, '-NoProfile', '-NoExit', '-Command', "'top' | Set-Content -LiteralPath '$top'; Start-Sleep 20"
+        ';'
+        'split-pane', '-H', '-s', '0.18', '-d', $env:TEMP, '--title', 'CodexSelfTest Status'
+        $pwshExe, '-NoProfile', '-NoExit', '-Command', "'bottom' | Set-Content -LiteralPath '$bottom'; Start-Sleep 20"
+    )
+    & $wtExe @argv
+    $deadline = (Get-Date).AddSeconds(20)
+    while ((Get-Date) -lt $deadline) {
+        if ((Test-Path -LiteralPath $top) -and (Test-Path -LiteralPath $bottom)) { break }
         Start-Sleep -Milliseconds 300
     }
-    $consumed = -not (Test-Path -LiteralPath $handoff)
-    Remove-Item -LiteralPath $handoff -Force -ErrorAction SilentlyContinue
-    $consumed
+    $both = (Test-Path -LiteralPath $top) -and (Test-Path -LiteralPath $bottom)
+    Remove-Item -LiteralPath $top, $bottom -Force -ErrorAction SilentlyContinue
+    $both
 }
 
 # ---------------------------------------------------------------------------
