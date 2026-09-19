@@ -10,8 +10,10 @@ $codex = (Get-Command codex.cmd -ErrorAction Stop).Source
 $cwd = (Get-Location).Path
 
 if (-not $env:WT_SESSION) {
+    # wt.exe は呼び出し元の PATH を継承しないため、pwsh.exe は絶対パスで渡す。
+    $pwsh = (Get-Command pwsh.exe -ErrorAction Stop).Source
     & (Get-Command wt.exe -ErrorAction Stop).Source -w new new-tab -d $cwd --title Codex `
-        pwsh.exe -NoExit -File $PSCommandPath @CodexArgs
+        $pwsh -NoExit -File $PSCommandPath @CodexArgs
     return
 }
 
