@@ -154,6 +154,47 @@ Test-Case 'codex-wt.ps1 が構文エラーを持たない' {
     -not $errors
 }
 
+# wt の -d に渡せるのは実在するファイルシステムのディレクトリだけ。
+# レジストリや Env: などのプロバイダパスを渡すとタブ自体が起動できず、
+# 「'codex' の起動時にエラー 2147942402 (0x80070002)」で失敗していた。
+Test-Case 'cwd はファイルシステム以外の場所でも実在ディレクトリになる' {
+    # ラッパーから cwd 決定ロジックだけを抜き出し、Env: ドライブ上で評価する。
+    $source = Get-Content -LiteralPath $wrapper -Raw
+    $match = [regex]::Match($source, '(?s)\$location = Get-Location.*?\nelse \{.*?\n\}')
+    if (-not $match.Success) { throw 'cwd 決定ロジックが見つかりません' }
+    $probe = Join-Path ([System.IO.Path]::GetTempPath()) "cwd-$([guid]::NewGuid().ToString('N')).ps1"
+    @"
+Set-Location Env:
+$($match.Value)
+`$cwd
+"@ | Set-Content -LiteralPath $probe -Encoding utf8
+    try {
+        $result = (& $pwshExe -NoProfile -File $probe 2>&1 | Select-Object -Last 1 | Out-String).Trim()
+        $result -and (Test-Path -LiteralPath $result -PathType Container)
+    } finally {
+        Remove-Item -LiteralPath $probe -Force -ErrorAction SilentlyContinue
+    }
+}
+
+# 実際に wt でタブを起動し、第 2 段が動いて引数ファイルを消費するまでを見る。
+# ファイル内容の照合だけでは、起動経路が壊れていても pass してしまう。
+Test-Case '実際に wt タブが起動し、第 2 段が引数ファイルを消費する' {
+    $wtExe = (Get-Command wt.exe -ErrorAction SilentlyContinue).Source
+    if (-not $wtExe) { throw 'wt.exe が無い' }
+    $handoff = Join-Path ([System.IO.Path]::GetTempPath()) "codex-args-probe-$([guid]::NewGuid().ToString('N')).json"
+    ConvertTo-Json -InputObject @(@('--version')) -Depth 3 | Set-Content -LiteralPath $handoff -Encoding utf8
+    $window = "codex-selftest-$([guid]::NewGuid().ToString('N').Substring(0, 6))"
+    & $wtExe -w $window new-tab -d $env:TEMP --title CodexSelfTest `
+        $pwshExe -NoProfile -File $wrapper -ArgsFile $handoff -WindowId $window
+    $deadline = (Get-Date).AddSeconds(15)
+    while ((Get-Date) -lt $deadline -and (Test-Path -LiteralPath $handoff)) {
+        Start-Sleep -Milliseconds 300
+    }
+    $consumed = -not (Test-Path -LiteralPath $handoff)
+    Remove-Item -LiteralPath $handoff -Force -ErrorAction SilentlyContinue
+    $consumed
+}
+
 # ---------------------------------------------------------------------------
 # codex_statusline.py: 表示幅の切り詰め
 # ---------------------------------------------------------------------------

@@ -17,7 +17,18 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $python = (Get-Command python.exe -ErrorAction Stop).Source
-$cwd = (Get-Location).Path
+
+# wt の -d に渡せるのは実在するファイルシステム上のディレクトリだけ。
+# (Get-Location).Path はレジストリや Env: などのプロバイダパスにもなり得て、
+# その場合 wt はタブを起動できず「'codex' の起動時にエラー 2147942402
+# (0x80070002) 指定されたファイルが見つかりません」で失敗する。
+$location = Get-Location
+if ($location.Provider.Name -eq 'FileSystem' -and (Test-Path -LiteralPath $location.ProviderPath -PathType Container)) {
+    $cwd = $location.ProviderPath
+}
+else {
+    $cwd = $env:USERPROFILE
+}
 
 # プロファイル側と同じフォールバックを持たせる。codex.cmd が PATH に無いだけで
 # ラッパーごと落ちると、呼び出し元のフォールバックが働く前に失敗してしまう。
