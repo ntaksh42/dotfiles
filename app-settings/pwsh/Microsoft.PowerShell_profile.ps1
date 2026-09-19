@@ -761,6 +761,7 @@ $script:DevTools = @(
     @{ Name = 'lazygit'; Backend = 'winget'; Id = 'JesseDuffield.lazygit'; Cmd = 'lazygit' }
     @{ Name = 'VSCode'; Backend = 'winget'; Id = 'Microsoft.VisualStudioCode'; Cmd = 'code' }
     @{ Name = 'Python'; Backend = 'winget'; Id = 'Python.Python.3.12'; Cmd = 'python' }
+    @{ Name = 'PowerShell 7'; Backend = 'winget'; Id = 'Microsoft.PowerShell'; Cmd = 'pwsh' }
     @{ Name = 'PSFzf'; Backend = 'psmodule'; Id = 'PSFzf' }
     @{ Name = 'Terminal-Icons'; Backend = 'psmodule'; Id = 'Terminal-Icons' }
     @{ Name = 'gita'; Backend = 'pip'; Id = 'gita'; Cmd = 'gita' }
