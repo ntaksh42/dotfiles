@@ -1,11 +1,16 @@
 param(
-    [Parameter(ValueFromRemainingArguments = $true)]
+    # Position = 0 を明示しないと、位置引数が先に宣言された内部用パラメータへ
+    # 束縛されてしまう（例: cx resume の 'resume' が $ArgsFile に吸われ、
+    # codex に渡らないまま「引数ファイルが見つかりません」と警告が出る）。
+    [Parameter(Position = 0, ValueFromRemainingArguments = $true)]
     [string[]]$CodexArgs,
 
-    # 再起動時に引数を受け渡すための内部用パラメータ。利用者は指定しない。
+    # 内部用。再起動時に引数を受け渡す。利用者は指定しない。
+    [Parameter(DontShow)]
     [string]$ArgsFile,
 
-    # 再起動後の自分自身が使う、ステータスラインを出す窓の ID。
+    # 内部用。ステータスラインを出す窓の ID。
+    [Parameter(DontShow)]
     [string]$WindowId
 )
 
@@ -22,7 +27,10 @@ if (-not (Test-Path -LiteralPath $codex)) { throw "codex.cmd が見つかりま�
 
 $wt = (Get-Command wt.exe -ErrorAction Stop).Source
 
-if (-not $env:WT_SESSION) {
+# $WindowId は自分自身の再起動でしか渡らない。$env:WT_SESSION は「Windows
+# Terminal の中にいる」ことしか示さないため、これを条件にすると既に開いている
+# タブで cx を叩いただけでそこにステータスラインが割り込んでしまう。
+if (-not $WindowId) {
     # wt.exe は引数を自前のパーサで解釈し、';' をサブコマンド区切りとして
     # 食ってしまう（エラーにならず黙って切り捨てられる）。引数は wt の
     # コマンドラインに乗せず、一時ファイル経由で再起動後の自分に渡す。
@@ -53,11 +61,8 @@ if ($ArgsFile) {
 }
 if (-not $CodexArgs) { $CodexArgs = @() }
 
-# 自分を起動した窓が分かっていればそれを、分からなければ現在の窓を対象にする。
-$target = if ($WindowId) { $WindowId } else { '0' }
-
 $stopFile = Join-Path ([System.IO.Path]::GetTempPath()) "codex-statusline-$([guid]::NewGuid().ToString('N')).stop"
-& $wt -w $target split-pane -H -s 0.18 -d $cwd --title 'Codex Status' `
+& $wt -w $WindowId split-pane -H -s 0.18 -d $cwd --title 'Codex Status' `
     $python (Join-Path $PSScriptRoot 'codex_statusline.py') --cwd $cwd --since ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - 1) --stop-file $stopFile
 
 Start-Sleep -Milliseconds 400
