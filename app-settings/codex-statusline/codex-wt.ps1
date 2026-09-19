@@ -72,8 +72,11 @@ if ($ArgsFile) {
 }
 if (-not $CodexArgs) { $CodexArgs = @() }
 
+# ここは第 1 段が作った窓の中で動いている。自分がいる窓を名前で指し直すと
+# wt がその窓を別途呼び出しに行き、ペインが期待どおり出ないことがある。
+# 現在の窓を指す -w 0 を使う（この時点では自分の窓が最前面にいる）。
 $stopFile = Join-Path ([System.IO.Path]::GetTempPath()) "codex-statusline-$([guid]::NewGuid().ToString('N')).stop"
-& $wt -w $WindowId split-pane -H -s 0.18 -d $cwd --title 'Codex Status' `
+& $wt -w 0 split-pane -H -s 0.18 -d $cwd --title 'Codex Status' `
     $python (Join-Path $PSScriptRoot 'codex_statusline.py') --cwd $cwd --since ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - 1) --stop-file $stopFile
 
 Start-Sleep -Milliseconds 400

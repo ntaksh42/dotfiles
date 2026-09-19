@@ -115,11 +115,18 @@ Test-Case '空配列も JSON 往復できる（引数なし起動）' {
 # codex-wt.ps1: 窓の指定と終了コード
 # ---------------------------------------------------------------------------
 
-# -w 0 は「直近に使われた窓」であり -w new で作った窓とは限らないため、
-# ステータスラインが別の Terminal 窓に割り込むことがあった。
-Test-Case '窓は -w 0 ではなく採番した名前で指定する' {
+# 第 1 段は採番した名前で窓を作る（-w new だと窓を特定できない）。
+Test-Case '第 1 段は採番した窓名で new-tab する' {
     $text = Get-Content -LiteralPath $wrapper -Raw
-    ($text -notmatch '-w\s+0\s+split-pane') -and ($text -match '\$windowName\s*=') -and ($text -match '-w\s+\$WindowId\s+split-pane')
+    ($text -match '\$windowName\s*=') -and ($text -match '-w\s+\$windowName\s+new-tab') -and ($text -notmatch '-w\s+new\s+new-tab')
+}
+
+# 第 2 段はその窓の中で動いているため、自分の窓を名前で指し直すと
+# wt がその窓を別途呼び出しに行き、ペインが出ないことがある。
+# 現在の窓を指す -w 0 を使う。
+Test-Case '第 2 段は現在の窓 (-w 0) に split-pane する' {
+    $text = Get-Content -LiteralPath $wrapper -Raw
+    ($text -match '-w\s+0\s+split-pane') -and ($text -notmatch '-w\s+\$WindowId\s+split-pane')
 }
 
 # $env:WT_SESSION は「Windows Terminal の中にいる」ことしか示さないため、
