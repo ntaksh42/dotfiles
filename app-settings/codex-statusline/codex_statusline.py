@@ -173,6 +173,30 @@ def reset_at(value, minutes):
         return None
 
 
+ANSI_RE = re.compile(r"\033\[[0-9;]*m")
+
+
+def clip(line, columns):
+    """表示幅で切り詰める。ANSI エスケープは幅を持たないので予算から除外する。"""
+    width = 0
+    out = []
+    position = 0
+    for match in ANSI_RE.finditer(line):
+        for char in line[position:match.start()]:
+            if width >= columns:
+                return "".join(out) + "\033[0m"
+            out.append(char)
+            width += 1
+        out.append(match.group())
+        position = match.end()
+    for char in line[position:]:
+        if width >= columns:
+            break
+        out.append(char)
+        width += 1
+    return "".join(out)
+
+
 def render(state, color, columns):
     def paint(text, shade):
         return f"\033[{PALETTE[shade]}m{text}\033[0m" if color else str(text)
@@ -209,7 +233,7 @@ def render(state, color, columns):
 
     if state.get("mode"):
         lines.append(paint(">> ", "yellow") + item("Mode", state["mode"], "yellow", "yellow"))
-    return "\n".join(line[:columns] for line in lines)
+    return "\n".join(clip(line, columns) for line in lines)
 
 
 def main():
@@ -238,7 +262,9 @@ def main():
                 path = find_session(home, cwd, args.since)
                 if path:
                     reader = SessionReader(path)
-                next_find = now + 5
+                # codex がセッションを書き出すまで数秒かかる。見つかるまでは
+                # 短い間隔で探し、Ctx Used / Mode が出るまでの空白を縮める。
+                next_find = now + (5 if reader else 1)
             if reader:
                 state.update({k: v for k, v in reader.poll().items() if v is not None})
             if now >= next_limits:
