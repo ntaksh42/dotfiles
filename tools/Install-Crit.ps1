@@ -46,6 +46,7 @@ else {
 
 $config | Add-Member -NotePropertyName host -NotePropertyValue '127.0.0.1' -Force
 $config | Add-Member -NotePropertyName no_update_check -NotePropertyValue $true -Force
+$config | Add-Member -NotePropertyName share_url -NotePropertyValue '' -Force
 $config | Add-Member -NotePropertyName share_targets -NotePropertyValue @() -Force
 $config | Add-Member -NotePropertyName agent_cmd -NotePropertyValue '' -Force
 

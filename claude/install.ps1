@@ -1,4 +1,4 @@
-# Claude Code dotfiles installer for Windows
+﻿# Claude Code dotfiles installer for Windows
 # Usage: .\install.ps1
 
 param()
@@ -150,7 +150,7 @@ if ($HookRegistrations.Count -gt 0) {
 
     foreach ($reg in $HookRegistrations) {
         # PSObject に載せる値なので生パスで持たせる（エスケープは ConvertTo-Json が行う）
-        $cmd = "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$HooksDestDir\$($reg.file)`""
+        $cmd = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$HooksDestDir\$($reg.file)`""
         $cmdEntry = [PSCustomObject]@{ type = "command"; command = $cmd }
         if ($null -ne $reg.async)       { $cmdEntry | Add-Member -MemberType NoteProperty -Name "async"       -Value $reg.async }
         if ($null -ne $reg.asyncRewake) { $cmdEntry | Add-Member -MemberType NoteProperty -Name "asyncRewake" -Value $reg.asyncRewake }

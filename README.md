@@ -81,6 +81,7 @@ codex
 {
   "host": "127.0.0.1",
   "no_update_check": true,
+  "share_url": "",
   "share_targets": [],
   "agent_cmd": ""
 }
