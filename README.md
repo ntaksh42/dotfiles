@@ -71,6 +71,21 @@ codex
 `codex exec`、`codex review`、ログインや App Server などの非対話コマンドは、ステータスラインを
 開かず通常の Codex CLI を実行します。Python、Windows Terminal、Codex CLI が必要です。
 
+## Crit
+
+`Install-DevTools` は Crit 本体と Codex 連携もインストールします。インストール時に
+`~/.crit.config.json` の既存項目を維持しつつ、社内利用向けの安全設定として
+ローカルホスト限定、更新確認の無効化、Share の無効化、`agent_cmd` の無効化を設定します。
+
+```json
+{
+  "host": "127.0.0.1",
+  "no_update_check": true,
+  "share_targets": [],
+  "agent_cmd": ""
+}
+```
+
 ## セットアップ手順
 
 ### 1. リポジトリをクローン
