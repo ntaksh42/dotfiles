@@ -650,15 +650,9 @@ function killport {
     }
 }
 
-# 司令塔プロンプトはプロファイルと同じ場所の prompts/ に置く。
-# 見つからない場合でも起動を壊さないよう、委譲方針の最小版にフォールバックする。
-function script:Get-ClaudeOrchestPrompt {
-    $promptPath = Join-Path (Split-Path -Parent $script:DotfilesProfilePath) 'prompts\orchest.md'
-    if (Test-Path -LiteralPath $promptPath) {
-        return (Get-Content -LiteralPath $promptPath -Raw)
-    }
-    'あなたは司令塔として俯瞰・立案・検証を担い、実装は implementer サブエージェントに委譲し、成果物は evaluator サブエージェントに検証させる。委譲プロンプトは自己完結させること。'
-}
+# ---------------------------------------------------------------------------
+# §6 AI CLI launchers (Claude Code / Codex)
+# ---------------------------------------------------------------------------
 
 # 司令塔/実行を分離して claude 起動: 立案・俯瞰は上位モデル、実行はサブエージェント
 function script:Invoke-ClaudeOrchest {
@@ -667,11 +661,10 @@ function script:Invoke-ClaudeOrchest {
         [Parameter(Mandatory)][string]$SubagentModel,
         [object[]]$Rest
     )
-    $orchestPrompt = Get-ClaudeOrchestPrompt
     $prev = $env:CLAUDE_CODE_SUBAGENT_MODEL
     $env:CLAUDE_CODE_SUBAGENT_MODEL = $SubagentModel
     try {
-        claude --model $MainModel --append-system-prompt $orchestPrompt @Rest
+        claude --model $MainModel @Rest
     }
     finally {
         if ($null -ne $prev) { $env:CLAUDE_CODE_SUBAGENT_MODEL = $prev }
@@ -691,6 +684,9 @@ Set-Alias ccfp fable-orchest-plan
 function cc { claude --model claude-opus-5 @args }
 Set-Alias ccop cc
 function ccp { claude --model claude-opus-5 --permission-mode plan @args }
+
+# Sonnet 5 で claude 起動（軽作業向け）
+function ccs { claude --model claude-sonnet-5 @args }
 
 # 直近の会話を継続 / セッションを選んで再開
 function ccc { claude --continue @args }
@@ -715,8 +711,7 @@ function codex {
     }
     & $wrapper @args
 }
-function cx { codex @args }
-function cxr { codex -s read-only -a untrusted @args }
+function cxr{ codex -s read-only -a untrusted @args }
 function cxa { codex -a never -s workspace-write @args }
 function cxh { codex -c model_reasoning_effort="high" @args }
 function cxrev { codex review @args }
@@ -734,7 +729,7 @@ function cxyolo {
 }
 
 # ---------------------------------------------------------------------------
-# §6 Environment setup helpers
+# §7 Environment setup helpers
 # ---------------------------------------------------------------------------
 
 # dotfiles リポジトリ（public）の raw コンテンツ取得元。app-settings 配下の設定ファイルを
@@ -1057,7 +1052,7 @@ function Update-DevTools {
 }
 
 # ---------------------------------------------------------------------------
-# §7 PSReadLine - prediction and key bindings
+# §8 PSReadLine - prediction and key bindings
 # ---------------------------------------------------------------------------
 
 # Interactive history search with delete support (Ctrl+r replacement)
@@ -1190,7 +1185,7 @@ if ($host.Name -eq 'ConsoleHost' -and -not [Console]::IsInputRedirected -and -no
 }
 
 # ---------------------------------------------------------------------------
-# §8 Help - list the commands this profile provides
+# §9 Help - list the commands this profile provides
 # ---------------------------------------------------------------------------
 
 # Catalog of commands defined above (data-driven; keep in sync when adding commands)
@@ -1245,17 +1240,21 @@ $script:ProfileHelp = [ordered]@{
         @{ Cmd = 'cat <file>'; Desc = 'bat 連携 (あれば)' }
         @{ Cmd = 'sudo <cmd>'; Desc = 'gsudo 連携 (あれば)' }
         @{ Cmd = 'z / zi'; Desc = 'zoxide スマート cd (あれば)' }
-        @{ Cmd = 'refreshenv'; Desc = 'PATH を再読込 (インストール後に)' }
+        @{ Cmd = 'refreshenv / Update-SessionPath'; Desc = 'PATH を再読込 (インストール後に)' }
+        @{ Cmd = 'phelp [keyword]'; Desc = 'このコマンド一覧を表示 (キーワードで絞り込み)' }
         @{ Cmd = 'clip / paste'; Desc = 'クリップボードへ書込 / 読出' }
         @{ Cmd = 'myip'; Desc = '公開 IP アドレスを表示' }
         @{ Cmd = 'port <n>'; Desc = 'ポートを使用中のプロセスを表示' }
         @{ Cmd = 'killport <n>'; Desc = 'ポートを使用中のプロセスを強制終了' }
+    )
+    'Claude Code'           = @(
         @{ Cmd = 'fable-orchest / ccf'; Desc = 'Fable が立案・Sonnet 5 が実行の構成で claude 起動' }
         @{ Cmd = 'fable-orchest-opus / ccfo'; Desc = 'Fable が立案・Opus 5 が実行の構成で claude 起動' }
         @{ Cmd = 'opus-orchest / cco'; Desc = 'Opus 5 が立案・Sonnet 5 が実行の構成で claude 起動' }
         @{ Cmd = 'fable-orchest-plan / ccfp'; Desc = 'ccf を plan モードで起動（立案を承認してから実行）' }
         @{ Cmd = 'cc / ccop'; Desc = 'Opus 5 で claude 起動（司令塔プロンプトなし、既定コマンド）' }
         @{ Cmd = 'ccp'; Desc = 'cc を plan モードで起動' }
+        @{ Cmd = 'ccs'; Desc = 'Sonnet 5 で claude 起動（軽作業向け）' }
         @{ Cmd = 'ccc'; Desc = '直近の会話を継続 (claude --continue)' }
         @{ Cmd = 'ccr'; Desc = 'セッションを選んで再開 (claude --resume)' }
     )
@@ -1303,6 +1302,6 @@ function Show-ProfileHelp {
         }
     }
     Write-Host ''
-    Write-Host "tip: 'phelp <keyword>' で絞り込み (例: phelp git) / Ctrl+g でコマンドパレット検索" -ForegroundColor DarkGray
+    Write-Host "tip: 'phelp <keyword>' で絞り込み (例: phelp git) / Ctrl+g でコマンドパレット検索 / Ctrl+r で履歴検索" -ForegroundColor DarkGray
 }
 Set-Alias phelp Show-ProfileHelp
