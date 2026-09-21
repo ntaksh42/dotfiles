@@ -543,6 +543,8 @@ function msb { msbuild @args }
 # screen, which is visible as a one-time flash from the default prompt to
 # starship's -- not worth the ~400-500ms saved (see zoxide's comment below).
 if (Test-Cmd starship) {
+    # 親プロセス経由で TERM=dumb が渡されると、starship が毎プロンプトでエラーを出す。
+    if ($env:TERM -eq 'dumb') { Remove-Item Env:TERM }
     . (Get-InitCache 'starship' 'starship' { starship init powershell --print-full-init })
 }
 
@@ -592,6 +594,8 @@ $null = Register-EngineEvent -SourceIdentifier PowerShell.OnIdle -Action {
     if (Get-Module -ListAvailable -Name Terminal-Icons) {
         Import-Module Terminal-Icons
     }
+    # 遅延ロード中に初回プロンプトが消えることがあるため、完了後に再描画する。
+    try { [Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt() } catch {}
 }
 
 # Native tab completion (verified snippets), each guarded on command presence
