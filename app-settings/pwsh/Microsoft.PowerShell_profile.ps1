@@ -740,7 +740,7 @@ function cxyolo {
 # クローンなしで取得するために使う。
 $script:DotfilesRawBase = 'https://raw.githubusercontent.com/ntaksh42/dotfiles/main'
 
-# Tool catalog (data-driven). Backend: winget | msstore | pip | psmodule | script | remote-config
+# Tool catalog (data-driven). Backend: winget | msstore | pip | psmodule | script | remote-config | symlink
 $script:DevTools = @(
     @{ Name = 'Files'; Backend = 'winget'; Id = 'FilesCommunity.Files' }
     @{ Name = 'Everything'; Backend = 'winget'; Id = 'voidtools.Everything' }
@@ -773,6 +773,7 @@ $script:DevTools = @(
     @{ Name = 'VSCode settings.json'; Backend = 'remote-config'; RepoPath = 'app-settings/vscode/settings.json'; Dest = (Join-Path $env:APPDATA 'Code\User\settings.json') }
     @{ Name = 'VSCode keybindings.json'; Backend = 'remote-config'; RepoPath = 'app-settings/vscode/keybindings.json'; Dest = (Join-Path $env:APPDATA 'Code\User\keybindings.json') }
     @{ Name = 'ccstatusline settings.json'; Backend = 'remote-config'; RepoPath = 'app-settings/ccstatusline/settings.json'; Dest = (Join-Path $env:USERPROFILE '.config\ccstatusline\settings.json') }
+    @{ Name = 'Skills link (Claude/Codex)'; Backend = 'symlink'; Target = (Join-Path $env:USERPROFILE '.agents\skills'); Dest = (Join-Path $env:USERPROFILE '.claude\skills') }
 )
 
 # remote-config バックエンド用: リポジトリ内のファイルを raw 経由で取得する（先頭の
@@ -865,6 +866,12 @@ function Test-ToolInstalled {
             if (-not (Test-Path -LiteralPath $Tool.Path -PathType Leaf)) { return $false }
             if ($Tool.RequiredCommand -and -not (Get-Command $Tool.RequiredCommand -ErrorAction Ignore)) { return $false }
             return $true
+        }
+        'symlink' {
+            $item = Get-Item -LiteralPath $Tool.Dest -Force -ErrorAction Ignore
+            if (-not $item -or -not $item.LinkType) { return $false }
+            $linked = ([string]@($item.Target)[0]).TrimEnd('\')
+            return ($linked -ieq $Tool.Target.TrimEnd('\'))
         }
         'remote-config' {
             if (-not (Test-Path -LiteralPath $Tool.Dest -PathType Leaf)) { return $false }
@@ -980,6 +987,37 @@ function Install-DevTools {
                     if ($t.RequiredCommand -and -not (Get-Command $t.RequiredCommand -ErrorAction Ignore)) {
                         throw "$($t.Name) requires '$($t.RequiredCommand)' to register its MCP server."
                     }
+                }
+                'symlink' {
+                    New-Item -ItemType Directory -Force -Path $t.Target | Out-Null
+                    $existing = Get-Item -LiteralPath $t.Dest -Force -ErrorAction Ignore
+                    if ($existing -and $existing.LinkType) {
+                        # 別の場所を指すリンクは作り直す（中身は移動しない）
+                        $existing.Delete()
+                    }
+                    elseif ($existing) {
+                        # 実体ディレクトリ: 中身を Target へ移動してからリンクに置き換える
+                        $children = @(Get-ChildItem -LiteralPath $t.Dest -Force)
+                        $conflicts = @($children | Where-Object { Test-Path -LiteralPath (Join-Path $t.Target $_.Name) })
+                        if ($conflicts) {
+                            throw "移動先に同名の項目があるため中断しました（$($conflicts.Name -join ', ')）。$($t.Dest) は変更していません。"
+                        }
+                        foreach ($c in $children) {
+                            Move-Item -LiteralPath $c.FullName -Destination $t.Target
+                            Write-Host "  移動: $($c.Name) -> $($t.Target)" -ForegroundColor Gray
+                        }
+                        Remove-Item -LiteralPath $t.Dest -Force
+                    }
+                    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $t.Dest) | Out-Null
+                    try {
+                        New-Item -ItemType SymbolicLink -Path $t.Dest -Target $t.Target -ErrorAction Stop | Out-Null
+                    }
+                    catch {
+                        # 開発者モード/管理者権限がない場合はジャンクションで代替（権限不要）
+                        Write-Host '  SymbolicLink を作成できないため Junction にフォールバックします。' -ForegroundColor Yellow
+                        New-Item -ItemType Junction -Path $t.Dest -Target $t.Target -ErrorAction Stop | Out-Null
+                    }
+                    Write-Host "  リンク: $($t.Dest) -> $($t.Target)" -ForegroundColor Gray
                 }
                 'remote-config' {
                     $content = Get-DotfilesRemoteConfig $t
