@@ -868,10 +868,15 @@ function Test-ToolInstalled {
             return $true
         }
         'symlink' {
-            $item = Get-Item -LiteralPath $Tool.Dest -Force -ErrorAction Ignore
-            if (-not $item -or -not $item.LinkType) { return $false }
-            $linked = ([string]@($item.Target)[0]).TrimEnd('\')
-            return ($linked -ieq $Tool.Target.TrimEnd('\'))
+            # 両ディレクトリの skill（SKILL.md を持つもの）がすべて相手側とリンクされていれば導入済み
+            foreach ($dir in $Tool.Dest, $Tool.Target) {
+                if (-not (Test-Path -LiteralPath $dir -PathType Container)) { return $false }
+            }
+            $unlinked = @(Get-ChildItem -LiteralPath $Tool.Dest -Directory -Force |
+                    Where-Object { -not $_.LinkType -and (Test-Path -LiteralPath (Join-Path $_.FullName 'SKILL.md')) })
+            $missing = @(Get-ChildItem -LiteralPath $Tool.Target -Directory -Force |
+                    Where-Object { (Test-Path -LiteralPath (Join-Path $_.FullName 'SKILL.md')) -and -not (Test-Path -LiteralPath (Join-Path $Tool.Dest $_.Name)) })
+            return (($unlinked.Count + $missing.Count) -eq 0)
         }
         'remote-config' {
             if (-not (Test-Path -LiteralPath $Tool.Dest -PathType Leaf)) { return $false }
@@ -989,35 +994,39 @@ function Install-DevTools {
                     }
                 }
                 'symlink' {
-                    New-Item -ItemType Directory -Force -Path $t.Target | Out-Null
-                    $existing = Get-Item -LiteralPath $t.Dest -Force -ErrorAction Ignore
-                    if ($existing -and $existing.LinkType) {
-                        # 別の場所を指すリンクは作り直す（中身は移動しない）
-                        $existing.Delete()
-                    }
-                    elseif ($existing) {
-                        # 実体ディレクトリ: 中身を Target へ移動してからリンクに置き換える
-                        $children = @(Get-ChildItem -LiteralPath $t.Dest -Force)
-                        $conflicts = @($children | Where-Object { Test-Path -LiteralPath (Join-Path $t.Target $_.Name) })
-                        if ($conflicts) {
-                            throw "移動先に同名の項目があるため中断しました（$($conflicts.Name -join ', ')）。$($t.Dest) は変更していません。"
+                    # すべての skill を Target（実体）に集約し、Dest 側はリンクにする。
+                    # Dest 側の実体は Target へ移動してリンクに置き換える。Target に同名がある場合は
+                    # Dest 側を正とし、Target 側は退避してから置き換える。Target にしかない skill は Dest にリンクを張る。
+                    New-Item -ItemType Directory -Force -Path $t.Target, $t.Dest | Out-Null
+                    $backupDir = Join-Path (Split-Path -Parent $t.Target) "skills-backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+                    $newLink = {
+                        param($Path, $LinkTarget)
+                        try {
+                            New-Item -ItemType SymbolicLink -Path $Path -Target $LinkTarget -ErrorAction Stop | Out-Null
                         }
-                        foreach ($c in $children) {
-                            Move-Item -LiteralPath $c.FullName -Destination $t.Target
-                            Write-Host "  移動: $($c.Name) -> $($t.Target)" -ForegroundColor Gray
+                        catch {
+                            # 開発者モード/管理者権限がない場合はジャンクションで代替（権限不要）
+                            New-Item -ItemType Junction -Path $Path -Target $LinkTarget -ErrorAction Stop | Out-Null
                         }
-                        Remove-Item -LiteralPath $t.Dest -Force
                     }
-                    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $t.Dest) | Out-Null
-                    try {
-                        New-Item -ItemType SymbolicLink -Path $t.Dest -Target $t.Target -ErrorAction Stop | Out-Null
+                    $isSkill = { -not $_.LinkType -and (Test-Path -LiteralPath (Join-Path $_.FullName 'SKILL.md')) }
+                    foreach ($s in @(Get-ChildItem -LiteralPath $t.Dest -Directory -Force | Where-Object $isSkill)) {
+                        $shared = Join-Path $t.Target $s.Name
+                        if (Test-Path -LiteralPath $shared) {
+                            New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
+                            Move-Item -LiteralPath $shared -Destination $backupDir
+                            Write-Host "  退避: $shared -> $backupDir" -ForegroundColor Yellow
+                        }
+                        Move-Item -LiteralPath $s.FullName -Destination $shared
+                        & $newLink $s.FullName $shared
+                        Write-Host "  共有: $($s.Name)" -ForegroundColor Gray
                     }
-                    catch {
-                        # 開発者モード/管理者権限がない場合はジャンクションで代替（権限不要）
-                        Write-Host '  SymbolicLink を作成できないため Junction にフォールバックします。' -ForegroundColor Yellow
-                        New-Item -ItemType Junction -Path $t.Dest -Target $t.Target -ErrorAction Stop | Out-Null
+                    foreach ($s in @(Get-ChildItem -LiteralPath $t.Target -Directory -Force | Where-Object $isSkill)) {
+                        $link = Join-Path $t.Dest $s.Name
+                        if (Test-Path -LiteralPath $link) { continue }
+                        & $newLink $link $s.FullName
+                        Write-Host "  リンク追加: $($s.Name)" -ForegroundColor Gray
                     }
-                    Write-Host "  リンク: $($t.Dest) -> $($t.Target)" -ForegroundColor Gray
                 }
                 'remote-config' {
                     $content = Get-DotfilesRemoteConfig $t
