@@ -915,9 +915,12 @@ function Show-DevEnv {
 # remote-config の既存ファイル上書きは、ccstatusline のようにアプリ自身が書き換える
 # 生きた設定を壊しうるため、-Force でも確認とJSON検証は省略しない
 # （-Force が省略するのは冒頭の一括インストール確認と delta 導入後の確認のみ）。
+# -Yes は上書き確認も含むすべての確認に y と答える（差分表示・JSON検証・バックアップは行う）。
 function Install-DevTools {
     [CmdletBinding()]
-    param([switch]$Force)
+    param([switch]$Force, [switch]$Yes)
+
+    if ($Yes) { $Force = $true }
 
     $toInstall = @($script:DevTools | Where-Object { -not (Test-ToolInstalled $_) })
     $toUpdate = @($script:DevTools | Where-Object { $_.Backend -eq 'script' -and (Test-ToolInstalled $_) })
@@ -1045,11 +1048,11 @@ function Install-DevTools {
                     }
                     $skip = $false
                     $existed = Test-Path -LiteralPath $t.Dest -PathType Leaf
-                    # 既存ファイルがある場合の上書き確認は -Force でも省略しない。
+                    # 既存ファイルがある場合の上書き確認は -Force でも省略しない（-Yes のみ省略）。
                     if ($existed) {
                         Write-Host "  差分 (ローカル -> リポジトリ):" -ForegroundColor Cyan
                         Show-DotfilesRemoteConfigDiff -Tool $t -RemoteContent $content | Write-Host
-                        $cfg = Read-Host "  $($t.Dest) は既に存在します。上書きしますか? (y/N)"
+                        $cfg = if ($Yes) { 'y' } else { Read-Host "  $($t.Dest) は既に存在します。上書きしますか? (y/N)" }
                         if ($cfg -notmatch '^(y|yes)$') { $skip = $true }
                     }
                     if ($skip) {
@@ -1322,7 +1325,7 @@ $script:ProfileHelp = [ordered]@{
     )
     'Dev environment'       = @(
         @{ Cmd = 'Show-DevEnv'; Desc = '開発ツールの導入状況を一覧' }
-        @{ Cmd = 'Install-DevTools'; Desc = '未導入ツールを一括インストール' }
+        @{ Cmd = 'Install-DevTools [-Yes]'; Desc = '未導入ツールを一括インストール (-Yes で全確認に y)' }
         @{ Cmd = 'Update-DevTools'; Desc = 'winget/PS モジュールを更新' }
     )
     'Aliases'               = @(
