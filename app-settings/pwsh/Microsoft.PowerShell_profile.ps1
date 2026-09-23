@@ -740,7 +740,7 @@ function cxyolo {
 # クローンなしで取得するために使う。
 $script:DotfilesRawBase = 'https://raw.githubusercontent.com/ntaksh42/dotfiles/main'
 
-# Tool catalog (data-driven). Backend: winget | msstore | pip | psmodule | script | remote-config | symlink
+# Tool catalog (data-driven). Backend: winget | msstore | pip | psmodule | script | remote-config
 $script:DevTools = @(
     @{ Name = 'Files'; Backend = 'winget'; Id = 'FilesCommunity.Files' }
     @{ Name = 'Everything'; Backend = 'winget'; Id = 'voidtools.Everything' }
@@ -773,7 +773,6 @@ $script:DevTools = @(
     @{ Name = 'VSCode settings.json'; Backend = 'remote-config'; RepoPath = 'app-settings/vscode/settings.json'; Dest = (Join-Path $env:APPDATA 'Code\User\settings.json') }
     @{ Name = 'VSCode keybindings.json'; Backend = 'remote-config'; RepoPath = 'app-settings/vscode/keybindings.json'; Dest = (Join-Path $env:APPDATA 'Code\User\keybindings.json') }
     @{ Name = 'ccstatusline settings.json'; Backend = 'remote-config'; RepoPath = 'app-settings/ccstatusline/settings.json'; Dest = (Join-Path $env:USERPROFILE '.config\ccstatusline\settings.json') }
-    @{ Name = 'Skills link (Claude/Codex)'; Backend = 'symlink'; Target = (Join-Path $env:USERPROFILE '.agents\skills'); Dest = (Join-Path $env:USERPROFILE '.claude\skills') }
 )
 
 # remote-config バックエンド用: リポジトリ内のファイルを raw 経由で取得する（先頭の
@@ -866,17 +865,6 @@ function Test-ToolInstalled {
             if (-not (Test-Path -LiteralPath $Tool.Path -PathType Leaf)) { return $false }
             if ($Tool.RequiredCommand -and -not (Get-Command $Tool.RequiredCommand -ErrorAction Ignore)) { return $false }
             return $true
-        }
-        'symlink' {
-            # 両ディレクトリの skill（SKILL.md を持つもの）がすべて相手側とリンクされていれば導入済み
-            foreach ($dir in $Tool.Dest, $Tool.Target) {
-                if (-not (Test-Path -LiteralPath $dir -PathType Container)) { return $false }
-            }
-            $unlinked = @(Get-ChildItem -LiteralPath $Tool.Dest -Directory -Force |
-                    Where-Object { -not $_.LinkType -and (Test-Path -LiteralPath (Join-Path $_.FullName 'SKILL.md')) })
-            $missing = @(Get-ChildItem -LiteralPath $Tool.Target -Directory -Force |
-                    Where-Object { (Test-Path -LiteralPath (Join-Path $_.FullName 'SKILL.md')) -and -not (Test-Path -LiteralPath (Join-Path $Tool.Dest $_.Name)) })
-            return (($unlinked.Count + $missing.Count) -eq 0)
         }
         'remote-config' {
             if (-not (Test-Path -LiteralPath $Tool.Dest -PathType Leaf)) { return $false }
@@ -994,41 +982,6 @@ function Install-DevTools {
                     }
                     if ($t.RequiredCommand -and -not (Get-Command $t.RequiredCommand -ErrorAction Ignore)) {
                         throw "$($t.Name) requires '$($t.RequiredCommand)' to register its MCP server."
-                    }
-                }
-                'symlink' {
-                    # すべての skill を Target（実体）に集約し、Dest 側はリンクにする。
-                    # Dest 側の実体は Target へ移動してリンクに置き換える。Target に同名がある場合は
-                    # Dest 側を正とし、Target 側は退避してから置き換える。Target にしかない skill は Dest にリンクを張る。
-                    New-Item -ItemType Directory -Force -Path $t.Target, $t.Dest | Out-Null
-                    $backupDir = Join-Path (Split-Path -Parent $t.Target) "skills-backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
-                    $newLink = {
-                        param($Path, $LinkTarget)
-                        try {
-                            New-Item -ItemType SymbolicLink -Path $Path -Target $LinkTarget -ErrorAction Stop | Out-Null
-                        }
-                        catch {
-                            # 開発者モード/管理者権限がない場合はジャンクションで代替（権限不要）
-                            New-Item -ItemType Junction -Path $Path -Target $LinkTarget -ErrorAction Stop | Out-Null
-                        }
-                    }
-                    $isSkill = { -not $_.LinkType -and (Test-Path -LiteralPath (Join-Path $_.FullName 'SKILL.md')) }
-                    foreach ($s in @(Get-ChildItem -LiteralPath $t.Dest -Directory -Force | Where-Object $isSkill)) {
-                        $shared = Join-Path $t.Target $s.Name
-                        if (Test-Path -LiteralPath $shared) {
-                            New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
-                            Move-Item -LiteralPath $shared -Destination $backupDir
-                            Write-Host "  退避: $shared -> $backupDir" -ForegroundColor Yellow
-                        }
-                        Move-Item -LiteralPath $s.FullName -Destination $shared
-                        & $newLink $s.FullName $shared
-                        Write-Host "  共有: $($s.Name)" -ForegroundColor Gray
-                    }
-                    foreach ($s in @(Get-ChildItem -LiteralPath $t.Target -Directory -Force | Where-Object $isSkill)) {
-                        $link = Join-Path $t.Dest $s.Name
-                        if (Test-Path -LiteralPath $link) { continue }
-                        & $newLink $link $s.FullName
-                        Write-Host "  リンク追加: $($s.Name)" -ForegroundColor Gray
                     }
                 }
                 'remote-config' {
