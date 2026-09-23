@@ -745,8 +745,8 @@ $script:DevTools = @(
     @{ Name = 'Files'; Backend = 'winget'; Id = 'FilesCommunity.Files' }
     @{ Name = 'Everything'; Backend = 'winget'; Id = 'voidtools.Everything' }
     @{ Name = 'PC Manager'; Backend = 'msstore'; Id = '9PM860492SZD' }
-    @{ Name = 'Waypoint'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/waypoint/main/installer/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\waypoint\waypoint.exe'); Args = @{ Silent = $true }; RebootRequiredExitCode = 3010 }
-    @{ Name = 'Windows-Operation-Cli'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/Windows-Operation-Cli/main/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\windows-operation-cli\windows-operation-cli.exe'); Args = @{ FromRelease = $true }; StopProcesses = @('windows-operation-cli'); RequiredCommand = 'claude' }
+    @{ Name = 'Waypoint'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/waypoint/main/installer/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\waypoint\waypoint.exe'); Args = @{ Silent = $true }; RebootRequiredExitCode = 3010; Repo = 'ntaksh42/waypoint' }
+    @{ Name = 'Windows-Operation-Cli'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/Windows-Operation-Cli/main/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\windows-operation-cli\windows-operation-cli.exe'); Args = @{ FromRelease = $true }; StopProcesses = @('windows-operation-cli'); RequiredCommand = 'claude'; Repo = 'ntaksh42/Windows-Operation-Cli' }
     @{ Name = 'Codex statusline'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-CodexStatusline.ps1"; Path = (Join-Path $env:LOCALAPPDATA 'CodexStatusline\codex-wt.ps1') }
     @{ Name = 'Crit'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-Crit.ps1"; Path = (Join-Path $env:USERPROFILE '.local\bin\crit.exe') }
     @{ Name = 'starship'; Backend = 'winget'; Id = 'Starship.Starship'; Cmd = 'starship' }
@@ -855,6 +855,58 @@ function Install-PythonIfMissing {
     return $false
 }
 
+# script バックエンドの導入済みバージョン記録先。インストーラが実行ファイルに
+# バージョン情報を埋めないもの（windows-operation-cli）があるため、成功した
+# インストール時のタグをここに書き出して次回の比較に使う。
+function Get-DevToolVersionMarkerPath {
+    param([Parameter(Mandatory)]$Tool)
+    $name = $Tool.Name -replace '[^A-Za-z0-9._-]', '-'
+    return Join-Path $env:LOCALAPPDATA "dotfiles\devtools\$name.version"
+}
+
+# GitHub Releases の最新タグ。取得できない場合（オフライン・レート制限）は $null を返し、
+# 呼び出し側はバージョン不明として従来どおり再インストール扱いにする。
+function Get-DevToolLatestVersion {
+    param([Parameter(Mandatory)]$Tool)
+    if (-not $Tool.Repo) { return $null }
+    try {
+        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$($Tool.Repo)/releases/latest" `
+            -Headers @{ 'User-Agent' = 'dotfiles-install-devtools' }
+        return ($release.tag_name -replace '^v', '')
+    }
+    catch {
+        return $null
+    }
+}
+
+# 導入済みバージョン。マーカーファイルを優先し、無ければ実行ファイルの
+# ProductVersion（MSI 由来の Waypoint はこれを持つ）にフォールバックする。
+function Get-DevToolInstalledVersion {
+    param([Parameter(Mandatory)]$Tool)
+    $marker = Get-DevToolVersionMarkerPath $Tool
+    if (Test-Path -LiteralPath $marker -PathType Leaf) {
+        $recorded = (Get-Content -LiteralPath $marker -Raw).Trim()
+        if ($recorded) { return ($recorded -replace '^v', '') }
+    }
+    if ($Tool.Path -and (Test-Path -LiteralPath $Tool.Path -PathType Leaf)) {
+        $product = (Get-Item -LiteralPath $Tool.Path).VersionInfo.ProductVersion
+        if ($product) { return ($product.Trim() -replace '^v', '') }
+    }
+    return $null
+}
+
+# 最新版が入っているかどうか。どちらかのバージョンが不明なら $false（= 更新対象）にして、
+# 判定できないことを理由に更新を取りこぼさないようにする。
+function Test-DevToolUpToDate {
+    param([Parameter(Mandatory)]$Tool)
+    if (-not $Tool.Repo) { return $false }
+    $installed = Get-DevToolInstalledVersion $Tool
+    if (-not $installed) { return $false }
+    $latest = Get-DevToolLatestVersion $Tool
+    if (-not $latest) { return $false }
+    return ($installed -eq $latest)
+}
+
 # Detect whether a catalog tool is installed
 function Test-ToolInstalled {
     param([Parameter(Mandatory)]$Tool)
@@ -899,7 +951,8 @@ function Show-DevEnv {
 
 # Install missing catalog tools. Script-backed tools (e.g. Waypoint) have no winget/PSGallery
 # update path, so an already-installed one is re-run here too to pull the latest version
-# instead of being skipped (idempotent; confirm unless -Force).
+# instead of being skipped (idempotent; confirm unless -Force)。ただし Repo を持つものは
+# GitHub Releases の最新タグと導入済みバージョンを比較し、最新なら再インストールしない。
 # remote-config の既存ファイル上書きは、ccstatusline のようにアプリ自身が書き換える
 # 生きた設定を壊しうるため、-Force でも確認とJSON検証は省略しない
 # （-Force が省略するのは冒頭の一括インストール確認と delta 導入後の確認のみ）。
@@ -911,7 +964,9 @@ function Install-DevTools {
     if ($Yes) { $Force = $true }
 
     $toInstall = @($script:DevTools | Where-Object { -not (Test-ToolInstalled $_) })
-    $toUpdate = @($script:DevTools | Where-Object { $_.Backend -eq 'script' -and (Test-ToolInstalled $_) })
+    $toUpdate = @($script:DevTools | Where-Object {
+            $_.Backend -eq 'script' -and (Test-ToolInstalled $_) -and -not (Test-DevToolUpToDate $_)
+        })
     $pending = @($toInstall + $toUpdate)
     if ($pending.Count -eq 0) { Write-Host 'All dev tools already installed.' -ForegroundColor Green; return }
 
@@ -1022,6 +1077,16 @@ function Install-DevTools {
                 }
             }
             $ok = $true
+            # 次回の更新判定用に、入れたバージョンを記録する。取得できなければ
+            # 記録しない（= 次回はバージョン不明として再インストールされる）。
+            if ($t.Repo) {
+                $installedVersion = Get-DevToolLatestVersion $t
+                if ($installedVersion) {
+                    $marker = Get-DevToolVersionMarkerPath $t
+                    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $marker) | Out-Null
+                    Set-Content -LiteralPath $marker -Value $installedVersion -NoNewline -Encoding UTF8
+                }
+            }
         }
         catch {
             Write-Warning "  Failed: $($_.Exception.Message)"
