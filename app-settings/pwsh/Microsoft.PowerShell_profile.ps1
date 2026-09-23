@@ -745,10 +745,10 @@ $script:DevTools = @(
     @{ Name = 'Files'; Backend = 'winget'; Id = 'FilesCommunity.Files' }
     @{ Name = 'Everything'; Backend = 'winget'; Id = 'voidtools.Everything' }
     @{ Name = 'PC Manager'; Backend = 'msstore'; Id = '9PM860492SZD' }
-    @{ Name = 'Waypoint'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/waypoint/main/installer/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\waypoint\waypoint.exe'); Args = @{ Silent = $true }; RebootRequiredExitCode = 3010; Repo = 'ntaksh42/waypoint' }
-    @{ Name = 'Windows-Operation-Cli'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/Windows-Operation-Cli/main/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\windows-operation-cli\windows-operation-cli.exe'); Args = @{ FromRelease = $true }; StopProcesses = @('windows-operation-cli'); RequiredCommand = 'claude'; Repo = 'ntaksh42/Windows-Operation-Cli' }
-    @{ Name = 'Codex statusline'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-CodexStatusline.ps1"; Path = (Join-Path $env:LOCALAPPDATA 'CodexStatusline\codex-wt.ps1') }
-    @{ Name = 'Crit'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-Crit.ps1"; Path = (Join-Path $env:USERPROFILE '.local\bin\crit.exe') }
+    @{ Name = 'Waypoint'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/waypoint/main/installer/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\waypoint\waypoint.exe'); Args = @{ Silent = $true }; RebootRequiredExitCode = 3010; Repo = 'ntaksh42/waypoint'; VersionSource = 'product' }
+    @{ Name = 'Windows-Operation-Cli'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/Windows-Operation-Cli/main/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\windows-operation-cli\windows-operation-cli.exe'); Args = @{ FromRelease = $true }; RequiredCommand = 'claude'; Repo = 'ntaksh42/Windows-Operation-Cli' }
+    @{ Name = 'Codex statusline'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-CodexStatusline.ps1"; Path = (Join-Path $env:LOCALAPPDATA 'CodexStatusline\codex-wt.ps1'); RemoteFiles = @('app-settings/codex-statusline/codex_statusline.py', 'app-settings/codex-statusline/codex-wt.ps1') }
+    @{ Name = 'Crit'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-Crit.ps1"; Path = (Join-Path $env:USERPROFILE '.local\bin\crit.exe'); Repo = 'tomasz-tomczyk/crit'; VersionSource = 'command' }
     @{ Name = 'starship'; Backend = 'winget'; Id = 'Starship.Starship'; Cmd = 'starship' }
     @{ Name = 'zoxide'; Backend = 'winget'; Id = 'ajeetdsouza.zoxide'; Cmd = 'zoxide' }
     @{ Name = 'eza'; Backend = 'winget'; Id = 'eza-community.eza'; Cmd = 'eza' }
@@ -855,56 +855,70 @@ function Install-PythonIfMissing {
     return $false
 }
 
-# script バックエンドの導入済みバージョン記録先。インストーラが実行ファイルに
-# バージョン情報を埋めないもの（windows-operation-cli）があるため、成功した
-# インストール時のタグをここに書き出して次回の比較に使う。
+# windows-operation-cli は実行ファイルに版情報がないため、導入時のタグと
+# 実行ファイルのハッシュを記録して次回の比較に使う。
 function Get-DevToolVersionMarkerPath {
     param([Parameter(Mandatory)]$Tool)
     $name = $Tool.Name -replace '[^A-Za-z0-9._-]', '-'
     return Join-Path $env:LOCALAPPDATA "dotfiles\devtools\$name.version"
 }
 
-# GitHub Releases の最新タグ。取得できない場合（オフライン・レート制限）は $null を返し、
-# 呼び出し側はバージョン不明として従来どおり再インストール扱いにする。
+# GitHub Releases の最新タグ。取得できない場合（オフライン・レート制限）は $null。
 function Get-DevToolLatestVersion {
     param([Parameter(Mandatory)]$Tool)
     if (-not $Tool.Repo) { return $null }
     try {
         $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$($Tool.Repo)/releases/latest" `
             -Headers @{ 'User-Agent' = 'dotfiles-install-devtools' }
-        return ($release.tag_name -replace '^v', '')
+        return $release.tag_name
     }
     catch {
         return $null
     }
 }
 
-# 導入済みバージョン。マーカーファイルを優先し、無ければ実行ファイルの
-# ProductVersion（MSI 由来の Waypoint はこれを持つ）にフォールバックする。
+# 導入済みバージョン。版情報がない windows-operation-cli のみマーカーを使う。
 function Get-DevToolInstalledVersion {
     param([Parameter(Mandatory)]$Tool)
-    $marker = Get-DevToolVersionMarkerPath $Tool
-    if (Test-Path -LiteralPath $marker -PathType Leaf) {
-        $recorded = (Get-Content -LiteralPath $marker -Raw).Trim()
-        if ($recorded) { return ($recorded -replace '^v', '') }
-    }
-    if ($Tool.Path -and (Test-Path -LiteralPath $Tool.Path -PathType Leaf)) {
+    if ($Tool.VersionSource -eq 'product') {
         $product = (Get-Item -LiteralPath $Tool.Path).VersionInfo.ProductVersion
         if ($product) { return ($product.Trim() -replace '^v', '') }
+        return $null
+    }
+    if ($Tool.VersionSource -eq 'command') {
+        try {
+            $output = @(& $Tool.Path --version)
+            if ($LASTEXITCODE -eq 0 -and $output[0] -match '^crit v([^\s]+)') { return $Matches[1] }
+        }
+        catch {}
+        return $null
+    }
+    $marker = Get-DevToolVersionMarkerPath $Tool
+    if ((Test-Path -LiteralPath $marker -PathType Leaf) -and
+        (Test-Path -LiteralPath $Tool.Path -PathType Leaf)) {
+        $recorded = @(Get-Content -LiteralPath $marker)
+        if ($recorded.Count -ge 2 -and $recorded[0].Trim() -and
+            $recorded[1].Trim() -eq (Get-FileHash -LiteralPath $Tool.Path).Hash) {
+            return ($recorded[0].Trim() -replace '^v', '')
+        }
     }
     return $null
 }
 
-# 最新版が入っているかどうか。どちらかのバージョンが不明なら $false（= 更新対象）にして、
-# 判定できないことを理由に更新を取りこぼさないようにする。
-function Test-DevToolUpToDate {
+# 配布元の2ファイルが両方ともローカルと一致するか確認する。通信失敗時は $null。
+function Test-DevToolRemoteFilesUpToDate {
     param([Parameter(Mandatory)]$Tool)
-    if (-not $Tool.Repo) { return $false }
-    $installed = Get-DevToolInstalledVersion $Tool
-    if (-not $installed) { return $false }
-    $latest = Get-DevToolLatestVersion $Tool
-    if (-not $latest) { return $false }
-    return ($installed -eq $latest)
+    $upToDate = $true
+    try {
+        foreach ($relativePath in $Tool.RemoteFiles) {
+            $remote = (Invoke-WebRequest -Uri "$script:DotfilesRawBase/$relativePath" -UseBasicParsing).Content
+            $localPath = Join-Path (Split-Path -Parent $Tool.Path) (Split-Path -Leaf $relativePath)
+            if (-not (Test-Path -LiteralPath $localPath -PathType Leaf) -or
+                (Get-Content -LiteralPath $localPath -Raw) -cne $remote) { $upToDate = $false }
+        }
+    }
+    catch { return $null }
+    return $upToDate
 }
 
 # Detect whether a catalog tool is installed
@@ -949,10 +963,8 @@ function Show-DevEnv {
     } | Format-Table -AutoSize
 }
 
-# Install missing catalog tools. Script-backed tools (e.g. Waypoint) have no winget/PSGallery
-# update path, so an already-installed one is re-run here too to pull the latest version
-# instead of being skipped (idempotent; confirm unless -Force)。ただし Repo を持つものは
-# GitHub Releases の最新タグと導入済みバージョンを比較し、最新なら再インストールしない。
+# Install missing catalog tools. Script-backed tools compare installed versions or
+# remote file contents before updating. If the remote check fails, skip the update.
 # remote-config の既存ファイル上書きは、ccstatusline のようにアプリ自身が書き換える
 # 生きた設定を壊しうるため、-Force でも確認とJSON検証は省略しない
 # （-Force が省略するのは冒頭の一括インストール確認と delta 導入後の確認のみ）。
@@ -964,9 +976,33 @@ function Install-DevTools {
     if ($Yes) { $Force = $true }
 
     $toInstall = @($script:DevTools | Where-Object { -not (Test-ToolInstalled $_) })
-    $toUpdate = @($script:DevTools | Where-Object {
-            $_.Backend -eq 'script' -and (Test-ToolInstalled $_) -and -not (Test-DevToolUpToDate $_)
-        })
+    $latestVersions = @{}
+    $toUpdate = @(foreach ($tool in $script:DevTools) {
+        if ($tool.Backend -ne 'script' -or -not (Test-ToolInstalled $tool)) { continue }
+        if ($tool.Repo) {
+            $latest = Get-DevToolLatestVersion $tool
+            if (-not $latest) {
+                Write-Warning "$($tool.Name): latest version could not be checked; skipping update."
+                continue
+            }
+            $latestVersions[$tool.Name] = $latest
+            if ((Get-DevToolInstalledVersion $tool) -eq ($latest -replace '^v', '')) { continue }
+        }
+        elseif ($tool.RemoteFiles) {
+            $upToDate = Test-DevToolRemoteFilesUpToDate $tool
+            if ($null -eq $upToDate) {
+                Write-Warning "$($tool.Name): remote files could not be checked; skipping update."
+                continue
+            }
+            if ($upToDate) { continue }
+        }
+        if ($tool.Name -eq 'Windows-Operation-Cli' -and
+            (Get-Process -Name 'windows-operation-cli' -ErrorAction SilentlyContinue)) {
+            Write-Warning 'Windows-Operation-Cli is running; close it before updating.'
+            continue
+        }
+        $tool
+    })
     $pending = @($toInstall + $toUpdate)
     if ($pending.Count -eq 0) { Write-Host 'All dev tools already installed.' -ForegroundColor Green; return }
 
@@ -1009,21 +1045,23 @@ function Install-DevTools {
                 }
                 'psmodule' { Install-Module $t.Id -Scope CurrentUser -Force -AcceptLicense }
                 'script' {
-                    foreach ($processName in @($t.StopProcesses)) {
-                        if (-not $processName) { continue }
-                        $processes = @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
-                        if ($processes.Count -eq 0) { continue }
-                        Write-Host "  Stopping running $processName process(es)..." -ForegroundColor Gray
-                        $processes | Stop-Process -Force -ErrorAction Stop
-                        Wait-Process -Id $processes.Id -ErrorAction SilentlyContinue
-                    }
                     $installerName = $t.Name -replace '[^A-Za-z0-9._-]', '-'
                     $installerPath = Join-Path $env:TEMP "$installerName-install.ps1"
                     Invoke-WebRequest -Uri $t.Id -OutFile $installerPath
                     # Splat as a hashtable: an array of '-Flag' strings is passed
                     # positionally, so switches never bind by name.
                     try {
-                        if ($t.Args) { $installerArgs = $t.Args; & $installerPath @installerArgs }
+                        if ($t.Args) {
+                            $installerArgs = $t.Args.Clone()
+                            if ($t.Name -eq 'Windows-Operation-Cli') {
+                                $releaseTag = $latestVersions[$t.Name]
+                                if (-not $releaseTag) { $releaseTag = Get-DevToolLatestVersion $t }
+                                if (-not $releaseTag) { throw 'Windows-Operation-Cli release could not be checked.' }
+                                $latestVersions[$t.Name] = $releaseTag
+                                $installerArgs.Version = $releaseTag
+                            }
+                            & $installerPath @installerArgs
+                        }
                         else { & $installerPath }
                     }
                     catch {
@@ -1077,14 +1115,15 @@ function Install-DevTools {
                 }
             }
             $ok = $true
-            # 次回の更新判定用に、入れたバージョンを記録する。取得できなければ
-            # 記録しない（= 次回はバージョン不明として再インストールされる）。
-            if ($t.Repo) {
-                $installedVersion = Get-DevToolLatestVersion $t
+            # 実行ファイルから版を読めないものだけ、更新前に確認したタグを記録する。
+            if ($t.Repo -and -not $t.VersionSource) {
+                $installedVersion = $latestVersions[$t.Name]
+                if (-not $installedVersion) { $installedVersion = Get-DevToolLatestVersion $t }
                 if ($installedVersion) {
                     $marker = Get-DevToolVersionMarkerPath $t
+                    $hash = (Get-FileHash -LiteralPath $t.Path).Hash
                     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $marker) | Out-Null
-                    Set-Content -LiteralPath $marker -Value $installedVersion -NoNewline -Encoding UTF8
+                    Set-Content -LiteralPath $marker -Value "$installedVersion`n$hash" -NoNewline -Encoding UTF8
                 }
             }
         }
