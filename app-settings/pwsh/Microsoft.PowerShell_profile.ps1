@@ -877,18 +877,57 @@ function Get-DevToolLatestVersion {
     }
 }
 
+# 比較用にバージョン文字列を正規化する（前後空白・先頭 v・+ビルドメタデータを除去）。
+function ConvertTo-DevToolVersion {
+    param([AllowNull()][string]$Version)
+    if (-not $Version) { return $null }
+    return (($Version.Trim() -replace '^[vV]', '') -split '\+', 2)[0]
+}
+
+# 導入済みが最新以上なら $true。数値として読めれば 1.2.3 と 1.2.3.0 を同一視し、
+# 導入済みの方が新しい場合も更新しない。読めなければ文字列一致で判定する。
+function Test-DevToolVersionCurrent {
+    param([AllowNull()][string]$Installed, [Parameter(Mandatory)][string]$Latest)
+    $i = ConvertTo-DevToolVersion $Installed
+    $l = ConvertTo-DevToolVersion $Latest
+    if (-not $i) { return $false }
+    $iv = $null; $lv = $null
+    if ([version]::TryParse($i, [ref]$iv) -and [version]::TryParse($l, [ref]$lv)) {
+        # [version] は省略された部分を -1 とするため 0 埋めしてから比較する。
+        $pad = { param($v) [version]::new($v.Major, $v.Minor, [math]::Max($v.Build, 0), [math]::Max($v.Revision, 0)) }
+        return ((& $pad $iv) -ge (& $pad $lv))
+    }
+    return ($i -eq $l)
+}
+
+# 改行コード・BOM・末尾の改行の違いを無視してテキストを比較する。
+function Test-DevToolTextEqual {
+    param([AllowNull()][string]$Left, [AllowNull()][string]$Right)
+    $normalize = { param($s) if ($null -eq $s) { return $null }; ($s.TrimStart([char]0xFEFF) -replace "`r`n", "`n").TrimEnd("`n") }
+    return ((& $normalize $Left) -ceq (& $normalize $Right))
+}
+
+# ローカルファイルを UTF-8 として読む（Windows PowerShell の Get-Content は BOM なし
+# UTF-8 を ANSI として読み、日本語を含むファイルが常に不一致になるため）。
+function Read-DevToolLocalText {
+    param([Parameter(Mandatory)][string]$Path)
+    return [IO.File]::ReadAllText($Path, [Text.Encoding]::UTF8)
+}
+
 # 導入済みバージョン。版情報がない windows-operation-cli のみマーカーを使う。
 function Get-DevToolInstalledVersion {
     param([Parameter(Mandatory)]$Tool)
     if ($Tool.VersionSource -eq 'product') {
-        $product = (Get-Item -LiteralPath $Tool.Path).VersionInfo.ProductVersion
-        if ($product) { return ($product.Trim() -replace '^v', '') }
+        $info = (Get-Item -LiteralPath $Tool.Path).VersionInfo
+        foreach ($v in @($info.ProductVersion, $info.FileVersion)) {
+            if ($v -and $v.Trim()) { return (ConvertTo-DevToolVersion $v) }
+        }
         return $null
     }
     if ($Tool.VersionSource -eq 'command') {
         try {
-            $output = @(& $Tool.Path --version)
-            if ($LASTEXITCODE -eq 0 -and $output[0] -match '^crit v([^\s]+)') { return $Matches[1] }
+            $output = @(& $Tool.Path --version) -join "`n"
+            if ($LASTEXITCODE -eq 0 -and $output -match '\bv?(\d+\.\d+[^\s]*)') { return (ConvertTo-DevToolVersion $Matches[1]) }
         }
         catch {}
         return $null
@@ -914,7 +953,7 @@ function Test-DevToolRemoteFilesUpToDate {
             $remote = (Invoke-WebRequest -Uri "$script:DotfilesRawBase/$relativePath" -UseBasicParsing).Content
             $localPath = Join-Path (Split-Path -Parent $Tool.Path) (Split-Path -Leaf $relativePath)
             if (-not (Test-Path -LiteralPath $localPath -PathType Leaf) -or
-                (Get-Content -LiteralPath $localPath -Raw) -cne $remote) { $upToDate = $false }
+                -not (Test-DevToolTextEqual (Read-DevToolLocalText $localPath) $remote)) { $upToDate = $false }
         }
     }
     catch { return $null }
@@ -926,27 +965,43 @@ function Test-ToolInstalled {
     param([Parameter(Mandatory)]$Tool)
     switch ($Tool.Backend) {
         'psmodule' { return [bool](Get-Module -ListAvailable -Name $Tool.Id) }
-        'pip' { return (Test-Cmd $Tool.Cmd) }
-        'script' {
-            if (-not (Test-Path -LiteralPath $Tool.Path -PathType Leaf)) { return $false }
-            if ($Tool.RequiredCommand -and -not (Get-Command $Tool.RequiredCommand -ErrorAction Ignore)) { return $false }
-            return $true
+        'pip' {
+            if (Test-Cmd $Tool.Cmd) { return $true }
+            # --user の導入先 Scripts が PATH に無いとコマンドが見えないため pip 側でも確認する。
+            if (-not (Test-Cmd python)) { return $false }
+            $null = python -m pip show $Tool.Id 2>$null
+            return ($LASTEXITCODE -eq 0)
         }
+        # RequiredCommand の有無は導入済み判定に含めない（含めると claude が PATH に
+        # 無いだけで毎回インストーラが走り、最後に失敗する）。Install-DevTools 側で扱う。
+        'script' { return (Test-Path -LiteralPath $Tool.Path -PathType Leaf) }
         'remote-config' {
             if (-not (Test-Path -LiteralPath $Tool.Dest -PathType Leaf)) { return $false }
-            try {
-                $remote = Get-DotfilesRemoteConfig $Tool
-                $local = Get-Content -LiteralPath $Tool.Dest -Raw
-                return ($local -eq $remote)
-            }
+            try { $remote = Get-DotfilesRemoteConfig $Tool }
             catch {
-                return $false
+                # 取得できないのに未導入扱いにすると既存ファイルの上書き処理へ進むため、据え置く。
+                Write-Warning "$($Tool.Name): remote config could not be checked; keeping existing file."
+                return $true
             }
+            $local = Read-DevToolLocalText $Tool.Dest
+            if (Test-DevToolTextEqual $local $remote) { return $true }
+            # JSON は整形（インデント・改行）だけの違いを差分とみなさない。
+            if ($Tool.Dest -like '*.json') {
+                try {
+                    $l = $local | ConvertFrom-Json | ConvertTo-Json -Depth 100 -Compress
+                    $r = $remote | ConvertFrom-Json | ConvertTo-Json -Depth 100 -Compress
+                    return ($l -ceq $r)
+                }
+                catch {}
+            }
+            return $false
         }
         default {
             if ($Tool.Cmd -and (Test-Cmd $Tool.Cmd)) { return $true }
-            $listed = winget list --id $Tool.Id --exact 2>$null | Select-String -SimpleMatch $Tool.Id
-            return [bool]$listed
+            # 出力の Id 列は端末幅で「…」に切り詰められ文字列照合が外れるため、終了コード
+            # （見つからなければ非 0）で判定する。msstore の規約確認で止まらないよう同意も渡す。
+            $null = winget list --id $Tool.Id --exact --accept-source-agreements 2>$null
+            return ($LASTEXITCODE -eq 0)
         }
     }
 }
@@ -975,10 +1030,13 @@ function Install-DevTools {
 
     if ($Yes) { $Force = $true }
 
-    $toInstall = @($script:DevTools | Where-Object { -not (Test-ToolInstalled $_) })
+    # 判定は winget/ネットワークを伴うため1回だけ行い、以降は結果を使い回す。
+    $installed = @{}
+    foreach ($tool in $script:DevTools) { $installed[$tool.Name] = [bool](Test-ToolInstalled $tool) }
+    $toInstall = @($script:DevTools | Where-Object { -not $installed[$_.Name] })
     $latestVersions = @{}
     $toUpdate = @(foreach ($tool in $script:DevTools) {
-        if ($tool.Backend -ne 'script' -or -not (Test-ToolInstalled $tool)) { continue }
+        if ($tool.Backend -ne 'script' -or -not $installed[$tool.Name]) { continue }
         if ($tool.Repo) {
             $latest = Get-DevToolLatestVersion $tool
             if (-not $latest) {
@@ -986,7 +1044,7 @@ function Install-DevTools {
                 continue
             }
             $latestVersions[$tool.Name] = $latest
-            if ((Get-DevToolInstalledVersion $tool) -eq ($latest -replace '^v', '')) { continue }
+            if (Test-DevToolVersionCurrent (Get-DevToolInstalledVersion $tool) $latest) { continue }
         }
         elseif ($tool.RemoteFiles) {
             $upToDate = Test-DevToolRemoteFilesUpToDate $tool
@@ -1003,7 +1061,14 @@ function Install-DevTools {
         }
         $tool
     })
-    $pending = @($toInstall + $toUpdate)
+    # 前提コマンドが無いまま走らせても最後に失敗するだけなので、インストーラ自体を起動しない。
+    $pending = @($toInstall + $toUpdate | Where-Object {
+            if ($_.RequiredCommand -and -not (Get-Command $_.RequiredCommand -ErrorAction Ignore)) {
+                Write-Warning "$($_.Name): '$($_.RequiredCommand)' not found; skipping."
+                return $false
+            }
+            $true
+        })
     if ($pending.Count -eq 0) { Write-Host 'All dev tools already installed.' -ForegroundColor Green; return }
 
     Write-Host 'The following tools will be installed/updated:' -ForegroundColor Cyan
