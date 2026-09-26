@@ -1018,6 +1018,31 @@ function Show-DevEnv {
     } | Format-Table -AutoSize
 }
 
+function Sync-DevToolSkills {
+    param(
+        [string]$AgentsSkillsDir = (Join-Path $env:USERPROFILE '.agents\skills'),
+        [string]$ClaudeSkillsDir = (Join-Path $env:USERPROFILE '.claude\skills')
+    )
+
+    if (-not (Test-Path -LiteralPath $AgentsSkillsDir -PathType Container)) { return }
+    foreach ($skill in (Get-ChildItem -LiteralPath $AgentsSkillsDir -Directory -Force)) {
+        if ($skill.LinkType -or -not (Test-Path -LiteralPath (Join-Path $skill.FullName 'SKILL.md') -PathType Leaf)) { continue }
+        $destination = Join-Path $ClaudeSkillsDir $skill.Name
+        if (Get-Item -LiteralPath $destination -Force -ErrorAction SilentlyContinue) { continue }
+
+        New-Item -ItemType Directory -Path $ClaudeSkillsDir -Force | Out-Null
+        Move-Item -LiteralPath $skill.FullName -Destination $destination -ErrorAction Stop
+        try {
+            New-Item -ItemType SymbolicLink -Path $skill.FullName -Target $destination -ErrorAction Stop | Out-Null
+            Write-Host "Linked skill: $($skill.Name)" -ForegroundColor Gray
+        }
+        catch {
+            Move-Item -LiteralPath $destination -Destination $skill.FullName -ErrorAction Stop
+            throw
+        }
+    }
+}
+
 # Install missing catalog tools. Script-backed tools compare installed versions or
 # remote file contents before updating. If the remote check fails, skip the update.
 # remote-config の既存ファイル上書きは、ccstatusline のようにアプリ自身が書き換える
@@ -1069,7 +1094,11 @@ function Install-DevTools {
             }
             $true
         })
-    if ($pending.Count -eq 0) { Write-Host 'All dev tools already installed.' -ForegroundColor Green; return }
+    if ($pending.Count -eq 0) {
+        Sync-DevToolSkills
+        Write-Host 'All dev tools already installed.' -ForegroundColor Green
+        return
+    }
 
     Write-Host 'The following tools will be installed/updated:' -ForegroundColor Cyan
     $pending | ForEach-Object {
@@ -1080,6 +1109,8 @@ function Install-DevTools {
         $ans = Read-Host 'Proceed? (y/N)'
         if ($ans -notmatch '^(y|yes)$') { Write-Host 'Aborted.'; return }
     }
+
+    Sync-DevToolSkills
 
     $results = @()
     foreach ($t in $pending) {
