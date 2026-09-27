@@ -256,6 +256,7 @@ function Resolve-GitCaseCollision {
     foreach ($path in (git ls-tree -r --name-only $Upstream)) {
         if ($path) { $remote[$path.ToLowerInvariant()] = $path }
     }
+    Assert-NativeCommandSucceeded "git ls-tree $Upstream"
     if ($remote.Count -eq 0) { return }
 
     # ローカル側の候補: 追跡ファイルと未追跡ファイル。パスがリモートと大文字小文字
@@ -277,25 +278,36 @@ function Resolve-GitCaseCollision {
         $src = Join-Path (git rev-parse --show-toplevel).Trim() ($path -replace '/', '\')
         $dest = Join-Path $backupDir ($path -replace '/', '\')
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dest) | Out-Null
-        Move-Item -LiteralPath $src -Destination $dest -Force -ErrorAction SilentlyContinue
+        Move-Item -LiteralPath $src -Destination $dest -Force -ErrorAction Stop
+        if (-not (Test-Path -LiteralPath $dest -PathType Leaf)) {
+            throw "Failed to back up case-conflicting file: $path"
+        }
         # 追跡ファイルなら、退避で消えた分をインデックスからも落として pull を通す。
-        git rm --cached --quiet -- $path 2>$null
+        git ls-files --error-unmatch -- $path *> $null
+        if ($LASTEXITCODE -eq 0) {
+            git rm --cached --quiet -- $path 2>$null
+            Assert-NativeCommandSucceeded "git rm --cached -- $path"
+        }
         Write-Host "  [fix] $path -> $match (退避: $dest)" -ForegroundColor Yellow
     }
 }
 
 function gpl {
     git pack-refs --all
+    Assert-NativeCommandSucceeded 'git pack-refs --all'
 
     # 衝突判定には fetch 済みの upstream が要る。pull 前に取得しておく。
     git fetch --prune --quiet
+    Assert-NativeCommandSucceeded 'git fetch --prune'
     $upstream = (git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null)
     if ($LASTEXITCODE -eq 0 -and $upstream) {
         Resolve-GitCaseCollision -Upstream $upstream.Trim()
     }
 
     git pull @args
+    Assert-NativeCommandSucceeded 'git pull'
     git pack-refs --all
+    Assert-NativeCommandSucceeded 'git pack-refs --all'
 }
 
 # Commit with a message (message required)
@@ -436,7 +448,9 @@ function git-nuke {
     }
 
     git reset --hard $Ref
+    Assert-NativeCommandSucceeded "git reset --hard $Ref"
     git clean -ffdx
+    Assert-NativeCommandSucceeded 'git clean -ffdx'
 }
 
 # このディレクトリと直下のサブディレクトリにある git リポジトリを gita に登録。
@@ -780,7 +794,15 @@ $script:DevTools = @(
 function Get-DotfilesRemoteConfig {
     param([Parameter(Mandatory)]$Tool)
     $uri = "$script:DotfilesRawBase/$($Tool.RepoPath)"
-    $content = (Invoke-WebRequest -Uri $uri -UseBasicParsing).Content
+    try {
+        $content = (Invoke-WebRequest -Uri $uri -UseBasicParsing -TimeoutSec 15 -ErrorAction Stop).Content
+    }
+    catch {
+        throw "Failed to retrieve ${uri}: $($_.Exception.Message)"
+    }
+    if ([string]::IsNullOrWhiteSpace($content)) {
+        throw "Retrieved empty content from $uri."
+    }
     if ($Tool.StripCommentLines) {
         $lines = $content -split "`r?`n"
         $content = ($lines | Select-Object -Skip $Tool.StripCommentLines) -join "`n"
