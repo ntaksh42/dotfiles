@@ -258,6 +258,13 @@ function Resolve-GitPullCollision {
     foreach ($path in (git -c core.quotepath=false ls-tree -r --name-only $Upstream)) {
         if ($path) { $remote[$path.ToLowerInvariant()] = $path }
     }
+    # upstream 側のディレクトリ (全ての親パス)。未追跡ファイルとの「ファイル vs ディレクトリ」衝突判定用。
+    $remoteDirs = @{}
+    foreach ($key in $remote.Keys) {
+        for ($i = $key.IndexOf('/'); $i -ge 0; $i = $key.IndexOf('/', $i + 1)) {
+            $remoteDirs[$key.Substring(0, $i)] = $true
+        }
+    }
     Assert-NativeCommandSucceeded "git ls-tree $Upstream"
     if ($remote.Count -eq 0) { return }
 
@@ -271,7 +278,17 @@ function Resolve-GitPullCollision {
     $backupDir = $null
     foreach ($c in $candidates) {
         $path = $c.Path
-        $match = $remote[$path.ToLowerInvariant()]
+        $lower = $path.ToLowerInvariant()
+        $match = $remote[$lower]
+        if (-not $match -and -not $c.Tracked) {
+            # 未追跡ファイル <-> upstream ディレクトリ (foo vs foo/x)、またはその逆 (foo/x vs foo)
+            $isDir = $remoteDirs.ContainsKey($lower)
+            $underFile = $false
+            for ($i = $lower.IndexOf('/'); $i -ge 0; $i = $lower.IndexOf('/', $i + 1)) {
+                if ($remote.ContainsKey($lower.Substring(0, $i))) { $underFile = $true; break }
+            }
+            if ($isDir -or $underFile) { $match = $path }
+        }
         if (-not $match) { continue }
         # 追跡ファイルは大文字小文字違いのときだけ衝突。未追跡は同一パスでも衝突する。
         if ($c.Tracked -and $match -ceq $path) { continue }
