@@ -243,69 +243,104 @@ function gf {
     git fetch --all --prune @args
     git pack-refs --all
 }
-# core.ignorecase=true な NTFS では、リモートの Foo.cs とローカルの foo.cs が
-# 同一パスに解決されるため pull が "would be overwritten by merge" で止まる。
-# fetch 済みの upstream ツリーと作業ツリーを突き合わせ、大文字小文字だけが違う
-# ファイルを .git/case-conflict-backup/ へ退避してから pull を続行する。
-# (削除ではなく退避なのは、ローカル側に未コミットの中身が残る場合があるため)
-function Resolve-GitCaseCollision {
+# pull を止める「作業ツリー上の衝突」を、pull 前に .git/pull-backup/ へ退避して解消する。
+#  1) core.ignorecase=true な NTFS では、リモートの Foo.cs とローカルの foo.cs が
+#     同一パスに解決されるため "would be overwritten by merge" で止まる (大文字小文字違い)。
+#  2) 未追跡のローカルファイルが upstream の同名ファイルと衝突しても止まる (同一パス)。
+# 削除ではなく退避なのは、ローカル側に未コミットの中身が残る場合があるため。
+# (追跡ファイルの未コミット変更は gpl 側で stash して扱う)
+function Resolve-GitPullCollision {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Upstream)
 
+    # quotepath=false: 非 ASCII のパスが "\346\227..." とエスケープされるのを防ぐ
     $remote = @{}
-    foreach ($path in (git ls-tree -r --name-only $Upstream)) {
+    foreach ($path in (git -c core.quotepath=false ls-tree -r --name-only $Upstream)) {
         if ($path) { $remote[$path.ToLowerInvariant()] = $path }
     }
     Assert-NativeCommandSucceeded "git ls-tree $Upstream"
     if ($remote.Count -eq 0) { return }
 
-    # ローカル側の候補: 追跡ファイルと未追跡ファイル。パスがリモートと大文字小文字
-    # だけ違うものが衝突する。
-    $local = @(
-        git ls-files
-        git ls-files --others --exclude-standard
-    ) | Where-Object { $_ } | Sort-Object -Unique
+    $tracked = @(git -c core.quotepath=false ls-files) | Where-Object { $_ }
+    $untracked = @(git -c core.quotepath=false ls-files --others --exclude-standard) | Where-Object { $_ }
+    $candidates = @(
+        $tracked | ForEach-Object { @{ Path = $_; Tracked = $true } }
+        $untracked | ForEach-Object { @{ Path = $_; Tracked = $false } }
+    )
 
     $backupDir = $null
-    foreach ($path in $local) {
+    foreach ($c in $candidates) {
+        $path = $c.Path
         $match = $remote[$path.ToLowerInvariant()]
-        if (-not $match -or $match -ceq $path) { continue }
+        if (-not $match) { continue }
+        # 追跡ファイルは大文字小文字違いのときだけ衝突。未追跡は同一パスでも衝突する。
+        if ($c.Tracked -and $match -ceq $path) { continue }
 
         if (-not $backupDir) {
             $gitDir = (git rev-parse --absolute-git-dir).Trim()
-            $backupDir = Join-Path $gitDir ('case-conflict-backup\{0}' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
+            $backupDir = Join-Path $gitDir ('pull-backup\{0}' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
         }
         $src = Join-Path (git rev-parse --show-toplevel).Trim() ($path -replace '/', '\')
         $dest = Join-Path $backupDir ($path -replace '/', '\')
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dest) | Out-Null
         Move-Item -LiteralPath $src -Destination $dest -Force -ErrorAction Stop
         if (-not (Test-Path -LiteralPath $dest -PathType Leaf)) {
-            throw "Failed to back up case-conflicting file: $path"
+            throw "Failed to back up conflicting file: $path"
         }
         # 追跡ファイルなら、退避で消えた分をインデックスからも落として pull を通す。
-        git ls-files --error-unmatch -- $path *> $null
-        if ($LASTEXITCODE -eq 0) {
+        if ($c.Tracked) {
             git rm --cached --quiet -- $path 2>$null
             Assert-NativeCommandSucceeded "git rm --cached -- $path"
         }
-        Write-Host "  [fix] $path -> $match (退避: $dest)" -ForegroundColor Yellow
+        $why = if ($c.Tracked) { "大文字小文字違い ($match)" } else { '未追跡ファイルが upstream と衝突' }
+        Write-Host "  [退避] $path : $why -> $dest" -ForegroundColor Yellow
     }
 }
 
+# git pull の安全版。未コミット変更を stash → 衝突ファイルを退避 → pull → stash 復元。
+# 引数は git pull にそのまま渡る (例: gpl --rebase)。
+# (--autostash を使わないのは、大文字小文字衝突の退避 (git rm --cached) が stash に
+#  巻き込まれ、復元時に競合するため)
 function gpl {
     git pack-refs --all
     Assert-NativeCommandSucceeded 'git pack-refs --all'
 
     # 衝突判定には fetch 済みの upstream が要る。pull 前に取得しておく。
+    Write-Host '[gpl] fetch' -ForegroundColor Cyan
     git fetch --prune --quiet
     Assert-NativeCommandSucceeded 'git fetch --prune'
     $upstream = (git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null)
-    if ($LASTEXITCODE -eq 0 -and $upstream) {
-        Resolve-GitCaseCollision -Upstream $upstream.Trim()
+    $hasUpstream = ($LASTEXITCODE -eq 0 -and $upstream)
+    if (-not $hasUpstream -and $args.Count -eq 0) {
+        Write-Warning 'gpl: upstream 未設定。git branch -u origin/<branch> で設定するか、gpl origin <branch> と指定する'
+        return
     }
 
+    $stashed = $false
+    if (git status --porcelain --untracked-files=no) {
+        Write-Host '[gpl] 未コミット変更を stash' -ForegroundColor Cyan
+        git stash push --quiet -m 'gpl: auto stash before pull'
+        Assert-NativeCommandSucceeded 'git stash push'
+        $stashed = $true
+    }
+    if ($hasUpstream) { Resolve-GitPullCollision -Upstream $upstream.Trim() }
+
+    Write-Host '[gpl] pull' -ForegroundColor Cyan
     git pull @args
-    Assert-NativeCommandSucceeded 'git pull'
+    if ($LASTEXITCODE -ne 0) {
+        $hint = '[gpl] pull 失敗: 上のエラーを確認。マージ競合ならファイル修正後 git add / git commit、中止は git merge --abort'
+        if ($stashed) { $hint += '。未コミット変更は stash に残っている (git stash pop で復元)' }
+        Write-Host $hint -ForegroundColor Red
+        Assert-NativeCommandSucceeded 'git pull'
+    }
+    if ($stashed) {
+        Write-Host '[gpl] stash を復元' -ForegroundColor Cyan
+        git stash pop --quiet
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host '[gpl] stash の復元で競合。解消後 git stash drop' -ForegroundColor Red
+            Assert-NativeCommandSucceeded 'git stash pop'
+        }
+    }
     git pack-refs --all
     Assert-NativeCommandSucceeded 'git pack-refs --all'
 }
@@ -1443,7 +1478,8 @@ $script:ProfileHelp = [ordered]@{
         @{ Cmd = 'gb'; Desc = 'git branch' }
         @{ Cmd = 'gd / gds'; Desc = 'git diff / git diff --staged' }
         @{ Cmd = 'gp / gpf'; Desc = 'git push / push --force-with-lease' }
-        @{ Cmd = 'gpl / gf'; Desc = 'git pull / fetch --all --prune (大文字小文字違いの ref・ファイルパス衝突を自動解決)' }
+        @{ Cmd = 'gpl'; Desc = '安全な git pull: 衝突ファイルを .git/pull-backup へ退避 + 未コミット変更を自動 stash/復元 (引数は git pull へ)' }
+        @{ Cmd = 'gf'; Desc = 'git fetch --all --prune (大文字小文字違いの ref 衝突を回避)' }
         @{ Cmd = 'gsta/gstp/gstl'; Desc = 'git stash push/pop/list' }
         @{ Cmd = 'gcm <msg>'; Desc = 'git commit -m' }
         @{ Cmd = 'gco [branch]'; Desc = 'checkout (引数なしは fzf で選択)' }
