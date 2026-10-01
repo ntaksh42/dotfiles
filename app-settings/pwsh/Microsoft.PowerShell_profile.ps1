@@ -251,7 +251,11 @@ function gf {
 # (追跡ファイルの未コミット変更は gpl 側で stash して扱う)
 function Resolve-GitPullCollision {
     [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$Upstream)
+    param(
+        [Parameter(Mandatory)][string]$Upstream,
+        # rebase は index/作業ツリーの差分があると開始できないため、追跡ファイルは触らない
+        [switch]$UntrackedOnly
+    )
 
     # quotepath=false: 非 ASCII のパスが "\346\227..." とエスケープされるのを防ぐ
     $remote = @{}
@@ -268,7 +272,7 @@ function Resolve-GitPullCollision {
     Assert-NativeCommandSucceeded "git ls-tree $Upstream"
     if ($remote.Count -eq 0) { return }
 
-    $tracked = @(git -c core.quotepath=false ls-files) | Where-Object { $_ }
+    $tracked = if ($UntrackedOnly) { @() } else { @(git -c core.quotepath=false ls-files) | Where-Object { $_ } }
     $untracked = @(git -c core.quotepath=false ls-files --others --exclude-standard) | Where-Object { $_ }
     $candidates = @(
         $tracked | ForEach-Object { @{ Path = $_; Tracked = $true } }
@@ -340,7 +344,13 @@ function gpl {
         Assert-NativeCommandSucceeded 'git stash push'
         $stashed = $true
     }
-    if ($hasUpstream) { Resolve-GitPullCollision -Upstream $upstream.Trim() }
+    # rebase モードか (引数が pull.rebase 設定より優先)。大文字小文字だけの改名は git が rebase でも処理できる。
+    $rebase = (git config --get pull.rebase) -notin @($null, '', 'false')
+    foreach ($a in $args) {
+        if ($a -in '--no-rebase', '--rebase=false') { $rebase = $false }
+        elseif ($a -match '^(-r|--rebase(=.+)?)$') { $rebase = $true }
+    }
+    if ($hasUpstream) { Resolve-GitPullCollision -Upstream $upstream.Trim() -UntrackedOnly:$rebase }
 
     Write-Host '[gpl] pull' -ForegroundColor Cyan
     git pull @args
