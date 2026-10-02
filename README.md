@@ -60,20 +60,15 @@ ccstatusline はTUI上での編集で設定ファイル自身を書き換える�
 
 ## Codex ステータスライン
 
-`Install-DevTools` は Codex 用の Windows Terminal ステータスラインも
-`%LOCALAPPDATA%\CodexStatusline` に配置します。PowerShell プロファイルを同期・再読み込み後、
-通常どおり `codex` を起動すると、下側 18% のペインにモデル、推論強度、コンテキスト、
-git 状態、セッション/週次の使用量を表示します。
+**現在は一時的に無効化中です。** `Install-DevTools` は Codex ステータスラインを
+インストールせず、導入済みの環境では `%LOCALAPPDATA%\CodexStatusline\codex-wt.ps1` を
+`codex-wt.ps1.disabled` に退避します（`codex` は通常の Codex CLI を起動します）。
+再び有効にするには、`.disabled` を元の名前に戻し、`Install-DevTools` のカタログと
+`Disable-CodexStatusline` の呼び出しを元に戻します。
 
-```powershell
-pwsh -File tools\Sync-AppSettings.ps1
-. $PROFILE
-Install-DevTools
-codex
-```
-
-`codex exec`、`codex review`、ログインや App Server などの非対話コマンドは、ステータスラインを
-開かず通常の Codex CLI を実行します。Python、Windows Terminal、Codex CLI が必要です。
+有効だった頃は、下側 18% のペインにモデル、推論強度、コンテキスト、git 状態、
+セッション/週次の使用量を表示していました。`tools/Install-CodexStatusline.ps1` と
+`app-settings/codex-statusline/` は再開用に残してあります。
 
 ## Crit
 

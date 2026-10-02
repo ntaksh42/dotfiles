@@ -823,7 +823,6 @@ $script:DevTools = @(
     @{ Name = 'PC Manager'; Backend = 'msstore'; Id = '9PM860492SZD' }
     @{ Name = 'Waypoint'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/waypoint/main/installer/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\waypoint\waypoint.exe'); Args = @{ Silent = $true }; RebootRequiredExitCode = 3010; Repo = 'ntaksh42/waypoint'; VersionSource = 'product' }
     @{ Name = 'Windows-Operation-Cli'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/Windows-Operation-Cli/main/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\windows-operation-cli\windows-operation-cli.exe'); Args = @{ FromRelease = $true }; RequiredCommand = 'claude'; Repo = 'ntaksh42/Windows-Operation-Cli' }
-    @{ Name = 'Codex statusline'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-CodexStatusline.ps1"; Path = (Join-Path $env:LOCALAPPDATA 'CodexStatusline\codex-wt.ps1'); RemoteFiles = @('app-settings/codex-statusline/codex_statusline.py', 'app-settings/codex-statusline/codex-wt.ps1') }
     @{ Name = 'Crit'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-Crit.ps1"; Path = (Join-Path $env:USERPROFILE '.local\bin\crit.exe'); Repo = 'tomasz-tomczyk/crit'; VersionSource = 'command' }
     @{ Name = 'starship'; Backend = 'winget'; Id = 'Starship.Starship'; Cmd = 'starship' }
     @{ Name = 'zoxide'; Backend = 'winget'; Id = 'ajeetdsouza.zoxide'; Cmd = 'zoxide' }
@@ -1127,6 +1126,16 @@ function Sync-DevToolSkills {
     }
 }
 
+# Codex statusline は一時的に無効化中。導入済みの環境ではラッパーを退避する
+# （codex 関数はラッパーが無ければ素の Codex CLI を起動する）。戻すときは
+# `.disabled` を元の名前へ戻す。
+function Disable-CodexStatusline {
+    $wrapper = Join-Path $env:LOCALAPPDATA 'CodexStatusline\codex-wt.ps1'
+    if (-not (Test-Path -LiteralPath $wrapper -PathType Leaf)) { return }
+    Move-Item -LiteralPath $wrapper -Destination "$wrapper.disabled" -Force
+    Write-Host "Codex statusline を無効化しました: $wrapper.disabled" -ForegroundColor Yellow
+}
+
 # Install missing catalog tools. Script-backed tools compare installed versions or
 # remote file contents before updating. If the remote check fails, skip the update.
 # remote-config の既存ファイル上書きは、ccstatusline のようにアプリ自身が書き換える
@@ -1138,6 +1147,8 @@ function Install-DevTools {
     param([switch]$Force, [switch]$Yes)
 
     if ($Yes) { $Force = $true }
+
+    Disable-CodexStatusline
 
     # 判定は winget/ネットワークを伴うため1回だけ行い、以降は結果を使い回す。
     $installed = @{}
