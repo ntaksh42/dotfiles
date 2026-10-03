@@ -1,0 +1,32 @@
+{
+  "name": "ado-link-bar",
+  "version": "0.1.0",
+  "description": "Links in the band above the prompt to the Azure DevOps pull requests and work items mentioned most recently in the conversation.",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Enabled",
+      "description": "Show Azure DevOps links in the band above the prompt.",
+      "default": true
+    },
+    "organization": {
+      "type": "string",
+      "title": "Organization",
+      "description": "Azure DevOps organization used to link AB#1234 mentions (dev.azure.com/<organization>). Empty: AB# mentions are ignored.",
+      "default": ""
+    },
+    "pullRequests": {
+      "type": "number",
+      "title": "Pull requests",
+      "description": "How many of the most recently mentioned pull requests to link. 0 shows none.",
+      "default": 5
+    },
+    "workItems": {
+      "type": "number",
+      "title": "Work items",
+      "description": "How many of the most recently mentioned work items to link. 0 shows none.",
+      "default": 5
+    }
+  }
+}

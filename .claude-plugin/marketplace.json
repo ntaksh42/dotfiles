@@ -11,6 +11,11 @@
       "name": "ado-pr-status",
       "source": "./claude/mods/ado-pr-status",
       "description": "Fetches the current branch's Azure DevOps PR in the background for the ccstatusline widget."
+    },
+    {
+      "name": "ado-link-bar",
+      "source": "./claude/mods/ado-link-bar",
+      "description": "Links in the band above the prompt to the Azure DevOps pull requests and work items mentioned most recently in the conversation."
     }
   ]
 }
