@@ -1,8 +1,8 @@
-import { describe, expect, test } from 'claude-code/testing'
+import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Args, On } from 'claude-code'
-import type { Engine } from 'claude-code/testing'
+import type { Engine, Mounted } from 'claude-code/testing'
 
-import { findMentions, remember, transcriptTexts } from '../hooks/links'
+import { cut, findMentions, parseWorkItem, remember, transcriptTexts, workItemRef } from '../hooks/links'
 
 const BAND = {
   plugin: 'ado-link-bar',
@@ -80,6 +80,73 @@ describe('helpers', () => {
       'not json',
     ].join('\n')
     expect(transcriptTexts(jsonl)).toEqual([`look at ${PR(3)}`, WI(5)])
+  })
+})
+
+describe('work item titles', () => {
+  test('reads the org and id back from a work item link', async () => {
+    expect(workItemRef(WI(5))).toEqual({ orgUrl: 'https://dev.azure.com/contoso', id: '5' })
+    expect(workItemRef('https://contoso.visualstudio.com/_workitems/edit/8')).toEqual({ orgUrl: 'https://dev.azure.com/contoso', id: '8' })
+    expect(workItemRef(PR(1))).toBeNull()
+  })
+
+  test('parses az output and shortens long titles', async () => {
+    expect(parseWorkItem(JSON.stringify({ fields: { 'System.Title': 'Fix login', 'System.State': 'Active' } }))).toEqual({ title: 'Fix login', state: 'Active' })
+    expect(parseWorkItem('not json')).toBeNull()
+    expect(parseWorkItem('{}')).toBeNull()
+    expect(cut('ログイン画面でパスワードを間違えると落ちる不具合', 10)).toBe('ログイン画面でパス…')
+  })
+
+  // Answers `az boards work-item show` with the given titles, counting each call.
+  const boards = (on: On, titles: Record<string, string>, calls: string[]) =>
+    on('process.run', (_$, e) => {
+      const id = e.argv[e.argv.indexOf('--id') + 1] ?? ''
+      calls.push(id)
+      // az refuses --fields beside its default --expand.
+      if (e.argv[e.argv.indexOf('--expand') + 1] !== 'none') throw new Error('--fields needs --expand none')
+      const title = titles[id]
+      return title === undefined
+        ? { value: { exitCode: 1, stdout: '', stderr: 'ERROR: not found', isStdoutTruncated: false, isStderrTruncated: false } }
+        : { value: { exitCode: 0, stdout: JSON.stringify({ fields: { 'System.Title': title, 'System.State': 'Active' } }), stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+    })
+
+  // The title lookup runs after the row is noted; wait until the band shows it.
+  const waitForText = async (ui: Mounted<'terminal', 'AbovePrompt'>, text: string) => {
+    for (let i = 0; i < 50 && !(await ui.find({ type: 'Text', text })); i++) await Promise.resolve()
+    return ui.find({ type: 'Text', text })
+  }
+
+  test('a work item shows its title and state, fetched once', async ($, on) => {
+    engine(on)
+    const calls: string[] = []
+    mock.env(on, {})
+    boards(on, { '10': 'Fix login' }, calls)
+    await $.session.start(START)
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    await append($, say('user', WI(10)))
+    expect(await waitForText(ui, ' Fix login')).toBeDefined()
+    // Only the id is the link; the title and state are plain text beside it.
+    expect(await ui.find({ type: 'Link', text: /#10$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: ' Active' })).toBeDefined()
+    await append($, say('assistant', `again ${WI(10)}`))
+    expect(calls).toEqual(['10'])
+    await ui.unmount()
+  })
+
+  test('a failed lookup keeps the bare id', async ($, on) => {
+    engine(on)
+    const calls: string[] = []
+    mock.env(on, {})
+    on('ui.log', () => ({ value: undefined }))
+    boards(on, {}, calls)
+    await $.session.start(START)
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    await append($, say('user', WI(11)))
+    expect(await waitForText(ui, ' Active')).toBeUndefined()
+    expect(await ui.find({ type: 'Link', text: /#11$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: ' Active' })).toBeUndefined()
+    expect(calls).toEqual(['11'])
+    await ui.unmount()
   })
 })
 

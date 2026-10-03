@@ -1,4 +1,4 @@
-import type { Mention } from '../types'
+import type { Mention, WorkItemInfo } from '../types'
 
 export type Kind = 'pr' | 'workItem'
 
@@ -41,6 +41,32 @@ export const findMentions = (text: string, organization = ''): Found[] => {
     }
   }
   return hits.sort((a, b) => a.at - b.at).map(h => h.found)
+}
+
+// The organization URL and id `az boards work-item show` needs for a work
+// item link as `classify` writes it.
+export const workItemRef = (url: string): { orgUrl: string; id: string } | null => {
+  const m = /^https:\/\/(?:dev\.azure\.com\/([^\/]+)|([\w-]+)\.visualstudio\.com)\/_workitems\/edit\/(\d+)$/.exec(url)
+  if (!m || !m[3]) return null
+  return { orgUrl: `https://dev.azure.com/${m[1] ?? m[2]}`, id: m[3] }
+}
+
+// The title and state in `az boards work-item show -o json` output.
+export const parseWorkItem = (json: string): WorkItemInfo | null => {
+  try {
+    const fields = (JSON.parse(json) as { fields?: Record<string, unknown> }).fields ?? {}
+    const title = fields['System.Title']
+    const state = fields['System.State']
+    return typeof title === 'string' ? { title, state: typeof state === 'string' ? state : '' } : null
+  } catch {
+    return null
+  }
+}
+
+// Shortens a title to fit the band.
+export const cut = (s: string, max = 20) => {
+  const t = s.replace(/\s+/g, ' ').trim()
+  return t.length <= max ? t : `${t.slice(0, max - 1).trimEnd()}…`
 }
 
 // Moves each found link to the front, the last one written ending up first,
