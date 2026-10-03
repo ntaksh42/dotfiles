@@ -154,6 +154,17 @@
     "command": "npx -y ccstatusline@latest",
     "padding": 0
   },
+  "enabledPlugins": {
+    "auto-session-title@dotfiles-mods": true
+  },
+  "extraKnownMarketplaces": {
+    "dotfiles-mods": {
+      "source": {
+        "source": "directory",
+        "path": "{{REPO_DIR}}"
+      }
+    }
+  },
   "language": "Japanese",
   "alwaysThinkingEnabled": true
 }

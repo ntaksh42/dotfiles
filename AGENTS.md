@@ -16,6 +16,8 @@ claude/              Claude Code 設定の管理元（~/.claude へインスト�
   hooks/             フック用PowerShellスクリプト（.HOOKブロックでメタデータ定義）
   skills/            Claude Code スキル（各サブディレクトリが1スキル）
   agents/            サブエージェント定義（.md、~/.claude/agents へインストール）
+  mods/              Claude Code mod（プラグイン）。リポジトリ直下の .claude-plugin/marketplace.json で
+                     dotfiles-mods マーケットプレイスとして公開し、settings で有効化する
 app-settings/        アプリ設定ファイルのバックアップ・管理
 tools/               汎用PowerShellユーティリティ
 ```

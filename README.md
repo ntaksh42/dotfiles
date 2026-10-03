@@ -85,6 +85,14 @@ ccstatusline はTUI上での編集で設定ファイル自身を書き換える�
 配置後は Claude Code を再起動すると、モデル・コンテキスト使用率・git ブランチ・
 セッション使用量などの構成が反映されます。
 
+## Claude Code Mods
+
+`Install-DevTools` は `claude/mods/` の Mod（`auto-session-title`）も導入します。
+`dotfiles-mods` マーケットプレイスが未登録なら GitHub の `ntaksh42/dotfiles` から登録し、
+その後 `claude plugin install` を実行します。`claude/install.ps1` がクローン先のパスで
+登録済みの場合は、そのマーケットプレイスをそのまま使います。GitHub から登録する場合は、
+Mod が `main` に取り込まれている必要があります。`claude` が PATH に無いとスキップされます。
+
 ## Codex ステータスライン
 
 **現在は一時的に無効化中です。** `Install-DevTools` は Codex ステータスラインを

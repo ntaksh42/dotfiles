@@ -36,6 +36,7 @@ $script:DevTools = @(
     @{ Name = 'VSCode settings.json'; Backend = 'remote-config'; RepoPath = 'app-settings/vscode/settings.json'; Dest = (Join-Path $env:APPDATA 'Code\User\settings.json') }
     @{ Name = 'VSCode keybindings.json'; Backend = 'remote-config'; RepoPath = 'app-settings/vscode/keybindings.json'; Dest = (Join-Path $env:APPDATA 'Code\User\keybindings.json') }
     @{ Name = 'ccstatusline settings.json'; Backend = 'remote-config'; RepoPath = 'app-settings/ccstatusline/settings.json'; Dest = (Join-Path $env:USERPROFILE '.config\ccstatusline\settings.json') }
+    @{ Name = 'auto-session-title (mod)'; Backend = 'claude-plugin'; Id = 'auto-session-title@dotfiles-mods'; Marketplace = 'dotfiles-mods'; MarketplaceSource = 'ntaksh42/dotfiles'; RequiredCommand = 'claude' }
 )
 
 # Ensure Python/pip is available; install via winget if missing. Returns $true on success.
@@ -171,6 +172,11 @@ function Test-ToolInstalled {
         # RequiredCommand の有無は導入済み判定に含めない（含めると claude が PATH に
         # 無いだけで毎回インストーラが走り、最後に失敗する）。Install-DevTools 側で扱う。
         'script' { return (Test-Path -LiteralPath $Tool.Path -PathType Leaf) }
+        'claude-plugin' {
+            if (-not (Test-Cmd claude)) { return $false }
+            try { $plugins = claude plugin list --json | ConvertFrom-Json } catch { return $false }
+            return [bool]($plugins | Where-Object { $_.id -eq $Tool.Id })
+        }
         'remote-config' {
             if (-not (Test-Path -LiteralPath $Tool.Dest -PathType Leaf)) { return $false }
             try { $remote = Get-DotfilesRemoteConfig $Tool }
@@ -348,6 +354,16 @@ function Install-DevTools {
                     }
                 }
                 'psmodule' { Install-Module $t.Id -Scope CurrentUser -Force -AcceptLicense }
+                'claude-plugin' {
+                    # claude/install.ps1 が同名マーケットプレイスをクローン先のパスで登録済みなら、それを使う。
+                    $marketplaces = claude plugin marketplace list --json | ConvertFrom-Json
+                    if (-not ($marketplaces | Where-Object { $_.name -eq $t.Marketplace })) {
+                        claude plugin marketplace add $t.MarketplaceSource
+                        Assert-NativeCommandSucceeded "claude plugin marketplace add $($t.MarketplaceSource)"
+                    }
+                    claude plugin install $t.Id
+                    Assert-NativeCommandSucceeded "claude plugin install $($t.Id)"
+                }
                 'script' {
                     $installerName = $t.Name -replace '[^A-Za-z0-9._-]', '-'
                     $installerPath = Join-Path $env:TEMP "$installerName-install.ps1"

@@ -136,7 +136,8 @@ Write-Host "Generating settings.json..." -ForegroundColor Green
 $template = Get-Content $TemplateFile -Raw -Encoding UTF8
 # JSON テキストへの埋め込みなのでバックスラッシュを1段だけエスケープする
 $claudeDirEscaped = $ClaudeDir -replace '\\', '\\'
-$settings = $template -replace '\{\{CLAUDE_DIR\}\}', $claudeDirEscaped
+$repoDirEscaped = (Split-Path -Parent $ScriptDir) -replace '\\', '\\'
+$settings = $template -replace '\{\{CLAUDE_DIR\}\}', $claudeDirEscaped -replace '\{\{REPO_DIR\}\}', $repoDirEscaped
 
 $settingsObj = $settings | ConvertFrom-Json
 

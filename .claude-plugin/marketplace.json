@@ -1,0 +1,11 @@
+{
+  "name": "dotfiles-mods",
+  "owner": { "name": "ntaksh42" },
+  "plugins": [
+    {
+      "name": "auto-session-title",
+      "source": "./claude/mods/auto-session-title",
+      "description": "Names the session with a short model-written summary of the first prompt."
+    }
+  ]
+}
