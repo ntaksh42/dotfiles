@@ -65,6 +65,18 @@
         "id": "fd99e7ad-111e-4ea7-b35b-266703703771",
         "type": "git-changes",
         "color": "blue"
+      },
+      {
+        "id": "3c176537-e658-4251-8f03-25a71f0035f4",
+        "type": "separator"
+      },
+      {
+        "id": "1395f165-c444-4b51-9775-7de2a1ac14d1",
+        "type": "custom-command",
+        "commandPath": "node \"E:/dotfiles/claude/mods/ado-pr-status/statusline/pr-line.mjs\"",
+        "preserveColors": true,
+        "timeout": 1000,
+        "color": "magenta"
       }
     ],
     [

@@ -1,0 +1,5 @@
+{
+  "name": "ado-pr-status",
+  "version": "0.1.0",
+  "description": "現在のブランチの Azure DevOps PR を裏で取得し、ccstatusline が読むファイルに書き出す"
+}

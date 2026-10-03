@@ -6,6 +6,11 @@
       "name": "auto-session-title",
       "source": "./claude/mods/auto-session-title",
       "description": "Names the session with a short model-written summary of the first prompt."
+    },
+    {
+      "name": "ado-pr-status",
+      "source": "./claude/mods/ado-pr-status",
+      "description": "Fetches the current branch's Azure DevOps PR in the background for the ccstatusline widget."
     }
   ]
 }

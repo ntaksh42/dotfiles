@@ -37,6 +37,7 @@ $script:DevTools = @(
     @{ Name = 'VSCode keybindings.json'; Backend = 'remote-config'; RepoPath = 'app-settings/vscode/keybindings.json'; Dest = (Join-Path $env:APPDATA 'Code\User\keybindings.json') }
     @{ Name = 'ccstatusline settings.json'; Backend = 'remote-config'; RepoPath = 'app-settings/ccstatusline/settings.json'; Dest = (Join-Path $env:USERPROFILE '.config\ccstatusline\settings.json') }
     @{ Name = 'auto-session-title (mod)'; Backend = 'claude-plugin'; Id = 'auto-session-title@dotfiles-mods'; Marketplace = 'dotfiles-mods'; MarketplaceSource = 'ntaksh42/dotfiles'; RequiredCommand = 'claude' }
+    @{ Name = 'ado-pr-status (mod)'; Backend = 'claude-plugin'; Id = 'ado-pr-status@dotfiles-mods'; Marketplace = 'dotfiles-mods'; MarketplaceSource = 'ntaksh42/dotfiles'; RequiredCommand = 'claude' }
 )
 
 # Ensure Python/pip is available; install via winget if missing. Returns $true on success.
