@@ -14,6 +14,33 @@ app-settings/              アプリ設定ファイルのバックアップ
 tools/                     汎用 PowerShell ユーティリティ
 ```
 
+## PowerShell コマンド
+
+`app-settings/pwsh/Microsoft.PowerShell_profile.ps1` が日常操作・Git・AI CLI・
+キーバインドを定義し、同じディレクトリの `DevTools.ps1` が開発ツールの
+導入・更新を定義します。配置時は両方のファイルが必要です。
+
+ローカルの変更を反映する場合は、リポジトリから同期します。
+
+```powershell
+pwsh -NoProfile -File tools/Sync-AppSettings.ps1 -WhatIf
+pwsh -NoProfile -File tools/Sync-AppSettings.ps1
+```
+
+同期先は Windows の Documents フォルダ配下の `PowerShell/` です。
+実環境で編集した場合は `-Direction Pull` で両ファイルを管理元へ取り込みます。
+`profile` は現在読み込んでいるプロファイルを編集し、`reload` は再読み込みします。
+`Update-Profile` は GitHub の `main` から両ファイルを取得し、構文検証・
+上書き確認・バックアップ後に更新するため、未公開のローカル変更は反映しません。
+
+コマンド一覧は `phelp`（例: `phelp git`）、検索は Ctrl+G で開けます。
+`gl`、`gp`、`gcm`、`cat` は標準エイリアスを置き換え、それぞれ
+Git log、Git push、Git commit、bat 連携として動作します。
+`gco` の引数なし実行は `git-switch` と同じブランチ選択を使います。
+その他の既存の短縮名も維持しています。
+
+検証は `pwsh -NoProfile -File app-settings/pwsh/tests/Test-Profile.ps1` で実行します。
+
 ## Git 設定
 
 PowerShell 7 / Git for Windows 向けの共有設定は

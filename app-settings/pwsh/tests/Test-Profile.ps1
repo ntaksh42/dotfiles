@@ -1,0 +1,174 @@
+# Run with: pwsh -NoProfile -File app-settings/pwsh/tests/Test-Profile.ps1
+$ErrorActionPreference = 'Stop'
+$root = Split-Path -Parent $PSScriptRoot
+$scratch = Join-Path ([IO.Path]::GetTempPath()) ('dotfiles-profile-test-' + [guid]::NewGuid().ToString('N'))
+$originalPath = $env:PATH
+$script:pass = 0
+$script:fail = 0
+
+function Test-Case {
+    param([string]$Name, [scriptblock]$Check)
+    try {
+        if (-not (& $Check)) { throw 'Check returned false' }
+        Write-Host "ok    $Name" -ForegroundColor Green
+        $script:pass++
+    }
+    catch {
+        Write-Host "FAIL  $Name -- $_" -ForegroundColor Red
+        $script:fail++
+    }
+}
+
+function Initialize-UpdateFixture {
+    $dir = Join-Path $scratch ([guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $dir | Out-Null
+    $script:PROFILE = [pscustomobject]@{ CurrentUserCurrentHost = Join-Path $dir 'Microsoft.PowerShell_profile.ps1' }
+    Set-Content -LiteralPath $script:PROFILE.CurrentUserCurrentHost -Value '# old profile' -NoNewline
+    Set-Content -LiteralPath (Join-Path $dir 'DevTools.ps1') -Value '# old tools' -NoNewline
+    $script:remote = @{
+        'DevTools.ps1' = '$script:UpdatedDevToolsLoaded = $true'
+        'Microsoft.PowerShell_profile.ps1' = '$script:UpdatedProfileLoaded = $true; . (Join-Path $PSScriptRoot ''DevTools.ps1'')'
+    }
+    $script:UpdatedProfileLoaded = $false
+    $script:UpdatedDevToolsLoaded = $false
+    $script:fetchFailure = $false
+    $script:promptCount = 0
+    $script:answer = 'y'
+    $dir
+}
+
+try {
+    New-Item -ItemType Directory -Path $scratch | Out-Null
+    # Load the actual profile without invoking installed external tools.
+    $env:PATH = ''
+    . (Join-Path $root 'Microsoft.PowerShell_profile.ps1')
+
+    Test-Case 'Git/bat shortcuts resolve to functions rather than built-in aliases' {
+        @('gl', 'gp', 'gcm', 'cat' | Where-Object { (Get-Command $_).CommandType -ne 'Function' }).Count -eq 0
+    }
+    Test-Case 'Split profile loads environment commands and help' {
+        (Get-Command Install-DevTools).CommandType -eq 'Function' -and
+        (Get-Command Update-Profile).CommandType -eq 'Function' -and
+        (Get-Command phelp).ResolvedCommandName -eq 'Show-ProfileHelp'
+    }
+    Test-Case 'Profile-only upgrade keeps daily commands and the recovery updater available' {
+        $dir = Join-Path $scratch 'profile-only'
+        New-Item -ItemType Directory -Path $dir | Out-Null
+        $profileOnly = Join-Path $dir 'Microsoft.PowerShell_profile.ps1'
+        Copy-Item -LiteralPath (Join-Path $root 'Microsoft.PowerShell_profile.ps1') -Destination $profileOnly
+        $output = & (Get-Process -Id $PID).Path -NoLogo -NoProfile -NonInteractive -Command {
+            param($Path)
+            $env:PATH = ''
+            $WarningPreference = 'SilentlyContinue'
+            . $Path
+            if ((Get-Command Update-Profile).CommandType -ne 'Function' -or
+                (Get-Command gl).CommandType -ne 'Function') { exit 1 }
+            'RECOVERY_READY'
+        } -args $profileOnly
+        $LASTEXITCODE -eq 0 -and $output -contains 'RECOVERY_READY'
+    }
+
+    function git {
+        $script:gitArgs = @($args)
+        $global:LASTEXITCODE = 0
+        if ($args[0] -eq 'branch') { 'origin/HEAD'; 'origin/topic' }
+        if ($args[0] -eq 'rev-parse') { $global:LASTEXITCODE = 1 }
+    }
+    function fzf {
+        $script:choices = @($input)
+        'origin/topic'
+    }
+    function bat { $script:batArgs = @($args) }
+    $script:_cmdCache['fzf'] = $true
+    $script:_cmdCache['bat'] = $true
+
+    Test-Case 'Git log/push/commit shortcuts forward arguments' {
+        gl --all
+        $logOk = ($script:gitArgs -join '|') -eq 'log|--oneline|--graph|--decorate|-20|--all'
+        gp origin topic
+        $pushOk = ($script:gitArgs -join '|') -eq 'push|origin|topic'
+        gcm 'message with spaces'
+        $logOk -and $pushOk -and ($script:gitArgs -join '|') -eq 'commit|-m|message with spaces'
+    }
+    Test-Case 'cat invokes bat with the supplied file name' {
+        cat 'file with spaces.txt'
+        ($script:batArgs -join '|') -eq 'file with spaces.txt'
+    }
+    Test-Case 'gco still forwards explicit checkout arguments' {
+        gco -b topic
+        ($script:gitArgs -join '|') -eq 'checkout|-b|topic'
+    }
+    Test-Case 'gco picker excludes remote HEAD and creates a tracking branch' {
+        gco
+        $script:choices -notcontains 'origin/HEAD' -and
+        ($script:gitArgs -join '|') -eq 'checkout|-b|topic|--track|origin/topic'
+    }
+
+    function Invoke-WebRequest {
+        param($Uri, [switch]$UseBasicParsing, $TimeoutSec)
+        if ($script:fetchFailure -and $Uri.EndsWith('Microsoft.PowerShell_profile.ps1')) { throw 'Simulated download failure' }
+        [pscustomobject]@{ Content = $script:remote[($Uri -split '/')[-1]] }
+    }
+    function Read-Host { param($Prompt) $script:promptCount++; $script:answer }
+    function Show-DotfilesRemoteConfigDiff { param($Tool, $RemoteContent) }
+
+    Test-Case 'Update downloads both files, backs them up, and reloads the pair' {
+        $dir = Initialize-UpdateFixture
+        Update-Profile -Force
+        $script:UpdatedProfileLoaded -and $script:UpdatedDevToolsLoaded -and
+        @(Get-ChildItem -LiteralPath $dir -Filter '*.backup.*').Count -eq 2 -and
+        (Get-Content -LiteralPath $script:PROFILE.CurrentUserCurrentHost -Raw) -ceq $script:remote['Microsoft.PowerShell_profile.ps1']
+    }
+    Test-Case 'Failed second download leaves both installed files unchanged' {
+        $dir = Initialize-UpdateFixture
+        $script:fetchFailure = $true
+        $threw = $false
+        try { Update-Profile -Force } catch { $threw = $true }
+        $threw -and (Get-Content -LiteralPath $script:PROFILE.CurrentUserCurrentHost -Raw) -eq '# old profile' -and
+        (Get-Content -LiteralPath (Join-Path $dir 'DevTools.ps1') -Raw) -eq '# old tools' -and
+        @(Get-ChildItem -LiteralPath $dir -Filter '*.backup.*').Count -eq 0
+    }
+    Test-Case 'Invalid downloaded PowerShell leaves both installed files unchanged' {
+        $dir = Initialize-UpdateFixture
+        $script:remote['Microsoft.PowerShell_profile.ps1'] = 'function Broken {'
+        $threw = $false
+        try { Update-Profile -Force } catch { $threw = $true }
+        $threw -and (Get-Content -LiteralPath (Join-Path $dir 'DevTools.ps1') -Raw) -eq '# old tools' -and
+        (Get-Content -LiteralPath $script:PROFILE.CurrentUserCurrentHost -Raw) -eq '# old profile'
+    }
+    Test-Case 'Declining the update leaves both installed files unchanged' {
+        $dir = Initialize-UpdateFixture
+        $script:answer = 'n'
+        Update-Profile
+        $script:promptCount -eq 1 -and
+        (Get-Content -LiteralPath (Join-Path $dir 'DevTools.ps1') -Raw) -eq '# old tools' -and
+        (Get-Content -LiteralPath $script:PROFILE.CurrentUserCurrentHost -Raw) -eq '# old profile'
+    }
+    Test-Case 'Missing DevTools file can be installed without replacing an unchanged profile' {
+        $dir = Initialize-UpdateFixture
+        Remove-Item -LiteralPath (Join-Path $dir 'DevTools.ps1')
+        Set-Content -LiteralPath $script:PROFILE.CurrentUserCurrentHost -Value $script:remote['Microsoft.PowerShell_profile.ps1'] -NoNewline
+        Update-Profile -Force
+        $script:UpdatedDevToolsLoaded -and
+        @(Get-ChildItem -LiteralPath $dir -Filter '*.backup.*').Count -eq 0
+    }
+    Test-Case 'Unchanged pair is not rewritten, backed up, or reloaded' {
+        $dir = Initialize-UpdateFixture
+        foreach ($name in $script:remote.Keys) {
+            Set-Content -LiteralPath (Join-Path $dir $name) -Value $script:remote[$name] -NoNewline
+        }
+        Update-Profile
+        -not $script:UpdatedProfileLoaded -and $script:promptCount -eq 0 -and
+        @(Get-ChildItem -LiteralPath $dir -Filter '*.backup.*').Count -eq 0
+    }
+}
+finally {
+    $env:PATH = $originalPath
+    if ($global:_dotfilesProfileIdleSubscriptionId) {
+        Unregister-Event -SubscriptionId $global:_dotfilesProfileIdleSubscriptionId -ErrorAction Ignore
+    }
+    if (Test-Path -LiteralPath $scratch) { Remove-Item -LiteralPath $scratch -Recurse -Force }
+}
+
+Write-Host "$script:pass passed, $script:fail failed"
+if ($script:fail -gt 0) { exit 1 }
