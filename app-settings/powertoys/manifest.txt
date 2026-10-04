@@ -1,0 +1,28 @@
+settings.json
+AdvancedPaste/settings.json
+AltWindowCycle/settings.json
+AlwaysOnTop/settings.json
+Awake/settings.json
+ColorPicker/settings.json
+CropAndLock/settings.json
+CursorWrap/settings.json
+FancyZones/settings.json
+FindMyMouse/settings.json
+GrabAndMove/settings.json
+Keyboard Manager/settings.json
+LightSwitch/settings.json
+Measure Tool/settings.json
+MouseHighlighter/settings.json
+MouseJump/settings.json
+MousePointerCrosshairs/settings.json
+MouseWithoutBorders/settings.json
+Peek/settings.json
+PowerDisplay/settings.json
+PowerToys Run/settings.json
+QuickAccent/settings.json
+Shortcut Guide/settings.json
+TextExtractor/settings.json
+Workspaces/settings.json
+FancyZones/custom-layouts.json
+FancyZones/layout-hotkeys.json
+FancyZones/layout-templates.json

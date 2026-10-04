@@ -1,0 +1,43 @@
+{
+  "properties": {
+    "DefaultOpenShortcutGuide": {
+      "win": true,
+      "ctrl": false,
+      "alt": false,
+      "shift": true,
+      "code": 191,
+      "key": ""
+    },
+    "open_shortcutguide": {
+      "win": true,
+      "ctrl": false,
+      "alt": false,
+      "shift": true,
+      "code": 191,
+      "key": ""
+    },
+    "win_key_action": {
+      "value": 1
+    },
+    "press_time": {
+      "value": 900
+    },
+    "close_on_windows_key_release": {
+      "value": true
+    },
+    "theme": {
+      "value": "system"
+    },
+    "disabled_apps": {
+      "value": ""
+    },
+    "first_run": {
+      "value": true
+    },
+    "window_position": {
+      "value": 0
+    }
+  },
+  "name": "Shortcut Guide",
+  "version": "2.0"
+}

@@ -1,0 +1,28 @@
+{
+  "custom-layouts": [
+    {
+      "uuid": "{DA32709F-7D6D-4767-AD5D-9E8572E166E7}",
+      "name": "\u30AB\u30B9\u30BF\u30E0 \u30EC\u30A4\u30A2\u30A6\u30C8 1",
+      "type": "canvas",
+      "info": {
+        "ref-width": 1920,
+        "ref-height": 1232,
+        "zones": [
+          {
+            "X": 0,
+            "Y": 0,
+            "width": 1345,
+            "height": 1232
+          },
+          {
+            "X": 1345,
+            "Y": 0,
+            "width": 575,
+            "height": 1232
+          }
+        ],
+        "sensitivity-radius": 20
+      }
+    }
+  ]
+}

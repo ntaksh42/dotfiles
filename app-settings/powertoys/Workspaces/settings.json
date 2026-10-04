@@ -1,0 +1,17 @@
+{
+  "properties": {
+    "hotkey": {
+      "value": {
+        "win": true,
+        "ctrl": true,
+        "alt": false,
+        "shift": false,
+        "code": 87,
+        "key": ""
+      }
+    },
+    "sortby": 2
+  },
+  "name": "Workspaces",
+  "version": "1.0"
+}

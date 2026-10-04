@@ -51,6 +51,10 @@ powershell.exe -File tools/Update-GitRepositories.ps1 -Path "C:\Projects"
 # app-settings/ の設定ファイルと実環境の配置先を同期
 pwsh -File tools/Sync-AppSettings.ps1                  # repo -> 実環境（既定）
 pwsh -File tools/Sync-AppSettings.ps1 -Direction Pull  # 実環境 -> repo
+
+# PowerToys 設定（app-settings/powertoys/）のバックアップ・復元
+pwsh -File tools/Sync-PowerToysSettings.ps1 -Direction Pull  # 実環境 -> repo
+pwsh -File tools/Sync-PowerToysSettings.ps1                  # repo -> 実環境（PowerToys を停止して復元）
 ```
 
 ## 開発規約

@@ -187,3 +187,26 @@ powershell.exe -File tools\Update-GitRepositories.ps1 -Path "C:\Projects"
 pwsh -File tools\Sync-AppSettings.ps1              # repo -> 実環境 (既定)
 pwsh -File tools\Sync-AppSettings.ps1 -Direction Pull  # 実環境 -> repo
 ```
+
+## PowerToys 設定
+
+PowerToys の設定（FancyZones のレイアウト・ホットキーを含む）は
+`app-settings/powertoys/` に保存します。対象は PowerToys 公式の Back up & restore と
+同じ設定ファイルです。ユーザー名入りのパスを含む `Workspaces\workspaces.json` と
+`NewPlus\settings.json` は公開リポジトリに載せないため対象外です。
+
+```powershell
+pwsh -File tools\Sync-PowerToysSettings.ps1 -Direction Pull  # 実環境 -> repo（バックアップ）
+pwsh -File tools\Sync-PowerToysSettings.ps1 -WhatIf          # 復元の対象だけ確認
+pwsh -File tools\Sync-PowerToysSettings.ps1                  # repo -> 実環境（復元）
+```
+
+バックアップ（Pull）は `app-settings/powertoys/manifest.txt` も更新します。
+新しい PC では `Install-DevTools` が PowerToys 本体（winget）に続いて設定を GitHub の `main`
+から配置します（`PowerToys settings`）。`FancyZones\custom-layouts.json` が未作成の環境にだけ
+一度実行し、既存ファイルが異なる場合は `.backup.<日時>` を残します。設定を取り直すときは
+上の `Sync-PowerToysSettings.ps1` を使います。
+
+復元は PowerToys を停止してコピーし、起動していた場合は再起動します。
+FancyZones のモニターごとの適用レイアウト（`applied-layouts.json`）は対象外なので、
+復元後に各モニターへレイアウトを選び直してください。
