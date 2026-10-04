@@ -188,6 +188,13 @@ pwsh -File tools\Sync-AppSettings.ps1              # repo -> 実環境 (既定)
 pwsh -File tools\Sync-AppSettings.ps1 -Direction Pull  # 実環境 -> repo
 ```
 
+## Orca 設定
+
+Orca の外観・エディタ・ターミナル設定は `app-settings/orca/settings.json` に保存します。
+`python tools/Export-OrcaSettings.py` で現在の設定を取り込めます。認証情報や作業履歴は
+対象外です。JSON の自動読み込みには対応していないため、復元方法と対象範囲は
+`app-settings/orca/README.md` を参照してください。
+
 ## PowerToys 設定
 
 PowerToys の設定（FancyZones のレイアウト・ホットキーを含む）は
