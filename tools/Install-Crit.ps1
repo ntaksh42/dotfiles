@@ -15,6 +15,12 @@ $downloadUrl = "https://github.com/tomasz-tomczyk/crit/releases/latest/download/
 New-Item -ItemType Directory -Path $installDir -Force | Out-Null
 try {
     Invoke-WebRequest -Uri $downloadUrl -OutFile $downloadPath
+    # 常駐中の crit.exe (_serve 等) は exe をロックし上書きに失敗するため、差し替え前に終了させる。
+    $running = @(Get-Process -Name 'crit' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $critPath })
+    if ($running) {
+        $running | Stop-Process -Force
+        $running | Wait-Process -Timeout 10
+    }
     Move-Item -LiteralPath $downloadPath -Destination $critPath -Force
 }
 finally {

@@ -61,6 +61,7 @@ Set-Alias cop   copilot
 Set-Alias g     git
 Set-Alias cx     codex
 Set-Alias which Get-Command
+Set-Alias cl    Clear-Host
 
 # ---------------------------------------------------------------------------
 # §2 Navigation & file operations
