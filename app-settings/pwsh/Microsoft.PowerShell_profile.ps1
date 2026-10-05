@@ -910,6 +910,22 @@ function Update-Profile {
 }
 
 $devToolsPath = Join-Path (Split-Path -Parent $script:DotfilesProfilePath) 'DevTools.ps1'
+# 分割前の Update-Profile はプロファイル本体しか更新しないため、インストール済みの
+# $PROFILE で DevTools.ps1 が欠けていたらリポジトリ版を取得して補う。
+if (-not (Test-Path -LiteralPath $devToolsPath -PathType Leaf) -and
+    $script:DotfilesProfilePath -eq $PROFILE.CurrentUserCurrentHost) {
+    try {
+        $content = Get-DotfilesRemoteConfig @{ RepoPath = 'app-settings/pwsh/DevTools.ps1' }
+        $tokens = $null; $parseErrors = $null
+        $null = [System.Management.Automation.Language.Parser]::ParseInput($content, [ref]$tokens, [ref]$parseErrors)
+        if ($parseErrors.Count -gt 0) { throw '取得した DevTools.ps1 が不正な PowerShell です。' }
+        Set-Content -LiteralPath $devToolsPath -Value $content -NoNewline -Encoding UTF8
+        Write-Host "DevTools.ps1 を取得しました: $devToolsPath" -ForegroundColor Green
+    }
+    catch {
+        Write-Warning "DevTools.ps1 の自動取得に失敗しました: $($_.Exception.Message)"
+    }
+}
 if (Test-Path -LiteralPath $devToolsPath -PathType Leaf) {
     . $devToolsPath
 }

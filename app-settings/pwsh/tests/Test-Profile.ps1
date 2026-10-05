@@ -67,6 +67,22 @@ try {
         } -args $profileOnly
         $LASTEXITCODE -eq 0 -and $output -contains 'RECOVERY_READY'
     }
+    Test-Case 'Installed profile without DevTools fetches and loads it on startup' {
+        $dir = Join-Path $scratch 'auto-fetch'
+        New-Item -ItemType Directory -Path $dir | Out-Null
+        $installed = Join-Path $dir 'Microsoft.PowerShell_profile.ps1'
+        Copy-Item -LiteralPath (Join-Path $root 'Microsoft.PowerShell_profile.ps1') -Destination $installed
+        $output = & (Get-Process -Id $PID).Path -NoLogo -NoProfile -NonInteractive -Command {
+            param($Path, $DevTools)
+            $env:PATH = ''
+            $PROFILE = [pscustomobject]@{ CurrentUserCurrentHost = $Path }
+            function Invoke-WebRequest { param($Uri, [switch]$UseBasicParsing, $TimeoutSec) [pscustomobject]@{ Content = Get-Content -LiteralPath $DevTools -Raw } }
+            . $Path 3>&1 | Where-Object { $_ -is [System.Management.Automation.WarningRecord] } | ForEach-Object { 'WARNING' }
+            if ((Get-Command Install-DevTools).CommandType -eq 'Function') { 'DEVTOOLS_LOADED' }
+        } -args $installed, (Join-Path $root 'DevTools.ps1')
+        $output -contains 'DEVTOOLS_LOADED' -and $output -notcontains 'WARNING' -and
+        (Test-Path -LiteralPath (Join-Path $dir 'DevTools.ps1'))
+    }
 
     function git {
         $script:gitArgs = @($args)
