@@ -8,6 +8,7 @@ $ErrorActionPreference = "Stop"
 $script:DevTools = @(
     @{ Name = 'Files'; Backend = 'winget'; Id = 'FilesCommunity.Files' }
     @{ Name = 'Everything'; Backend = 'winget'; Id = 'voidtools.Everything' }
+    @{ Name = 'Orca'; Backend = 'winget'; Id = 'StablyAI.Orca' }
     @{ Name = 'PC Manager'; Backend = 'msstore'; Id = '9PM860492SZD' }
     @{ Name = 'PowerToys'; Backend = 'winget'; Id = 'Microsoft.PowerToys' }
     # 既存の設定を上書きしないよう、レイアウトが未作成（custom-layouts.json なし）の環境にだけ一度配置する。

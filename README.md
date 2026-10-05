@@ -190,6 +190,9 @@ pwsh -File tools\Sync-AppSettings.ps1 -Direction Pull  # 実環境 -> repo
 
 ## Orca 設定
 
+`Install-DevTools` は Orca 本体も winget（`StablyAI.Orca`）でインストールします。
+導入済みの場合はスキップします。
+
 Orca の外観・エディタ・ターミナル設定は `app-settings/orca/settings.json` に保存します。
 `python tools/Export-OrcaSettings.py` で現在の設定を取り込めます。認証情報や作業履歴は
 対象外です。JSON の自動読み込みには対応していないため、復元方法と対象範囲は
