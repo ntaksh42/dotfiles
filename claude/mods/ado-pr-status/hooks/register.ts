@@ -17,10 +17,14 @@ async function git($: EngineInterface, args: string[], cwd: string): Promise<str
   return ran.exitCode === 0 ? ran.stdout.trim() : ''
 }
 
-/** az.cmd はシェル経由でないと起動できないので、Windows では cmd を挟む */
+/**
+ * az.cmd はシェル経由でないと起動できないので、Windows では cmd を挟む。
+ * パイプ時の az はコンソールのコードページ (日本語環境では cp932) で JSON を出すため、
+ * PYTHONUTF8=1 で UTF-8 に固定する（しないとタイトルが文字化けする）。
+ */
 async function az($: EngineInterface, args: string[]) {
   const isWindows = (await $.env.get('OS')) === 'Windows_NT'
-  const argv = isWindows ? ['cmd', '/d', '/c', 'az', ...args] : ['az', ...args]
+  const argv = isWindows ? ['cmd', '/d', '/c', 'set', 'PYTHONUTF8=1&&', 'az', ...args] : ['az', ...args]
 
   return $.process.run(argv, { timeoutMs: 30_000 })
 }
