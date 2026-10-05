@@ -7,7 +7,9 @@ import { join } from 'node:path'
 
 const TITLE_MAX = 40
 
-const link = (url, text) => `\x1b]8;;${url}\x1b\\${text}\x1b]8;;\x1b\\`
+// OSC 8 の終端は ST(ESC \) ではなく BEL を使う。ccstatusline 経由だと ESC \ の後半が
+// 途中で落ちて、エスケープ列の残骸がリンク文字として表示される（文字化け）ため。
+const link = (url, text) => `\x1b]8;;${url}\x07${text}\x1b]8;;\x07`
 
 const format = status => {
   const pr = status.pr

@@ -18,10 +18,11 @@ const cfg = { organization: '', prs: 5, workItems: 5 }
 // Work items whose title was already asked for, so each is fetched once.
 const requested = new Set<string>()
 
-// az.cmd only starts through a shell, so Windows goes through cmd.
+// az.cmd only starts through a shell, so Windows goes through cmd. Piped, az writes JSON in the
+// console code page (cp932 on Japanese Windows), so PYTHONUTF8=1 pins it to UTF-8 for the titles.
 async function az($: EngineInterface, args: string[]) {
   const isWindows = (await $.env.get('OS')) === 'Windows_NT'
-  const argv = isWindows ? ['cmd', '/d', '/c', 'az', ...args] : ['az', ...args]
+  const argv = isWindows ? ['cmd', '/d', '/c', 'set', 'PYTHONUTF8=1&&', 'az', ...args] : ['az', ...args]
   return $.process.run(argv, { timeoutMs: 30_000 })
 }
 
