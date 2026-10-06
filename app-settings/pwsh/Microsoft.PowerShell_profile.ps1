@@ -305,16 +305,21 @@ function Resolve-GitPullCollision {
             $backupDir = Join-Path $gitDir ('pull-backup\{0}' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
         }
         $src = Join-Path (git rev-parse --show-toplevel).Trim() ($path -replace '/', '\')
+        # skip-worktree / sparse-checkout の追跡ファイルは作業ツリーに実体が無い
+        if (-not (Test-Path -LiteralPath $src -PathType Leaf)) { continue }
         $dest = Join-Path $backupDir ($path -replace '/', '\')
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dest) | Out-Null
-        Move-Item -LiteralPath $src -Destination $dest -Force -ErrorAction Stop
-        if (-not (Test-Path -LiteralPath $dest -PathType Leaf)) {
-            throw "Failed to back up conflicting file: $path"
+        try {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dest) -ErrorAction Stop | Out-Null
+            Move-Item -LiteralPath $src -Destination $dest -Force -ErrorAction Stop
+        } catch {
+            # エディタ等がファイルをロックしている。退避せず続行し、衝突すれば pull 側のエラーで分かる。
+            Write-Warning "退避に失敗 ($path): $($_.Exception.Message)"
+            continue
         }
         # 追跡ファイルなら、退避で消えた分をインデックスからも落として pull を通す。
         if ($c.Tracked) {
             git rm --cached --quiet -- $path 2>$null
-            Assert-NativeCommandSucceeded "git rm --cached -- $path"
+            if ($LASTEXITCODE -ne 0) { Write-Warning "git rm --cached に失敗: $path" }
         }
         $why = if ($c.Tracked) { "大文字小文字違い ($match)" } else { '未追跡ファイルが upstream と衝突' }
         Write-Host "  [退避] $path : $why -> $dest" -ForegroundColor Yellow
@@ -326,13 +331,17 @@ function Resolve-GitPullCollision {
 # (--autostash を使わないのは、大文字小文字衝突の退避 (git rm --cached) が stash に
 #  巻き込まれ、復元時に競合するため)
 function gpl {
-    git pack-refs --all
-    Assert-NativeCommandSucceeded 'git pack-refs --all'
+    # pack-refs は最適化なので、他プロセス (IDE の自動 fetch 等) と packed-refs.lock が競合しても止めない
+    git pack-refs --all 2>$null
+    if ($LASTEXITCODE -ne 0) { Write-Warning 'gpl: git pack-refs をスキップ (他の git プロセスがロック中の可能性)' }
 
     # 衝突判定には fetch 済みの upstream が要る。pull 前に取得しておく。
     Write-Host '[gpl] fetch' -ForegroundColor Cyan
     git fetch --prune --quiet
-    Assert-NativeCommandSucceeded 'git fetch --prune'
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host '[gpl] fetch 失敗: 上のエラーを確認 (ネットワーク・認証・他の git プロセスのロック)' -ForegroundColor Red
+        return
+    }
     $upstream = (git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null)
     $hasUpstream = ($LASTEXITCODE -eq 0 -and $upstream)
     if (-not $hasUpstream -and $args.Count -eq 0) {
@@ -343,9 +352,15 @@ function gpl {
     $stashed = $false
     if (git status --porcelain --untracked-files=no) {
         Write-Host '[gpl] 未コミット変更を stash' -ForegroundColor Cyan
+        # サブモジュール内の変更だけだと stash は何も作らず成功する。その場合に古い stash を pop しないよう、
+        # stash の先頭が変わったかで判定する。
+        $before = git rev-parse -q --verify refs/stash 2>$null
         git stash push --quiet -m 'gpl: auto stash before pull'
-        Assert-NativeCommandSucceeded 'git stash push'
-        $stashed = $true
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host '[gpl] stash 失敗: 上のエラーを確認' -ForegroundColor Red
+            return
+        }
+        $stashed = (git rev-parse -q --verify refs/stash 2>$null) -ne $before
     }
     # rebase モードか (引数が pull.rebase 設定より優先)。大文字小文字だけの改名は git が rebase でも処理できる。
     $rebase = (git config --get pull.rebase) -notin @($null, '', 'false')
@@ -353,26 +368,32 @@ function gpl {
         if ($a -in '--no-rebase', '--rebase=false') { $rebase = $false }
         elseif ($a -match '^(-r|--rebase(=.+)?)$') { $rebase = $true }
     }
-    if ($hasUpstream) { Resolve-GitPullCollision -Upstream $upstream.Trim() -UntrackedOnly:$rebase }
+    $stashHint = if ($stashed) { '。未コミット変更は stash に残っている (git stash pop で復元)' } else { '' }
+    if ($hasUpstream) {
+        try {
+            Resolve-GitPullCollision -Upstream $upstream.Trim() -UntrackedOnly:$rebase
+        } catch {
+            Write-Host "[gpl] 衝突ファイルの退避に失敗: $($_.Exception.Message)$stashHint" -ForegroundColor Red
+            return
+        }
+    }
 
     Write-Host '[gpl] pull' -ForegroundColor Cyan
     git pull @args
     if ($LASTEXITCODE -ne 0) {
-        $hint = '[gpl] pull 失敗: 上のエラーを確認。マージ競合ならファイル修正後 git add / git commit、中止は git merge --abort'
-        if ($stashed) { $hint += '。未コミット変更は stash に残っている (git stash pop で復元)' }
-        Write-Host $hint -ForegroundColor Red
-        Assert-NativeCommandSucceeded 'git pull'
+        Write-Host "[gpl] pull 失敗: 上のエラーを確認。マージ競合ならファイル修正後 git add / git commit、中止は git merge --abort$stashHint" -ForegroundColor Red
+        return
     }
     if ($stashed) {
         Write-Host '[gpl] stash を復元' -ForegroundColor Cyan
         git stash pop --quiet
         if ($LASTEXITCODE -ne 0) {
             Write-Host '[gpl] stash の復元で競合。解消後 git stash drop' -ForegroundColor Red
-            Assert-NativeCommandSucceeded 'git stash pop'
+            return
         }
     }
-    git pack-refs --all
-    Assert-NativeCommandSucceeded 'git pack-refs --all'
+    git pack-refs --all 2>$null
+    if ($LASTEXITCODE -ne 0) { Write-Warning 'gpl: git pack-refs をスキップ (他の git プロセスがロック中の可能性)' }
 }
 
 # Commit with a message (message required)
