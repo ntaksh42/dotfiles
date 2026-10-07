@@ -217,6 +217,67 @@ try {
         Update-Profile
         -not $script:UpdatedProfileLoaded -and $script:promptCount -eq 0 -and (Get-BackupCount $dir) -eq 0
     }
+
+    function Invoke-RestMethod {
+        param($Uri, $Headers)
+        $repo = ($Uri -split '/')[5]
+        $assets = if ($repo -eq 'DevDeck') { 'DevDeck_0.2.20_x64-setup.exe', 'DevDeck_0.2.20_x64_en-US.msi' } else { 'rdpmanager-0.4.13.msi' }
+        [pscustomobject]@{
+            tag_name = if ($repo -eq 'DevDeck') { 'v0.2.20' } else { 'v0.4.13' }
+            assets   = @($assets | ForEach-Object { [pscustomobject]@{ name = $_; browser_download_url = "https://example.invalid/$_" } })
+        }
+    }
+    function Invoke-WebRequest { param($Uri, $OutFile, [switch]$UseBasicParsing) Set-Content -LiteralPath $OutFile -Value 'stub' }
+    function Start-Process {
+        param($FilePath, $ArgumentList, [switch]$Wait, [switch]$PassThru)
+        $script:started += , @($FilePath, ($ArgumentList -join ' '))
+        [pscustomobject]@{ ExitCode = $script:installerExit }
+    }
+    function Get-ExtraToolUninstallEntry {
+        param($Tool)
+        if ($script:installedVersions.ContainsKey($Tool.Name)) { [pscustomobject]@{ DisplayVersion = $script:installedVersions[$Tool.Name] } }
+    }
+    function Initialize-ExtraToolFixture { $script:started = @(); $script:installerExit = 0; $script:installedVersions = @{} }
+
+    Test-Case 'Install-ExtraTools is separate from the Install-DevTools catalog' {
+        $script:DevTools.Name -notcontains 'DevDeck' -and $script:DevTools.Name -notcontains 'RdpManager' -and
+        @($script:ExtraTools.Name) -contains 'DevDeck' -and @($script:ExtraTools.Name) -contains 'RdpManager'
+    }
+    Test-Case 'Install-ExtraTools updates an outdated DevDeck silently with the NSIS setup' {
+        Initialize-ExtraToolFixture
+        $script:installedVersions['DevDeck'] = '0.2.19'
+        Install-ExtraTools -Name DevDeck -Yes | Out-Null
+        $script:started.Count -eq 1 -and $script:started[0][0] -like '*DevDeck_0.2.20_x64-setup.exe' -and $script:started[0][1] -eq '/S'
+    }
+    Test-Case 'Install-ExtraTools skips a tool that is already current' {
+        Initialize-ExtraToolFixture
+        $script:installedVersions['DevDeck'] = '0.2.20'
+        Install-ExtraTools -Name DevDeck -Yes | Out-Null
+        $script:started.Count -eq 0
+    }
+    Test-Case 'Install-ExtraTools installs a missing RdpManager through msiexec' {
+        Initialize-ExtraToolFixture
+        Install-ExtraTools -Name RdpManager -Yes | Out-Null
+        $script:started.Count -eq 1 -and $script:started[0][0] -eq 'msiexec.exe' -and
+        $script:started[0][1] -like '/i "*rdpmanager-0.4.13.msi" /passive'
+    }
+    Test-Case 'Install-ExtraTools without -Name handles every extra tool' {
+        Initialize-ExtraToolFixture
+        Install-ExtraTools -Yes | Out-Null
+        $script:started.Count -eq @($script:ExtraTools).Count
+    }
+    Test-Case 'Install-ExtraTools declining the prompt installs nothing' {
+        Initialize-ExtraToolFixture
+        $script:answer = 'n'
+        Install-ExtraTools -Name DevDeck | Out-Null
+        $script:started.Count -eq 0
+    }
+    Test-Case 'Install-ExtraTools rejects an unknown tool name' {
+        Initialize-ExtraToolFixture
+        $threw = $false
+        try { Install-ExtraTools -Name Nope -Yes } catch { $threw = $true }
+        $threw -and $script:started.Count -eq 0
+    }
 }
 finally {
     $env:PATH = $originalPath

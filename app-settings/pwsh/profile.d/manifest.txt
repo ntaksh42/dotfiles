@@ -6,6 +6,7 @@ integrations.ps1
 ai-cli.ps1
 devtools-catalog.ps1
 devtools.ps1
+extra-tools.ps1
 windows-settings.ps1
 psreadline.ps1
 help.ps1

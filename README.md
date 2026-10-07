@@ -19,7 +19,7 @@ tools/                     汎用 PowerShell ユーティリティ
 `app-settings/pwsh/Microsoft.PowerShell_profile.ps1` は基本ヘルパー・エイリアスと
 `Update-Profile` を持つローダーで、機能本体は `app-settings/pwsh/profile.d/` に
 分割しています（`navigation` / `git` / `vs-build` / `integrations` / `ai-cli` /
-`devtools-catalog` / `devtools` / `windows-settings` / `psreadline` / `help`）。
+`devtools-catalog` / `devtools` / `extra-tools` / `windows-settings` / `psreadline` / `help`）。
 読み込み順は `profile.d/manifest.txt` が決めます。新しいファイルを足すときは
 `profile.d/` に置いて `manifest.txt` に 1 行追加します。配置時はローダーと
 `profile.d/` の両方が必要です。
@@ -44,6 +44,22 @@ Git log、Git push、Git commit、bat 連携として動作します。
 その他の既存の短縮名も維持しています。
 
 検証は `pwsh -NoProfile -File app-settings/pwsh/tests/Test-Profile.ps1` で実行します。
+
+## 一部の端末だけに入れるアプリ
+
+DevDeck（`ntaksh42/DevDeck`）と RdpManager（`ntaksh42/rdp-manager`）は全端末には不要なため、
+`Install-DevTools` のカタログには入れず、専用の `Install-ExtraTools` で導入します。
+GitHub Releases の最新インストーラを取得して実行し、導入済みで最新なら何もしません。
+古い場合は更新し、実行中のアプリは終了します。
+
+```powershell
+Install-ExtraTools                       # DevDeck と RdpManager の両方
+Install-ExtraTools -Name DevDeck         # 指定したものだけ
+Install-ExtraTools -Name RdpManager -Yes # 確認を省略
+```
+
+DevDeck は NSIS 版（ユーザー単位・無人）、RdpManager は MSI 版（マシン単位のため UAC が出ます）を使います。
+対象を増やすときは `profile.d/extra-tools.ps1` の `$script:ExtraTools` に 1 行足します。
 
 ## Git 設定
 
