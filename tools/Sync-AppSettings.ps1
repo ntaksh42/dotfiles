@@ -30,10 +30,19 @@ $pwsh7Profile = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'PowerSh
 
 # 同期マッピング: リポジトリ管理元（repo 相対） <-> 実環境の配置先
 $mappings = @(
-    @{ Repo = "app-settings\pwsh\DevTools.ps1"; Env = Join-Path (Split-Path -Parent $pwsh7Profile) 'DevTools.ps1' }
     @{ Repo = "app-settings\pwsh\Microsoft.PowerShell_profile.ps1"; Env = $pwsh7Profile }
     @{ Repo = "app-settings\starship\starship.toml"; Env = Join-Path $HOME ".config\starship.toml" }
 )
+
+# profile.d はコピー元側にある *.ps1 / manifest.txt をまとめて同期する
+# （Update-Profile が作る *.backup.* は拡張子が合わないため対象外）。
+$pwshDir = Split-Path -Parent $pwsh7Profile
+$profileDSource = if ($Direction -eq 'Push') { Join-Path $repoRoot 'app-settings\pwsh\profile.d' } else { Join-Path $pwshDir 'profile.d' }
+if (Test-Path $profileDSource) {
+    $mappings += Get-ChildItem -LiteralPath $profileDSource -File | Where-Object Name -match '\.(ps1|txt)$' | ForEach-Object {
+        @{ Repo = "app-settings\pwsh\profile.d\$($_.Name)"; Env = Join-Path $pwshDir "profile.d\$($_.Name)" }
+    }
+}
 
 foreach ($m in $mappings) {
     $repoPath = Join-Path $repoRoot $m.Repo

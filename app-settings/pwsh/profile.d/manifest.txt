@@ -1,0 +1,11 @@
+# profile.d の読み込み順。ローダー・Update-Profile・テストがこの一覧を参照する。
+navigation.ps1
+git.ps1
+vs-build.ps1
+integrations.ps1
+ai-cli.ps1
+devtools-catalog.ps1
+devtools.ps1
+windows-settings.ps1
+psreadline.ps1
+help.ps1

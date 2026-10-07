@@ -16,9 +16,13 @@ tools/                     汎用 PowerShell ユーティリティ
 
 ## PowerShell コマンド
 
-`app-settings/pwsh/Microsoft.PowerShell_profile.ps1` が日常操作・Git・AI CLI・
-キーバインドを定義し、同じディレクトリの `DevTools.ps1` が開発ツールの
-導入・更新を定義します。配置時は両方のファイルが必要です。
+`app-settings/pwsh/Microsoft.PowerShell_profile.ps1` は基本ヘルパー・エイリアスと
+`Update-Profile` を持つローダーで、機能本体は `app-settings/pwsh/profile.d/` に
+分割しています（`navigation` / `git` / `vs-build` / `integrations` / `ai-cli` /
+`devtools-catalog` / `devtools` / `windows-settings` / `psreadline` / `help`）。
+読み込み順は `profile.d/manifest.txt` が決めます。新しいファイルを足すときは
+`profile.d/` に置いて `manifest.txt` に 1 行追加します。配置時はローダーと
+`profile.d/` の両方が必要です。
 
 ローカルの変更を反映する場合は、リポジトリから同期します。
 
@@ -28,9 +32,9 @@ pwsh -NoProfile -File tools/Sync-AppSettings.ps1
 ```
 
 同期先は Windows の Documents フォルダ配下の `PowerShell/` です。
-実環境で編集した場合は `-Direction Pull` で両ファイルを管理元へ取り込みます。
+実環境で編集した場合は `-Direction Pull` でローダーと `profile.d/` を管理元へ取り込みます。
 `profile` は現在読み込んでいるプロファイルを編集し、`reload` は再読み込みします。
-`Update-Profile` は GitHub の `main` から両ファイルを取得し、構文検証・
+`Update-Profile` は GitHub の `main` からローダーと `profile.d/` 一式を取得し、構文検証・
 上書き確認・バックアップ後に更新するため、未公開のローカル変更は反映しません。
 
 コマンド一覧は `phelp`（例: `phelp git`）、検索は Ctrl+G で開けます。
