@@ -1177,6 +1177,7 @@ $script:ProfileHelp = [ordered]@{
         @{ Cmd = 'Show-DevEnv'; Desc = '開発ツールの導入状況を一覧' }
         @{ Cmd = 'Install-DevTools [-Yes]'; Desc = '未導入ツールを一括インストール (-Yes で全確認に y)' }
         @{ Cmd = 'Update-DevTools'; Desc = 'winget/PS モジュールを更新' }
+        @{ Cmd = 'Set-WindowsSettings [-Check]'; Desc = 'Windows 設定（レジストリ）を適用 (-Check で差分のみ)' }
     )
     'Aliases'               = @(
         @{ Cmd = 'cop'; Desc = 'copilot' }
