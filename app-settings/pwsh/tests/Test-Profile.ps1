@@ -65,6 +65,13 @@ try {
         $listed.Count -eq @($listed | Select-Object -Unique).Count -and
         $null -eq (Compare-Object ($listed | Sort-Object) ($actual | Sort-Object))
     }
+    Test-Case 'Compatibility DevTools.ps1 stub stays fetchable and defines nothing' {
+        # 分割前の Update-Profile は DevTools.ps1 を取得するため、無いと旧ローダーの環境が移行できない。
+        $stub = Join-Path $root 'DevTools.ps1'
+        $tokens = $null; $parseErrors = $null
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($stub, [ref]$tokens, [ref]$parseErrors)
+        $parseErrors.Count -eq 0 -and $ast.EndBlock.Statements.Count -eq 0
+    }
     Test-Case 'Manifest rejects names that escape profile.d' {
         $threw = $false
         try { $null = @(Read-DotfilesManifest "ok.ps1`n..\evil.ps1") } catch { $threw = $true }
