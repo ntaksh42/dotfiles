@@ -48,7 +48,7 @@ function Invoke-CommandPalette {
 
     $rows = foreach ($section in $script:ProfileHelp.Keys) {
         foreach ($item in $script:ProfileHelp[$section]) {
-            $names = ($item.Cmd -split '[,/]') | ForEach-Object {
+            $names = ($item.Cmd -split '[,/](?![^\[<]*[\]>])') | ForEach-Object {
                 ($_ -replace '[\[<].*', '').Trim()
             } | Where-Object { $_ }
             foreach ($name in $names) {
