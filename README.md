@@ -43,7 +43,7 @@ Git log、Git push、Git commit、bat 連携として動作します。
 `gco` の引数なし実行は `git-switch` と同じブランチ選択を使います。
 その他の既存の短縮名も維持しています。
 
-検証は `pwsh -NoProfile -File app-settings/pwsh/tests/Test-Profile.ps1` で実行します。
+検証は `pwsh -NoProfile -File app-settings/pwsh/tests/Invoke-AllTests.ps1` で全テストファイルを一括実行します（個別実行は各 `Test-*.ps1`）。
 
 ## 一部の端末だけに入れるアプリ
 

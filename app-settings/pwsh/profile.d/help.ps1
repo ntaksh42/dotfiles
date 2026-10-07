@@ -63,13 +63,14 @@ $script:ProfileHelp = [ordered]@{
         @{ Cmd = 'killport <n>'; Desc = 'ポートを使用中のプロセスを強制終了' }
     )
     'Claude Code'           = @(
-        @{ Cmd = 'fable-orchest / ccf'; Desc = 'Fable が立案・Sonnet 5 が実行の構成で claude 起動' }
+        @{ Cmd = 'fable-orchest / ccf'; Desc = 'Fable が立案・Sonnet 5.5 が実行の構成で claude 起動' }
         @{ Cmd = 'fable-orchest-opus / ccfo'; Desc = 'Fable が立案・Opus 5.5 が実行の構成で claude 起動' }
-        @{ Cmd = 'opus-orchest / cco'; Desc = 'Opus 5.5 が立案・Sonnet 5 が実行の構成で claude 起動' }
+        @{ Cmd = 'opus-orchest / cco'; Desc = 'Opus 5.5 が立案・Sonnet 5.5 が実行の構成で claude 起動' }
         @{ Cmd = 'fable-orchest-plan / ccfp'; Desc = 'ccf を plan モードで起動（立案を承認してから実行）' }
         @{ Cmd = 'cc / ccop'; Desc = 'Opus 5.5 で claude 起動（司令塔プロンプトなし、既定コマンド）' }
         @{ Cmd = 'ccp'; Desc = 'cc を plan モードで起動' }
-        @{ Cmd = 'ccs'; Desc = 'Sonnet 5 で claude 起動（軽作業向け）' }
+        @{ Cmd = 'ccs'; Desc = 'Sonnet 5.5 で claude 起動（軽作業向け）' }
+        @{ Cmd = 'cch'; Desc = 'Haiku 5.5 で claude 起動（最軽量・高速）' }
         @{ Cmd = 'ccc'; Desc = '直近の会話を継続 (claude --continue)' }
         @{ Cmd = 'ccr'; Desc = 'セッションを選んで再開 (claude --resume)' }
     )

@@ -5,6 +5,10 @@ function Get-WindowsSettingValue($Path, $Name) {
     $key.GetValue($(if ($Name -eq '(default)') { '' } else { $Name }))
 }
 
+function Test-IsAdministrator {
+    ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
 # Apply Windows settings (registry) from the catalog below. Idempotent; HKLM entries need admin.
 # -Check only reports differences and returns $true when none. -WhatIf previews writes.
 function Set-WindowsSettings {
@@ -38,7 +42,7 @@ function Set-WindowsSettings {
         @{ Group = 'Security'; Label = 'UAC: 管理者の昇格確認を出さない'; Path = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'; Name = 'ConsentPromptBehaviorAdmin'; Value = 0 }
     )
 
-    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    $isAdmin = Test-IsAdministrator
     $diffCount = 0
     $restartExplorer = $false
 

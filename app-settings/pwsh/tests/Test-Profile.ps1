@@ -3,21 +3,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ('dotfiles-profile-test-' + [guid]::NewGuid().ToString('N'))
 $originalPath = $env:PATH
-$script:pass = 0
-$script:fail = 0
-
-function Test-Case {
-    param([string]$Name, [scriptblock]$Check)
-    try {
-        if (-not (& $Check)) { throw 'Check returned false' }
-        Write-Host "ok    $Name" -ForegroundColor Green
-        $script:pass++
-    }
-    catch {
-        Write-Host "FAIL  $Name -- $_" -ForegroundColor Red
-        $script:fail++
-    }
-}
+. (Join-Path $PSScriptRoot 'TestHarness.ps1')
 
 function Initialize-UpdateFixture {
     $dir = Join-Path $scratch ([guid]::NewGuid().ToString('N'))
@@ -287,5 +273,4 @@ finally {
     if (Test-Path -LiteralPath $scratch) { Remove-Item -LiteralPath $scratch -Recurse -Force }
 }
 
-Write-Host "$script:pass passed, $script:fail failed"
-if ($script:fail -gt 0) { exit 1 }
+Complete-Tests

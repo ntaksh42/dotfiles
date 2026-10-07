@@ -19,10 +19,10 @@ function script:Invoke-ClaudeOrchest {
         else { Remove-Item Env:CLAUDE_CODE_SUBAGENT_MODEL -ErrorAction Ignore }
     }
 }
-function fable-orchest { Invoke-ClaudeOrchest 'claude-fable-5'  'claude-sonnet-5' $args }
+function fable-orchest { Invoke-ClaudeOrchest 'claude-fable-5'  'claude-sonnet-5-5' $args }
 function fable-orchest-opus { Invoke-ClaudeOrchest 'claude-fable-5'  'claude-opus-5-5' $args }
-function opus-orchest { Invoke-ClaudeOrchest 'claude-opus-5-5'   'claude-sonnet-5' $args }
-function fable-orchest-plan { Invoke-ClaudeOrchest 'claude-fable-5'  'claude-sonnet-5' (@('--permission-mode', 'plan') + $args) }
+function opus-orchest { Invoke-ClaudeOrchest 'claude-opus-5-5'   'claude-sonnet-5-5' $args }
+function fable-orchest-plan { Invoke-ClaudeOrchest 'claude-fable-5'  'claude-sonnet-5-5' (@('--permission-mode', 'plan') + $args) }
 Set-Alias ccf  fable-orchest
 Set-Alias ccfo fable-orchest-opus
 Set-Alias cco  opus-orchest
@@ -33,8 +33,11 @@ function cc { claude --model claude-opus-5-5 @args }
 Set-Alias ccop cc
 function ccp { claude --model claude-opus-5-5 --permission-mode plan @args }
 
-# Sonnet 5 で claude 起動（軽作業向け）
-function ccs { claude --model claude-sonnet-5 @args }
+# Sonnet 5.5 で claude 起動（軽作業向け）
+function ccs { claude --model claude-sonnet-5-5 @args }
+
+# Haiku 5.5 で claude 起動（最軽量・高速）
+function cch { claude --model claude-haiku-5-5 @args }
 
 # 直近の会話を継続 / セッションを選んで再開
 function ccc { claude --continue @args }
