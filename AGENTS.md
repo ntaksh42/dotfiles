@@ -55,6 +55,11 @@ pwsh -File tools/Sync-AppSettings.ps1 -Direction Pull  # 実環境 -> repo
 # PowerToys 設定（app-settings/powertoys/）のバックアップ・復元
 pwsh -File tools/Sync-PowerToysSettings.ps1 -Direction Pull  # 実環境 -> repo
 pwsh -File tools/Sync-PowerToysSettings.ps1                  # repo -> 実環境（PowerToys を停止して復元）
+
+# Windows 設定（レジストリ）の適用。pwsh プロファイル経由のコマンド（app-settings/pwsh/DevTools.ps1）
+# HKLM 項目は管理者権限が必要
+Set-WindowsSettings -Check    # 差分のみ表示（書き込まない）
+Set-WindowsSettings           # 適用（Explorer 系は explorer.exe を再起動）
 ```
 
 ## 開発規約
