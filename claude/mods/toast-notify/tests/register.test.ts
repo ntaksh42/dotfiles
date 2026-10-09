@@ -3,7 +3,7 @@ import type { On } from 'claude-code'
 
 import { firstLine, formatDuration } from '../hooks/register'
 
-type Toast = { title: string; body: string; session?: string }
+type Toast = { title: string; body: string; session?: string; level?: string }
 
 // エンジン側の応答。process.run で出したトーストを記録し、コマンドは runMs だけ時計を進める
 const engine = (on: On, toasts: Toast[], runMs = 0, isError = false) => {
@@ -131,7 +131,7 @@ describe('停滞検知', () => {
     on('ui.log', () => ({ value: undefined }) as never)
     on('process.run', (_$, e) => {
       const env = e.init?.env ?? {}
-      toasts.push({ title: env.TOAST_NOTIFY_TITLE ?? '', body: env.TOAST_NOTIFY_BODY ?? '' })
+      toasts.push({ title: env.TOAST_NOTIFY_TITLE ?? '', body: env.TOAST_NOTIFY_BODY ?? '', level: env.TOAST_NOTIFY_LEVEL })
       return { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } } as never
     })
     on('session.start', (_$, e) => ({ cwd: e.cwd }))
@@ -141,7 +141,7 @@ describe('停滞検知', () => {
     return clock
   }
 
-  const STALL = { title: 'Claude: 停止の可能性 - shop', body: '5分間進捗がありません' }
+  const STALL = { title: 'Claude: 停止の可能性 - shop', body: '5分間進捗がありません', level: 'warn' }
 
   test('ターン中に 5 分進捗がなければ一度だけ通知する', async ($, on) => {
     const toasts: Toast[] = []

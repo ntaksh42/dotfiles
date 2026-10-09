@@ -1,7 +1,7 @@
 {
   "name": "toast-notify",
-  "version": "0.1.0",
-  "description": "Windows toast notifications when a long turn or command finishes, when Claude waits for permission, when a turn stalls, and when a turn fails.",
+  "version": "0.2.0",
+  "description": "Windows toast notifications when a long turn or command finishes, when Claude waits for permission, when a turn stalls, and when a turn fails. Inside an rdpmanager RDP session they go to the client instead.",
   "userConfig": {
     "enabled": {
       "type": "boolean",

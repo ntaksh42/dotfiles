@@ -3,8 +3,21 @@ import type { EngineInterface, Register } from 'claude-code'
 // Windows PowerShell 5.1 の AppUserModelID。pwsh 7 は WinRT を読めないため powershell.exe を使う
 const APP_ID = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe'
 // タイトル・本文は環境変数で渡し、スクリプト側で XML エスケープする（引数経由の注入を避ける）
+// rdpmanager で RDP 接続中なら仮想チャネル CCNOTIF でクライアント側へ送り、届かなければローカルにトーストを出す
+// （CCNOTIF の仕様は ntaksh42/rdp-manager の docs/remote-notifications.md）
 const SCRIPT = [
   "$ErrorActionPreference = 'Stop'",
+  '$sent = $false',
+  'try { ' + [
+    'Add-Type -Namespace ToastNotify -Name Wts -MemberDefinition \'[DllImport("wtsapi32.dll", SetLastError = true, CharSet = CharSet.Ansi)] public static extern IntPtr WTSVirtualChannelOpen(IntPtr hServer, int sessionId, string name); [DllImport("wtsapi32.dll", SetLastError = true)] public static extern bool WTSVirtualChannelWrite(IntPtr h, byte[] buffer, int length, out int written); [DllImport("wtsapi32.dll")] public static extern bool WTSVirtualChannelClose(IntPtr h);\'',
+    '$m = if ($env:TOAST_NOTIFY_SESSION) { $env:TOAST_NOTIFY_BODY + [Environment]::NewLine + $env:TOAST_NOTIFY_SESSION } else { $env:TOAST_NOTIFY_BODY }',
+    '$j = @{ title = $env:TOAST_NOTIFY_TITLE; message = $m; level = $env:TOAST_NOTIFY_LEVEL } | ConvertTo-Json -Compress',
+    '$p = [Text.Encoding]::ASCII.GetBytes([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($j)))',
+    // 静的チャネルは 1 チャンク 1600 バイトを超えると分割され、受信側で捨てられる
+    '$h = if ($p.Length -le 1500) { [ToastNotify.Wts]::WTSVirtualChannelOpen([IntPtr]::Zero, -1, \'CCNOTIF\') } else { [IntPtr]::Zero }',
+    'if ($h -ne [IntPtr]::Zero) { try { $w = 0; $sent = [ToastNotify.Wts]::WTSVirtualChannelWrite($h, $p, $p.Length, [ref]$w) -and $w -eq $p.Length } finally { [void][ToastNotify.Wts]::WTSVirtualChannelClose($h) } }',
+  ].join('; ') + ' } catch { }',
+  'if ($sent) { exit 0 }',
   '[void][Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]',
   '[void][Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]',
   '$t = [Security.SecurityElement]::Escape($env:TOAST_NOTIFY_TITLE)',
@@ -42,17 +55,19 @@ const project = async ($: EngineInterface) => {
   return cwd.split(/[\\/]/).filter(Boolean).pop() ?? cwd
 }
 
-async function toast($: EngineInterface, title: string, body: string) {
+type Level = 'info' | 'warn'
+
+async function toast($: EngineInterface, title: string, body: string, level: Level) {
   const ran = await $.process.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-Command', SCRIPT], {
-    env: { TOAST_NOTIFY_TITLE: `${title} - ${await project($)}`, TOAST_NOTIFY_BODY: body, TOAST_NOTIFY_SESSION: sessionTitle, TOAST_NOTIFY_APP: APP_ID },
+    env: { TOAST_NOTIFY_TITLE: `${title} - ${await project($)}`, TOAST_NOTIFY_BODY: body, TOAST_NOTIFY_SESSION: sessionTitle, TOAST_NOTIFY_LEVEL: level, TOAST_NOTIFY_APP: APP_ID },
     timeoutMs: 15_000,
   })
   if (ran.exitCode !== 0) await $.ui.log(`toast-notify: ${ran.stderr.trim().split('\n')[0]}`, { to: 'debug' })
 }
 
 // 通知の失敗でフックを止めない。表示を待たずに戻る
-const notify = ($: EngineInterface, title: string, body: string) => {
-  toast($, title, body).catch(error => $.ui.log(`toast-notify: ${String(error)}`, { to: 'debug' }))
+const notify = ($: EngineInterface, title: string, body: string, level: Level = 'info') => {
+  toast($, title, body, level).catch(error => $.ui.log(`toast-notify: ${String(error)}`, { to: 'debug' }))
 }
 
 export const register: Register = (on, options) => {
@@ -70,7 +85,7 @@ export const register: Register = (on, options) => {
           if (stall.dirty) Object.assign(stall, { last: now, dirty: false, notified: false })
           else if (!stall.notified && now - stall.last >= cfg.stallMs) {
             stall.notified = true
-            notify($, 'Claude: 停止の可能性', `${formatDuration(cfg.stallMs)}間進捗がありません`)
+            notify($, 'Claude: 停止の可能性', `${formatDuration(cfg.stallMs)}間進捗がありません`, 'warn')
           }
         }, error => $.ui.log(`toast-notify: ${String(error)}`, { to: 'debug' }))
       })
@@ -99,7 +114,7 @@ export const register: Register = (on, options) => {
     if (e.agentId !== undefined || e.isAborted) return done
     if (e.reason === 'error' || e.reason === 'refusal') {
       const detail = e.reason === 'refusal' ? e.refusal.explanation ?? '' : firstLine(e.answer)
-      notify($, 'Claude: エラーで停止', detail || (e.reason === 'refusal' ? 'リクエストが拒否されました' : 'API エラー'))
+      notify($, 'Claude: エラーで停止', detail || (e.reason === 'refusal' ? 'リクエストが拒否されました' : 'API エラー'), 'warn')
     } else if (e.durationMs >= cfg.minTurnMs) {
       notify($, `Claude: 完了 (${formatDuration(e.durationMs)})`, firstLine(e.answer) || '応答が完了しました')
     }
@@ -121,7 +136,7 @@ export const register: Register = (on, options) => {
   on('classic.Notification', async ($, e, next) => {
     const done = await next(e)
     if (e.agent_id === undefined && e.notification_type !== 'idle_prompt' && e.notification_type !== 'auth_success') {
-      notify($, 'Claude: 入力待ち', e.message)
+      notify($, 'Claude: 入力待ち', e.message, 'warn')
     }
     return done
   })
@@ -143,7 +158,7 @@ export const register: Register = (on, options) => {
       const elapsed = (await $.clock.now()) - started
       if (ran.deny === undefined && elapsed >= cfg.minCommandMs) {
         const failed = ran.isError === true
-        notify($, `${failed ? 'コマンド失敗' : 'コマンド完了'} (${formatDuration(elapsed)})`, firstLine(e.command))
+        notify($, `${failed ? 'コマンド失敗' : 'コマンド完了'} (${formatDuration(elapsed)})`, firstLine(e.command), failed ? 'warn' : 'info')
       }
       return ran
     })
