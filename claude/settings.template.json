@@ -155,7 +155,8 @@
     "padding": 0
   },
   "enabledPlugins": {
-    "auto-session-title@dotfiles-mods": true
+    "auto-session-title@dotfiles-mods": true,
+    "toast-notify@dotfiles-mods": true
   },
   "extraKnownMarketplaces": {
     "dotfiles-mods": {

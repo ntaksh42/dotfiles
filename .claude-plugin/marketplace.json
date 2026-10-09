@@ -16,6 +16,11 @@
       "name": "ado-link-bar",
       "source": "./claude/mods/ado-link-bar",
       "description": "Links in the band above the prompt to the Azure DevOps pull requests and work items mentioned most recently in the conversation."
+    },
+    {
+      "name": "toast-notify",
+      "source": "./claude/mods/toast-notify",
+      "description": "Windows toast notifications when a long turn or command finishes, when Claude waits for permission, when a turn stalls, and when a turn fails."
     }
   ]
 }

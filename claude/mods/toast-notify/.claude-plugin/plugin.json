@@ -1,0 +1,31 @@
+{
+  "name": "toast-notify",
+  "version": "0.1.0",
+  "description": "Windows toast notifications when a long turn or command finishes, when Claude waits for permission, when a turn stalls, and when a turn fails.",
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Enabled",
+      "description": "Show Windows toast notifications.",
+      "default": true
+    },
+    "minTurnSeconds": {
+      "type": "number",
+      "title": "Minimum turn seconds",
+      "description": "A finished turn shorter than this raises no toast. Failed turns always do.",
+      "default": 30
+    },
+    "minCommandSeconds": {
+      "type": "number",
+      "title": "Minimum command seconds",
+      "description": "A Bash or PowerShell command that ran at least this long raises a toast when it finishes.",
+      "default": 60
+    },
+    "stallSeconds": {
+      "type": "number",
+      "title": "Stall seconds",
+      "description": "A turn with no model output or tool call for this long raises a toast. 0 disables it.",
+      "default": 300
+    }
+  }
+}
