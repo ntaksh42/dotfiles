@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "keybindings": {},
+  "platforms": {
+    "darwin": {},
+    "linux": {},
+    "win32": {
+      "app.settings": [
+        "Mod+Comma"
+      ],
+      "dashboard.toggle": [
+        "Mod+Shift+A"
+      ],
+      "terminal.splitRight": [
+        "Alt+Shift+Plus"
+      ],
+      "terminal.splitDown": [
+        "Alt+Shift+Minus"
+      ]
+    }
+  }
+}

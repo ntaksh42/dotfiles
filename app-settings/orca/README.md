@@ -18,3 +18,7 @@ python tools/Export-OrcaSettings.py
 現在の Orca は設定を SQLite 内で管理しており、この JSON を設定ファイルとして
 直接読み込みません。復元は JSON を参照して Orca の設定画面で行ってください。
 `Sync-AppSettings.ps1` の同期対象には含めていません。
+
+`keybindings.json` は Orca が直接読み込む `~/.orca/keybindings.json` の管理元です。
+`Sync-AppSettings.ps1` の同期対象に含めています。反映には Orca の再起動か、
+設定の Shortcuts 画面からの再読み込みが必要です。

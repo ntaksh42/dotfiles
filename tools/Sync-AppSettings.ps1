@@ -32,6 +32,7 @@ $pwsh7Profile = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'PowerSh
 $mappings = @(
     @{ Repo = "app-settings\pwsh\Microsoft.PowerShell_profile.ps1"; Env = $pwsh7Profile }
     @{ Repo = "app-settings\starship\starship.toml"; Env = Join-Path $HOME ".config\starship.toml" }
+    @{ Repo = "app-settings\orca\keybindings.json"; Env = Join-Path $HOME ".orca\keybindings.json" }
 )
 
 # profile.d はコピー元側にある *.ps1 / manifest.txt をまとめて同期する
