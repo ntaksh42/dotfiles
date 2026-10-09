@@ -107,7 +107,7 @@ ccstatusline はTUI上での編集で設定ファイル自身を書き換える�
 
 ## Claude Code Mods
 
-`Install-DevTools` は `claude/mods/` の Mod（`auto-session-title`）も導入します。
+`Install-DevTools` は `claude/mods/` の Mod（`auto-session-title`、`toast-notify` など）も導入します。
 `dotfiles-mods` マーケットプレイスが未登録なら GitHub の `ntaksh42/dotfiles` から登録し、
 その後 `claude plugin install` を実行します。`claude/install.ps1` がクローン先のパスで
 登録済みの場合は、そのマーケットプレイスをそのまま使います。GitHub から登録する場合は、
