@@ -225,9 +225,9 @@ Orca の外観・エディタ・ターミナル設定は `app-settings/orca/sett
 ## Dockyard
 
 `Install-DevTools` は [Dockyard](https://github.com/ntaksh42/dockyard) の最新リリース（MSIX）も
-インストール・更新します（`tools/Install-Dockyard.ps1`）。署名証明書が未信頼の場合は
-`Cert:\LocalMachine\TrustedPeople` へ登録するため UAC の確認が出ます。.NET 10 Desktop Runtime が
-無ければ winget で入れます。
+インストール・更新します（`tools/Install-Dockyard.ps1`）。ARM64 の PC でも x64 版を入れます。
+署名証明書が未信頼の場合は `Cert:\LocalMachine\TrustedPeople` へ登録するため UAC の確認が出ます。
+x64 版の .NET 10 Desktop Runtime が無ければ winget で入れます（ARM64 の PC では `dotnet\x64` に入ります）。
 
 ## PowerToys 設定
 

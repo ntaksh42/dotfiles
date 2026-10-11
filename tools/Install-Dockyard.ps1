@@ -3,11 +3,8 @@ $ErrorActionPreference = 'Stop'
 # Dockyard の最新リリース（MSIX）を入れる。Install-DevTools の 'Dockyard' から実行される。
 # 署名は自己署名証明書のため、未信頼なら Dockyard.cer を LocalMachine\TrustedPeople に入れる（UAC が出る）。
 
-$runtime = switch ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture) {
-    'X64' { 'x64' }
-    'Arm64' { 'arm64' }
-    default { throw "Dockyard does not provide a package for $_." }
-}
+# ARM64 の PC でも x64 版を入れる（エミュレーションで動く）。
+$runtime = 'x64'
 
 $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/ntaksh42/dockyard/releases/latest' `
     -Headers @{ 'User-Agent' = 'dotfiles-install-devtools' }
@@ -15,9 +12,12 @@ $msixAsset = $release.assets | Where-Object { $_.name -like "Dockyard-*-$runtime
 $cerAsset = $release.assets | Where-Object { $_.name -eq 'Dockyard.cer' } | Select-Object -First 1
 if (-not $msixAsset -or -not $cerAsset) { throw "Dockyard $($release.tag_name) has no $runtime package or certificate." }
 
-# 実行に必要な .NET 10 Desktop Runtime。
-if (-not (Get-ChildItem -Path "$env:ProgramFiles\dotnet\shared\Microsoft.WindowsDesktop.App\10.*" -Directory -ErrorAction Ignore)) {
-    winget install --id Microsoft.DotNet.DesktopRuntime.10 --exact --source winget --accept-package-agreements --accept-source-agreements
+# 実行に必要な x64 版の .NET 10 Desktop Runtime。ARM64 の PC では x64 版は dotnet\x64 に入り、
+# ARM64 版の .NET 10 があっても x64 の Dockyard は起動できない。
+$dotnetRoot = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq 'Arm64' ?
+    "$env:ProgramFiles\dotnet\x64" : "$env:ProgramFiles\dotnet"
+if (-not (Get-ChildItem -Path "$dotnetRoot\shared\Microsoft.WindowsDesktop.App\10.*" -Directory -ErrorAction Ignore)) {
+    winget install --id Microsoft.DotNet.DesktopRuntime.10 --exact --architecture x64 --source winget --accept-package-agreements --accept-source-agreements
     if ($LASTEXITCODE -ne 0) { throw "winget install Microsoft.DotNet.DesktopRuntime.10 failed with exit code $LASTEXITCODE" }
 }
 
