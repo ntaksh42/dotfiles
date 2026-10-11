@@ -47,6 +47,7 @@ powershell.exe -ExecutionPolicy Bypass -File claude/install.ps1
 
 ```
 review-before-build/
+├── INSTALL.md          # このファイル
 ├── SKILL.md            # エージェントが読む手順
 ├── references/         # シートの書き方・出す前の検査・回答文の形
 └── assets/             # 標準シートの雛形 / 埋め忘れ検査 / 指摘の部品 / 添削シートの生成スクリプト
