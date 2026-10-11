@@ -34,3 +34,33 @@ test('手動で付けた名前は上書きしない', async ($, on) => {
   const r = await $.classic.UserPromptSubmit({ prompt: '依頼', source: 'user', session_id: 's1', session_title: '手動の名前' })
   expect(r.sessionTitle).toBeUndefined()
 })
+
+test('5 ターンごとに会話全体から付け直す', async ($, on) => {
+  const prompts: string[] = []
+  on('classic.UserPromptSubmit', () => ({}))
+  on('model.complete', (_$, e) => {
+    prompts.push(e.prompt)
+    return { value: { isAnswered: true, text: `タイトル${prompts.length}`, usage: { input_tokens: 0, output_tokens: 0 } } } as never
+  })
+  const titles: (string | undefined)[] = []
+  let current: string | undefined
+  for (let i = 1; i <= 11; i++) {
+    const r = await $.classic.UserPromptSubmit({ prompt: `依頼${i}`, source: 'user', session_id: 's1', session_title: current })
+    titles.push(r.sessionTitle)
+    current = r.sessionTitle ?? current
+  }
+  expect(titles.map((t, i) => (t ? i + 1 : 0)).filter(Boolean)).toEqual([1, 6, 11])
+  expect(prompts[1]).toContain('Current title: タイトル1')
+  expect(prompts[1]).toContain('First request: 依頼1')
+  expect(prompts[1]).toContain('- 依頼6')
+  expect(prompts[1]).not.toContain('- 依頼1\n')
+})
+
+test('スラッシュコマンドは数えない', async ($, on) => {
+  engine(on)
+  await $.classic.UserPromptSubmit({ prompt: '依頼', source: 'user', session_id: 's1' })
+  for (let i = 0; i < 5; i++) {
+    const r = await $.classic.UserPromptSubmit({ prompt: '/status', source: 'user', session_id: 's1', session_title: '日本語タイトル' })
+    expect(r.sessionTitle).toBeUndefined()
+  }
+})

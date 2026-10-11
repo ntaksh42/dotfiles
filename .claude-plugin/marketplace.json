@@ -5,7 +5,7 @@
     {
       "name": "auto-session-title",
       "source": "./claude/mods/auto-session-title",
-      "description": "Names the session with a short model-written summary of the first prompt."
+      "description": "Names the session from the first prompt, then renames it from the conversation every 5 prompts."
     },
     {
       "name": "ado-pr-status",
