@@ -28,8 +28,8 @@ class Finding:
 METAPHOR_VERBS = [
     (r"(黙って|静かに|そっと)[ぁ-ん]{0,3}(無視|捨て|切り捨て|スキップ|破棄|止ま|落ち|壊れ|失敗|消え|劣化|崩れ|上書き)", "黙って・静かに＋失敗"),
     (r"(側|方向)[にへ]倒[すしせれ]", "〜側に倒す"),
-    (r"(時間|工数|半日|一日|丸一日)[をが]?溶[かけ]", "時間を溶かす"),
-    (r"[0-9一二三ひと]つ?ずつ[^。、]{0,4}潰", "一つずつ潰す"),
+    (r"(時間|工数|半日|[0-9数一二三丸]+日)[をがも]?溶[かけ]", "時間を溶かす"),
+    (r"[0-9一二三ひと](つ|個|件)?ずつ[^。、]{0,4}潰", "一つずつ潰す"),
     (r"(地味|じわじわ|ボディブロー)[にと]?[^。、]{0,4}効", "地味に効く"),
     (r"(設計|実装|内部|詳細|仕組み|領域|本質)[^。、]{0,3}(に|へ|まで)踏み込", "〜に踏み込む"),
 ]
@@ -60,21 +60,27 @@ DASHES = re.compile(r"[—―─]+")
 BOLD_PAIR = re.compile(r"\*\*([^*\n]+?)\*\*")
 NEGATION = re.compile(r"ではなく")
 FRONT_MATTER = re.compile(r"---\r?\n.*?\r?\n---\r?\n", re.S)
+HTML_COMMENT = re.compile(r"<!--.*?-->")
 
 
 def prose_lines(text):
-    """フロントマター、コードブロック、引用、表を除いた (行番号, 行) を返す。インラインコードも消す。"""
+    """フロントマター、コードブロック、HTML コメント、引用、表を除いた (行番号, 行) を返す。インラインコードも消す。"""
     head = FRONT_MATTER.match(text)
     skip = head.group(0).count("\n") if head else 0
-    kept, in_fence = [], False
+    kept, in_fence, in_comment = [], False, False
     for no, raw in enumerate(text.splitlines(), 1):
         stripped = raw.lstrip()
         if no <= skip:
             continue
-        if stripped.startswith("```"):
+        if in_comment:
+            in_comment = "-->" not in raw
+        elif stripped.startswith(("```", "~~~")):
             in_fence = not in_fence
         elif not in_fence and not stripped.startswith((">", "|")):
-            kept.append((no, re.sub(r"`[^`]*`", "", raw)))
+            line = HTML_COMMENT.sub("", re.sub(r"`[^`]*`", "", raw))
+            if "<!--" in line:
+                line, in_comment = line.split("<!--")[0], True
+            kept.append((no, line))
     return kept
 
 
@@ -124,7 +130,7 @@ def lint(text, concise=False):
             found += [Finding("metaphor_verb", "warn", no, f"比喩動詞「{label}」", _around(line, m))
                       for m in re.finditer(pattern, line)]
         found += [Finding("dash", "warn", no, "ダッシュ記号。助詞や読点でつなぐ", _around(line, m))
-                  for m in DASHES.finditer(line)]
+                  for m in DASHES.finditer(line) if line.strip(" —―─")]  # 罫線だけの行は除く
         found += [Finding("broken_bold", "warn", no, "太字として表示されない書き方（記号の内側だけを太字にするか、空白を入れる）", pair)
                   for pair in broken_bold(line)]
         if concise:

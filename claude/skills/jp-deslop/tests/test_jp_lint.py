@@ -18,7 +18,9 @@ class MetaphorVerb(unittest.TestCase):
                   "調査に半日溶かしてしまいました。",
                   "不具合を一つずつ潰していきます。",
                   "この設定が地味に効いてきます。",
-                  "内部実装まで踏み込んで調べました。"]:
+                  "内部実装まで踏み込んで調べました。",
+                  "この調査で丸2日が溶けました。",
+                  "警告を1個ずつ潰しました。"]:
             self.assertIn("metaphor_verb", rules(s), s)
 
     def test_keeps_literal_and_technical_uses(self):
@@ -40,6 +42,13 @@ class Symbols(unittest.TestCase):
     def test_ignores_code_and_quote(self):
         text = "説明です。\n```\n設計――境界――\n```\n> 引用――です\n"
         self.assertEqual(rules(text), set())
+
+    def test_ignores_tilde_fence_and_html_comment(self):
+        text = "説明です。\n~~~\n設計――境界――\n~~~\n<!-- 設計――境界 -->\n<!--\n設計――境界\n-->\n"
+        self.assertEqual(rules(text), set())
+
+    def test_ignores_ruled_line(self):
+        self.assertNotIn("dash", rules("見出し\n──────────\n本文です。"))
 
 
 class Density(unittest.TestCase):
