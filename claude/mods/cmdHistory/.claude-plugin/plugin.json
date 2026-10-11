@@ -1,0 +1,6 @@
+{
+  "name": "cmdHistory",
+  "version": "0.1.1",
+  "description": "/cmdHistory lists PowerShell (PSReadLine) history in a pane and puts the picked command in the prompt as a ! shell command.",
+  "types": "./types/index.d.ts"
+}

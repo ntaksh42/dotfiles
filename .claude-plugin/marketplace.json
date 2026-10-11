@@ -21,6 +21,16 @@
       "name": "toast-notify",
       "source": "./claude/mods/toast-notify",
       "description": "Windows toast notifications when a long turn or command finishes, when Claude waits for permission, when a turn stalls, and when a turn fails. Inside an rdpmanager RDP session they go to the client instead."
+    },
+    {
+      "name": "bang-history",
+      "source": "./claude/mods/bang-history",
+      "description": "Appends commands run with ! in Claude Code to the PowerShell (PSReadLine) history file."
+    },
+    {
+      "name": "cmdHistory",
+      "source": "./claude/mods/cmdHistory",
+      "description": "/cmdHistory lists PowerShell (PSReadLine) history in a pane and puts the picked command in the prompt as a ! shell command."
     }
   ]
 }
