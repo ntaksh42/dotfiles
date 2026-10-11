@@ -1,4 +1,7 @@
+import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
+
+import type { TitleSession } from '../types'
 
 const MAX_LEN = 40
 const MAX_PROMPT_CHARS = 500
@@ -9,25 +12,25 @@ const RECENT_PROMPTS = 5
 const SYSTEM = 'Reply with only a short Japanese title (at most 30 characters) summarizing the user request below. Always write the title in Japanese, even if the request is in another language. No quotes, no trailing punctuation.'
 const RENAME_SYSTEM = 'Reply with only a short Japanese title (at most 30 characters) for the whole session, judging from the requests below. Keep the current title if it still fits. Always write the title in Japanese. No quotes, no trailing punctuation.'
 
-type Session = { count: number; first: string; recent: string[] }
+// mod の再読み込みで消えないよう $.state に持つ。/clear で session_id が変わっても前のタイトルが引き継がれるため、セッション単位で管理する
+const sessions = atom({ plugin: 'auto-session-title', key: 'sessions' } as const, {})
+const ownTitles = atom({ plugin: 'auto-session-title', key: 'ownTitles' } as const, [])
 
 export const register: Register = on => {
-  // /clear で session_id が変わっても前のタイトルが引き継がれるため、セッション単位で管理する
-  const sessions = new Map<string, Session>()
-  const ownTitles = new Set<string>()
-
   on('classic.UserPromptSubmit', async ($, e, next) => {
     const ran = await next(e)
     if ((e.source ?? 'user') !== 'user') return ran
     // 手動で付けた名前（自分が付けたもの以外）は上書きしない
-    if (e.session_title && !ownTitles.has(e.session_title)) return ran
+    if (e.session_title && !(await read($, ownTitles)).includes(e.session_title)) return ran
 
     const prompt = e.prompt.trim().slice(0, MAX_PROMPT_CHARS)
     if (!prompt || prompt.startsWith('/')) return ran
-    const s = sessions.get(e.session_id) ?? { count: 0, first: prompt, recent: [] }
-    sessions.set(e.session_id, s)
-    s.count += 1
-    s.recent = [...s.recent, prompt].slice(-RECENT_PROMPTS)
+    const all = await update($, sessions, map => {
+      const cur: TitleSession = map[e.session_id] ?? { count: 0, first: prompt, recent: [] }
+      return { ...map, [e.session_id]: { ...cur, count: cur.count + 1, recent: [...cur.recent, prompt].slice(-RECENT_PROMPTS) } }
+    })
+    const s = all[e.session_id]
+    if (!s) return ran
     if ((s.count - 1) % RENAME_EVERY !== 0) return ran
 
     const isFirst = s.count === 1
@@ -45,7 +48,7 @@ export const register: Register = on => {
     // 付け直しに失敗したら今のタイトルのままにする
     if (!summary && !isFirst) return ran
     const title = (summary || (prompt.split('\n')[0] ?? '')).slice(0, MAX_LEN)
-    ownTitles.add(title)
+    await update($, ownTitles, t => [...t, title])
 
     return { ...ran, sessionTitle: title }
   })

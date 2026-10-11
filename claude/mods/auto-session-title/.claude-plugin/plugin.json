@@ -1,1 +1,1 @@
-{ "name": "auto-session-title", "version": "0.2.0", "description": "Names the session from the first prompt, then renames it from the conversation every 5 prompts." }
+{ "name": "auto-session-title", "version": "0.2.1", "description": "Names the session from the first prompt, then renames it from the conversation every 5 prompts.", "types": "./types/index.d.ts" }
