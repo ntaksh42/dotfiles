@@ -52,6 +52,9 @@ powershell.exe -File tools/Update-GitRepositories.ps1 -Path "C:\Projects"
 pwsh -File tools/Sync-AppSettings.ps1                  # repo -> 実環境（既定）
 pwsh -File tools/Sync-AppSettings.ps1 -Direction Pull  # 実環境 -> repo
 
+# claude/mods/ の全 mod に claude plugin validate / test をかける（失敗があれば終了コード 1）
+pwsh -File tools/Test-ClaudeMods.ps1
+
 # PowerToys 設定（app-settings/powertoys/）のバックアップ・復元
 pwsh -File tools/Sync-PowerToysSettings.ps1 -Direction Pull  # 実環境 -> repo
 pwsh -File tools/Sync-PowerToysSettings.ps1                  # repo -> 実環境（PowerToys を停止して復元）
