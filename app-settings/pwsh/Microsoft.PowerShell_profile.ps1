@@ -217,11 +217,11 @@ if (Test-Path -LiteralPath $script:DotfilesManifestPath -PathType Leaf) {
             . $dotfilesPartPath
         }
         else {
-            Write-Warning "$dotfilesPart が見つかりません。Update-Profile または tools/Sync-AppSettings.ps1 でプロファイル一式を配置してください。"
+            Write-Warning "$dotfilesPart が見つかりません。Update-Profile でプロファイル一式を配置してください。"
         }
     }
     Remove-Variable dotfilesPart, dotfilesPartPath -ErrorAction Ignore
 }
 else {
-    Write-Warning 'profile.d が見つかりません。Update-Profile または tools/Sync-AppSettings.ps1 でプロファイル一式を配置してください。'
+    Write-Warning 'profile.d が見つかりません。Update-Profile でプロファイル一式を配置してください。'
 }

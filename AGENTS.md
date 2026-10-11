@@ -32,7 +32,6 @@ tools/               汎用PowerShellユーティリティ
 
 - `claude/skills/` 配下のサブディレクトリが個別スキル
 - 各スキルは `SKILL.md`（プロンプト定義）と `references/`（参照資料）で構成
-- `.skill` ファイル（単一ファイル形式）も存在する（例: `ai-news-researcher.skill`）
 
 ### settings.template.json
 
@@ -45,19 +44,12 @@ tools/               汎用PowerShellユーティリティ
 # Claude Code 環境のインストール（hooks, skills, agents, settings を ~/.claude に展開）
 powershell.exe -ExecutionPolicy Bypass -File claude/install.ps1
 
-# 複数gitリポジトリの一括pull
-powershell.exe -File tools/Update-GitRepositories.ps1 -Path "C:\Projects"
-
-# app-settings/ の設定ファイルと実環境の配置先を同期
-pwsh -File tools/Sync-AppSettings.ps1                  # repo -> 実環境（既定）
-pwsh -File tools/Sync-AppSettings.ps1 -Direction Pull  # 実環境 -> repo
+# app-settings/ の設定ファイルを実環境へ配置する（pwsh プロファイル経由。GitHub の main から取得）
+# 配置対象は app-settings/pwsh/profile.d/devtools-catalog.ps1 のカタログで定義する。プロファイル自体は Update-Profile
+Install-DevTools
 
 # claude/mods/ の全 mod に claude plugin validate / test をかける（失敗があれば終了コード 1）
 pwsh -File tools/Test-ClaudeMods.ps1
-
-# PowerToys 設定（app-settings/powertoys/）のバックアップ・復元
-pwsh -File tools/Sync-PowerToysSettings.ps1 -Direction Pull  # 実環境 -> repo
-pwsh -File tools/Sync-PowerToysSettings.ps1                  # repo -> 実環境（PowerToys を停止して復元）
 
 # Windows 設定（レジストリ）の適用。pwsh プロファイル経由のコマンド（app-settings/pwsh/profile.d/windows-settings.ps1）
 # HKLM 項目は管理者権限が必要

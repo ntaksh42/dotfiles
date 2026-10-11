@@ -7,7 +7,7 @@
     ファイルを GitHub から取得し、全ファイルが有効な JSON であることを確認してから
     書き込む。既存ファイルが異なる場合は .backup.<日時> を残す。
     PowerToys が起動中なら停止してから書き込み、書き込み後に再起動する。
-    manifest.txt は tools/Sync-PowerToysSettings.ps1 -Direction Pull が更新する。
+    manifest.txt は app-settings/powertoys/ にファイルを足したときに手で追記する。
 #>
 param(
     [string]$BaseUri = 'https://raw.githubusercontent.com/ntaksh42/dotfiles/main',

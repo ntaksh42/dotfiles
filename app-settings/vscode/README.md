@@ -9,31 +9,12 @@ Visual Studio のショートカットに寄せた VSCode 設定一式。`.NET` 
 | `settings.json` | ユーザー設定。`%APPDATA%\Code\User\settings.json` へ配置 |
 | `keybindings.json` | Visual Studio キーマップの差分補完。`%APPDATA%\Code\User\keybindings.json` へ配置 |
 | `extensions.txt` | 拡張機能リスト（1 行 1 ID、`#` はコメント） |
-| `Install-VSCodeSettings.ps1` | インストーラ |
 
 ## セットアップ
 
-```powershell
-# 設定ファイルのみ配置（既存ファイルは .backup.<timestamp> として退避）
-powershell.exe -ExecutionPolicy Bypass -File app-settings\vscode\Install-VSCodeSettings.ps1
-
-# 拡張機能もまとめて導入
-powershell.exe -ExecutionPolicy Bypass -File app-settings\vscode\Install-VSCodeSettings.ps1 -InstallExtensions
-```
-
-配置後は VSCode を再起動してください。
-
-### 現在の環境を管理元へ書き戻す
-
-GUI で設定を変えた後、その内容をリポジトリに取り込む場合：
-
-```powershell
-powershell.exe -ExecutionPolicy Bypass -File app-settings\vscode\Install-VSCodeSettings.ps1 -Export
-```
-
-`settings.json` / `keybindings.json` を上書きし、導入済み拡張を
-`extensions.installed.txt` に出力します。拡張リストは自動マージせず、
-差分を確認して `extensions.txt` へ手動反映します。
+`settings.json` と `keybindings.json` は `Install-DevTools` が配置します（既存ファイルが
+異なる場合は差分を表示して上書きを確認し、`.backup.<日時>` を残します）。配置後は VSCode を
+再起動してください。拡張機能は `extensions.txt` を見て `code --install-extension <ID>` で入れます。
 
 ## キーマップの方針
 

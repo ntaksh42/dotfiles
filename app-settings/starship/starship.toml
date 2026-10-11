@@ -2,7 +2,7 @@
 #
 # 配置先: ~/.config/starship.toml
 # 管理元: このリポジトリの app-settings/starship/starship.toml
-#   反映方法: powershell.exe -File tools/Sync-AppSettings.ps1
+#   反映方法: Install-DevTools
 #
 # 記号は一般 Unicode のみで Nerd Font 不要。PUA グリフを使わないため
 # フォントフォールバックが効き、どのターミナルでも崩れない。

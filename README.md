@@ -24,15 +24,6 @@ tools/                     汎用 PowerShell ユーティリティ
 `profile.d/` に置いて `manifest.txt` に 1 行追加します。配置時はローダーと
 `profile.d/` の両方が必要です。
 
-ローカルの変更を反映する場合は、リポジトリから同期します。
-
-```powershell
-pwsh -NoProfile -File tools/Sync-AppSettings.ps1 -WhatIf
-pwsh -NoProfile -File tools/Sync-AppSettings.ps1
-```
-
-同期先は Windows の Documents フォルダ配下の `PowerShell/` です。
-実環境で編集した場合は `-Direction Pull` でローダーと `profile.d/` を管理元へ取り込みます。
 `profile` は現在読み込んでいるプロファイルを編集し、`reload` は再読み込みします。
 `Update-Profile` は GitHub の `main` からローダーと `profile.d/` 一式を取得し、構文検証・
 上書き確認・バックアップ後に更新するため、未公開のローカル変更は反映しません。
@@ -199,14 +190,10 @@ powershell.exe -ExecutionPolicy Bypass -File claude\install.ps1
 
 ## ユーティリティ
 
+`app-settings/` の設定ファイルは `Install-DevTools` が GitHub の `main` から配置します
+（プロファイルは `Update-Profile`）。実環境で変えた設定は、手でリポジトリへコピーして取り込みます。
+
 ```powershell
-# 複数 git リポジトリを一括 pull
-powershell.exe -File tools\Update-GitRepositories.ps1 -Path "C:\Projects"
-
-# app-settings/ の設定ファイルと実環境の配置先を同期
-pwsh -File tools\Sync-AppSettings.ps1              # repo -> 実環境 (既定)
-pwsh -File tools\Sync-AppSettings.ps1 -Direction Pull  # 実環境 -> repo
-
 # Windows 設定（レジストリ）を適用 (pwsh プロファイル経由)。HKLM 項目は管理者権限が必要
 Set-WindowsSettings -Check    # 差分のみ表示
 Set-WindowsSettings           # 適用
@@ -217,10 +204,9 @@ Set-WindowsSettings           # 適用
 `Install-DevTools` は Orca 本体も winget（`StablyAI.Orca`）でインストールします。
 導入済みの場合はスキップします。
 
-Orca の外観・エディタ・ターミナル設定は `app-settings/orca/settings.json` に保存します。
-`python tools/Export-OrcaSettings.py` で現在の設定を取り込めます。認証情報や作業履歴は
-対象外です。JSON の自動読み込みには対応していないため、復元方法と対象範囲は
-`app-settings/orca/README.md` を参照してください。
+`app-settings/orca/keybindings.json` は `Install-DevTools` が `~/.orca/keybindings.json` へ配置します。
+外観・エディタ・ターミナル設定の控えは `app-settings/orca/settings.json` にあります。
+JSON の自動読み込みには対応していないため、`app-settings/orca/README.md` を参照してください。
 
 ## Dockyard
 
@@ -236,18 +222,11 @@ PowerToys の設定（FancyZones のレイアウト・ホットキーを含む�
 同じ設定ファイルです。ユーザー名入りのパスを含む `Workspaces\workspaces.json` と
 `NewPlus\settings.json` は公開リポジトリに載せないため対象外です。
 
-```powershell
-pwsh -File tools\Sync-PowerToysSettings.ps1 -Direction Pull  # 実環境 -> repo（バックアップ）
-pwsh -File tools\Sync-PowerToysSettings.ps1 -WhatIf          # 復元の対象だけ確認
-pwsh -File tools\Sync-PowerToysSettings.ps1                  # repo -> 実環境（復元）
-```
-
-バックアップ（Pull）は `app-settings/powertoys/manifest.txt` も更新します。
 新しい PC では `Install-DevTools` が PowerToys 本体（winget）に続いて設定を GitHub の `main`
 から配置します（`PowerToys settings`）。`FancyZones\custom-layouts.json` が未作成の環境にだけ
-一度実行し、既存ファイルが異なる場合は `.backup.<日時>` を残します。設定を取り直すときは
-上の `Sync-PowerToysSettings.ps1` を使います。
+一度実行し、既存ファイルが異なる場合は `.backup.<日時>` を残します。配置するファイルは
+`app-settings/powertoys/manifest.txt` に載ったものだけなので、ファイルを足したら manifest にも追記します。
 
-復元は PowerToys を停止してコピーし、起動していた場合は再起動します。
+配置時は PowerToys を停止してコピーし、起動していた場合は再起動します。
 FancyZones のモニターごとの適用レイアウト（`applied-layouts.json`）は対象外なので、
 復元後に各モニターへレイアウトを選び直してください。

@@ -1,9 +1,7 @@
 # VSCode 拡張機能リスト
 # 1 行 1 拡張 ID。# 始まりはコメント、空行は無視。
-# Install-VSCodeSettings.ps1 -InstallExtensions がこのリストを順に code --install-extension する。
 #
-# このファイルは複数マシンの和集合。全部入れたくない場合は不要な行を # でコメントアウトするか、
-# -InstallExtensions を使わず必要なものだけ手動で入れる。
+# このファイルは複数マシンの和集合。必要なものを code --install-extension <ID> で入れる。
 
 # --- キーマップ / 基盤 -------------------------------------------------
 ms-vscode.vs-keybindings
