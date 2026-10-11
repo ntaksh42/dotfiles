@@ -1,4 +1,4 @@
-# review-before-build 0.3.0 — 実装前レビュー for Claude Code
+# review-before-action 0.3.0 — 実装前レビュー for Claude Code
 
 Claude Code のエージェントに「作る前に確認して」と言えるようにする skill です。「実装前に確認させて」「作る前に見せて」と頼むと、エージェントが案を確認用の HTML 1 枚 (レビューシート) にしてブラウザで開きます。問いに答えて [貼り付ける文章を作る] を押し、出てきた文章をターミナルに貼れば、エージェントが回答を反映して続きをやります。
 
@@ -16,14 +16,14 @@ powershell.exe -ExecutionPolicy Bypass -File claude/install.ps1
 
 ### skill だけ single で配る場合 (zip 配布)
 
-1. `review-before-build/` フォルダを、そのまま `~/.claude/skills/` の下に置く
+1. `review-before-action/` フォルダを、そのまま `~/.claude/skills/` の下に置く
 
    ```bash
    mkdir -p ~/.claude/skills
-   cp -r review-before-build ~/.claude/skills/
+   cp -r review-before-action ~/.claude/skills/
    ```
 
-   置いたあとは `~/.claude/skills/review-before-build/SKILL.md` が存在する形になります。
+   置いたあとは `~/.claude/skills/review-before-action/SKILL.md` が存在する形になります。
 
 2. Claude Code を再起動する
 
@@ -37,6 +37,8 @@ powershell.exe -ExecutionPolicy Bypass -File claude/install.ps1
 
 エージェントが `./review/<topic>-01.html` を作ってブラウザで開きます。答えたら一番下の [貼り付ける文章を作る] を押し、出てきた文章をターミナルに貼って Enter。答えなかった問いは「お任せ」になり、エージェントの推奨案で進みます。
 
+Crit (`crit` コマンド) が入っていれば、HTML をブラウザで開く代わりに Crit で開きます。気になる箇所にインラインでコメントを書き、Finish Review を押せば反映されます。貼り付けは不要です。
+
 ## 使われない場面
 
 **既に書いたコードや差分のレビューには使いません。** それはコードレビュー (`self-review` / `code-review`) の領分で、このスキルは「まだ書いていない案」を見せるためのものです。
@@ -46,7 +48,7 @@ powershell.exe -ExecutionPolicy Bypass -File claude/install.ps1
 ## 中身
 
 ```
-review-before-build/
+review-before-action/
 ├── INSTALL.md          # このファイル
 ├── SKILL.md            # エージェントが読む手順
 ├── references/         # シートの書き方・出す前の検査・回答文の形
