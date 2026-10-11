@@ -46,7 +46,6 @@ $script:DevTools = @(
     @{ Name = 'ado-pr-status (mod)'; Backend = 'claude-plugin'; Id = 'ado-pr-status@dotfiles-mods'; Marketplace = 'dotfiles-mods'; MarketplaceSource = 'ntaksh42/dotfiles'; RequiredCommand = 'claude' }
     @{ Name = 'ado-link-bar (mod)'; Backend = 'claude-plugin'; Id = 'ado-link-bar@dotfiles-mods'; Marketplace = 'dotfiles-mods'; MarketplaceSource = 'ntaksh42/dotfiles'; RequiredCommand = 'claude' }
     @{ Name = 'toast-notify (mod)'; Backend = 'claude-plugin'; Id = 'toast-notify@dotfiles-mods'; Marketplace = 'dotfiles-mods'; MarketplaceSource = 'ntaksh42/dotfiles'; RequiredCommand = 'claude' }
-    @{ Name = 'bang-history (mod)'; Backend = 'claude-plugin'; Id = 'bang-history@dotfiles-mods'; Marketplace = 'dotfiles-mods'; MarketplaceSource = 'ntaksh42/dotfiles'; RequiredCommand = 'claude' }
     @{ Name = 'cmdHistory (mod)'; Backend = 'claude-plugin'; Id = 'cmdHistory@dotfiles-mods'; Marketplace = 'dotfiles-mods'; MarketplaceSource = 'ntaksh42/dotfiles'; RequiredCommand = 'claude' }
 )
 

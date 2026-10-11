@@ -157,7 +157,6 @@
   "enabledPlugins": {
     "auto-session-title@dotfiles-mods": true,
     "toast-notify@dotfiles-mods": true,
-    "bang-history@dotfiles-mods": true,
     "cmdHistory@dotfiles-mods": true
   },
   "extraKnownMarketplaces": {

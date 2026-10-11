@@ -1,5 +1,0 @@
-{
-  "name": "bang-history",
-  "version": "0.1.0",
-  "description": "Appends commands run with ! in Claude Code to the PowerShell (PSReadLine) history file."
-}
