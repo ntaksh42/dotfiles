@@ -16,6 +16,8 @@ $script:DevTools = @(
     @{ Name = 'Waypoint'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/waypoint/main/installer/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\waypoint\waypoint.exe'); Args = @{ Silent = $true }; RebootRequiredExitCode = 3010; Repo = 'ntaksh42/waypoint'; VersionSource = 'product' }
     @{ Name = 'Windows-Operation-Cli'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/Windows-Operation-Cli/main/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\windows-operation-cli\windows-operation-cli.exe'); Args = @{ FromRelease = $true }; RequiredCommand = 'claude'; Repo = 'ntaksh42/Windows-Operation-Cli' }
     @{ Name = 'Crit'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-Crit.ps1"; Path = (Join-Path $env:USERPROFILE '.local\bin\crit.exe'); Repo = 'tomasz-tomczyk/crit'; VersionSource = 'command' }
+    # MSIX のため導入先のファイルではなくパッケージ名で判定する（AppxName）。
+    @{ Name = 'Dockyard'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-Dockyard.ps1"; AppxName = 'Dockyard'; Repo = 'ntaksh42/dockyard'; VersionSource = 'appx' }
     @{ Name = 'starship'; Backend = 'winget'; Id = 'Starship.Starship'; Cmd = 'starship' }
     @{ Name = 'zoxide'; Backend = 'winget'; Id = 'ajeetdsouza.zoxide'; Cmd = 'zoxide' }
     @{ Name = 'eza'; Backend = 'winget'; Id = 'eza-community.eza'; Cmd = 'eza' }

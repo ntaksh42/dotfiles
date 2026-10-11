@@ -222,6 +222,13 @@ Orca の外観・エディタ・ターミナル設定は `app-settings/orca/sett
 対象外です。JSON の自動読み込みには対応していないため、復元方法と対象範囲は
 `app-settings/orca/README.md` を参照してください。
 
+## Dockyard
+
+`Install-DevTools` は [Dockyard](https://github.com/ntaksh42/dockyard) の最新リリース（MSIX）も
+インストール・更新します（`tools/Install-Dockyard.ps1`）。署名証明書が未信頼の場合は
+`Cert:\LocalMachine\TrustedPeople` へ登録するため UAC の確認が出ます。.NET 10 Desktop Runtime が
+無ければ winget で入れます。
+
 ## PowerToys 設定
 
 PowerToys の設定（FancyZones のレイアウト・ホットキーを含む）は

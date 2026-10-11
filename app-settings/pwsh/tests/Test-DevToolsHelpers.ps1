@@ -52,7 +52,7 @@ try {
         'msstore'       = 'Id'
         'pip'           = 'Id', 'Cmd'
         'psmodule'      = 'Id'
-        'script'        = 'Id', 'Path', 'Args', 'RebootRequiredExitCode', 'RequiredCommand', 'Repo', 'VersionSource', 'InstallOnly', 'RemoteFiles'
+        'script'        = 'Id', 'Path', 'Args', 'RebootRequiredExitCode', 'RequiredCommand', 'Repo', 'VersionSource', 'InstallOnly', 'RemoteFiles', 'AppxName'
         'remote-config' = 'RepoPath', 'Dest', 'StripCommentLines'
         'claude-plugin' = 'Id', 'Marketplace', 'MarketplaceSource', 'RequiredCommand'
     }
@@ -115,9 +115,10 @@ try {
         $ps = @(Get-ToolsByBackend 'psmodule')
         $ps.Count -gt 0 -and @($ps | Where-Object { [string]::IsNullOrWhiteSpace($_.Id) }).Count -eq 0
     }
-    Test-Case 'script entries have an https Id (installer URL) and an absolute Path' {
+    Test-Case 'script entries have an https Id (installer URL) and an absolute Path or an AppxName' {
         $bad = @(Get-ToolsByBackend 'script' | Where-Object {
-                $_.Id -notmatch '^https://' -or [string]::IsNullOrWhiteSpace($_.Path) -or -not [IO.Path]::IsPathRooted($_.Path)
+                $_.Id -notmatch '^https://' -or ($_.AppxName -and $_.Path) -or
+                (-not $_.AppxName -and ([string]::IsNullOrWhiteSpace($_.Path) -or -not [IO.Path]::IsPathRooted($_.Path)))
             } | ForEach-Object Name)
         if ($bad) { throw "bad script entry: $($bad -join ', ')" }
         $true
@@ -132,10 +133,11 @@ try {
     Test-Case 'script Args, when present, is a hashtable (Install-DevTools clones and splats it)' {
         @(Get-ToolsByBackend 'script' | Where-Object { $_.ContainsKey('Args') -and $_.Args -isnot [hashtable] }).Count -eq 0
     }
-    Test-Case 'script Repo values look like owner/name and VersionSource is product or command' {
+    Test-Case 'script Repo values look like owner/name and VersionSource is product, command or appx (with AppxName)' {
         $bad = @(Get-ToolsByBackend 'script' | Where-Object {
                 ($_.Repo -and $_.Repo -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') -or
-                ($_.VersionSource -and $_.VersionSource -notin 'product', 'command')
+                ($_.VersionSource -and $_.VersionSource -notin 'product', 'command', 'appx') -or
+                (($_.VersionSource -eq 'appx') -ne [bool]$_.AppxName)
             } | ForEach-Object Name)
         if ($bad) { throw "bad Repo/VersionSource: $($bad -join ', ')" }
         $true

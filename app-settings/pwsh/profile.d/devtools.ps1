@@ -80,6 +80,11 @@ function Get-DevToolInstalledVersion {
         }
         return $null
     }
+    if ($Tool.VersionSource -eq 'appx') {
+        $package = Get-AppxPackage -Name $Tool.AppxName | Select-Object -First 1
+        if ($package) { return (ConvertTo-DevToolVersion $package.Version) }
+        return $null
+    }
     if ($Tool.VersionSource -eq 'command') {
         try {
             $output = @(& $Tool.Path --version) -join "`n"
@@ -130,7 +135,10 @@ function Test-ToolInstalled {
         }
         # RequiredCommand の有無は導入済み判定に含めない（含めると claude が PATH に
         # 無いだけで毎回インストーラが走り、最後に失敗する）。Install-DevTools 側で扱う。
-        'script' { return (Test-Path -LiteralPath $Tool.Path -PathType Leaf) }
+        'script' {
+            if ($Tool.AppxName) { return [bool](Get-AppxPackage -Name $Tool.AppxName) }
+            return (Test-Path -LiteralPath $Tool.Path -PathType Leaf)
+        }
         'claude-plugin' {
             if (-not (Test-Cmd claude)) { return $false }
             try { $plugins = claude plugin list --json | ConvertFrom-Json } catch { return $false }
