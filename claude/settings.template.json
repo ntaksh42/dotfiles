@@ -156,6 +156,8 @@
   },
   "enabledPlugins": {
     "auto-session-title@dotfiles-mods": true,
+    "ado-pr-status@dotfiles-mods": true,
+    "ado-link-bar@dotfiles-mods": true,
     "toast-notify@dotfiles-mods": true,
     "cmdHistory@dotfiles-mods": true
   },
