@@ -8,10 +8,10 @@ Claude Code のエージェントに「作る前に確認して」と言える�
 
 ### この dotfiles リポジトリを使っている場合
 
-インストーラが `claude/skills/` 配下を `~/.claude/skills/` へ展開するので、個別の作業は要りません。
+`claude/mods/dotfiles` の dotfiles plugin に含まれているので、個別の作業は要りません。plugin は `Install-DevTools` が導入します。
 
 ```powershell
-powershell.exe -ExecutionPolicy Bypass -File claude/install.ps1
+Install-DevTools
 ```
 
 ### skill だけ single で配る場合 (zip 配布)

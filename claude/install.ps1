@@ -1,5 +1,7 @@
 ﻿# Claude Code dotfiles installer for Windows
 # Usage: .\install.ps1
+# skills・hooks は claude/mods/ の plugin として Install-DevTools が導入する。
+# このスクリプトは CLAUDE.md と settings.json の配置だけを行う。
 
 param()
 
@@ -8,12 +10,6 @@ $ErrorActionPreference = "Stop"
 # Paths
 $ScriptDir       = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ClaudeDir       = Join-Path $env:USERPROFILE ".claude"
-$HooksSourceDir  = Join-Path $ScriptDir "hooks"
-$HooksDestDir    = Join-Path $ClaudeDir "hooks"
-$SkillsSourceDir = Join-Path $ScriptDir "skills"
-$SkillsDestDir   = Join-Path $ClaudeDir "skills"
-$AgentsSourceDir = Join-Path $ScriptDir "agents"
-$AgentsDestDir   = Join-Path $ClaudeDir "agents"
 $TemplateFile    = Join-Path $ScriptDir "settings.template.json"
 $GlobalClaudeMd  = Join-Path $ScriptDir "CLAUDE.global.md"
 
@@ -33,77 +29,6 @@ if (Test-Path $SettingsFile) {
     $BackupFile = Join-Path $ClaudeDir "settings.json.backup.$(Get-Date -Format 'yyyyMMdd-HHmmss')"
     Write-Host "Backing up existing settings.json to $BackupFile" -ForegroundColor Yellow
     Copy-Item $SettingsFile $BackupFile
-}
-
-# Copy hook scripts to .claude/hooks/ and register in settings.json
-Write-Host "Copying hook scripts..." -ForegroundColor Green
-if (-not (Test-Path $HooksDestDir)) {
-    New-Item -ItemType Directory -Path $HooksDestDir -Force | Out-Null
-}
-
-$HookRegistrations = @()
-foreach ($file in (Get-ChildItem -Path $HooksSourceDir -Filter "*.ps1")) {
-    $dest = Join-Path $HooksDestDir $file.Name
-    Copy-Item $file.FullName $dest -Force
-    Write-Host "  - hooks\$($file.Name)" -ForegroundColor Gray
-
-    # .HOOK ブロックからメタデータを抽出
-    $content = Get-Content $file.FullName -Raw
-    if ($content -match '(?s)<#\s*\.HOOK\s*(\{.*?\})\s*#>') {
-        try {
-            $meta = $Matches[1] | ConvertFrom-Json
-            $HookRegistrations += [PSCustomObject]@{
-                file        = $file.Name
-                event       = $meta.event
-                matcher     = if ($meta.PSObject.Properties.Name -contains "matcher")     { $meta.matcher }     else { $null }
-                async       = if ($meta.PSObject.Properties.Name -contains "async")       { $meta.async }       else { $null }
-                asyncRewake = if ($meta.PSObject.Properties.Name -contains "asyncRewake") { $meta.asyncRewake } else { $null }
-            }
-            $asyncLabel = if ($meta.PSObject.Properties.Name -contains "async" -and $meta.async) { ", async=true" } else { "" }
-            Write-Host "    -> event=$($meta.event)$(if ($meta.matcher) { ", matcher=$($meta.matcher)" })$asyncLabel" -ForegroundColor DarkGray
-        } catch {
-            Write-Host "    -> WARNING: Failed to parse .HOOK metadata" -ForegroundColor Yellow
-        }
-    }
-}
-
-# Copy skills
-if (Test-Path $SkillsSourceDir) {
-    Write-Host "Copying skills..." -ForegroundColor Green
-    if (-not (Test-Path $SkillsDestDir)) {
-        New-Item -ItemType Directory -Path $SkillsDestDir | Out-Null
-    }
-    $SkillDirs = Get-ChildItem -Path $SkillsSourceDir -Directory
-    foreach ($skillDir in $SkillDirs) {
-        $destSkillDir = Join-Path $SkillsDestDir $skillDir.Name
-        # 既存を消してから入れ替える。Copy-Item -Recurse は展開先が既にあると
-        # その配下へ入れ子コピーしてしまい、削除済みファイルも残るため。
-        # シンボリックリンク/ジャンクションの場合、Remove-Item -Recurse -Force は
-        # リンクをたどってリンク先の中身ごと削除してしまうため、リンク自体だけを
-        # 外す ([IO.Directory]::Delete の非再帰) 経路を分ける。
-        if (Test-Path $destSkillDir) {
-            $existingDest = Get-Item -LiteralPath $destSkillDir -Force
-            if ($existingDest.LinkType) {
-                [System.IO.Directory]::Delete($destSkillDir, $false)
-            } else {
-                Remove-Item $destSkillDir -Recurse -Force
-            }
-        }
-        Copy-Item $skillDir.FullName $destSkillDir -Recurse -Force
-        Write-Host "  - $($skillDir.Name)" -ForegroundColor Gray
-    }
-}
-
-# Copy agents (subagent definitions)
-if (Test-Path $AgentsSourceDir) {
-    Write-Host "Copying agents..." -ForegroundColor Green
-    if (-not (Test-Path $AgentsDestDir)) {
-        New-Item -ItemType Directory -Path $AgentsDestDir | Out-Null
-    }
-    foreach ($file in (Get-ChildItem -Path $AgentsSourceDir -Filter "*.md")) {
-        Copy-Item $file.FullName (Join-Path $AgentsDestDir $file.Name) -Force
-        Write-Host "  - agents\$($file.Name)" -ForegroundColor Gray
-    }
 }
 
 # Copy global CLAUDE.md (CLAUDE.global.md -> ~/.claude/CLAUDE.md)
@@ -135,68 +60,15 @@ if (-not $currentValue) {
 Write-Host "Generating settings.json..." -ForegroundColor Green
 $template = Get-Content $TemplateFile -Raw -Encoding UTF8
 # JSON テキストへの埋め込みなのでバックスラッシュを1段だけエスケープする
-$claudeDirEscaped = $ClaudeDir -replace '\\', '\\'
 $repoDirEscaped = (Split-Path -Parent $ScriptDir) -replace '\\', '\\'
-$settings = $template -replace '\{\{CLAUDE_DIR\}\}', $claudeDirEscaped -replace '\{\{REPO_DIR\}\}', $repoDirEscaped
-
-$settingsObj = $settings | ConvertFrom-Json
-
-# hooks/ スクリプトのメタデータから settings.json に hook を登録
-if ($HookRegistrations.Count -gt 0) {
-    Write-Host "Registering hooks from metadata..." -ForegroundColor Green
-
-    if (-not ($settingsObj.PSObject.Properties.Name -contains "hooks")) {
-        $settingsObj | Add-Member -MemberType NoteProperty -Name "hooks" -Value ([PSCustomObject]@{})
-    }
-
-    foreach ($reg in $HookRegistrations) {
-        # PSObject に載せる値なので生パスで持たせる（エスケープは ConvertTo-Json が行う）
-        $cmd = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$HooksDestDir\$($reg.file)`""
-        $cmdEntry = [PSCustomObject]@{ type = "command"; command = $cmd }
-        if ($null -ne $reg.async)       { $cmdEntry | Add-Member -MemberType NoteProperty -Name "async"       -Value $reg.async }
-        if ($null -ne $reg.asyncRewake) { $cmdEntry | Add-Member -MemberType NoteProperty -Name "asyncRewake" -Value $reg.asyncRewake }
-
-        $hookEntry = [PSCustomObject]@{ hooks = @($cmdEntry) }
-        if ($reg.matcher) {
-            $hookEntry | Add-Member -MemberType NoteProperty -Name "matcher" -Value $reg.matcher
-        }
-
-        $event = $reg.event
-        if (-not ($settingsObj.hooks.PSObject.Properties.Name -contains $event)) {
-            $settingsObj.hooks | Add-Member -MemberType NoteProperty -Name $event -Value @()
-        }
-
-        # 同じ matcher かつ同じスクリプトが既に存在する場合だけスキップする。
-        # matcher だけで判定すると、同一 matcher の別スクリプト（例: Bash の
-        # dangerous-command-guard と filter-test-output）が登録されない。
-        $alreadyExists = @($settingsObj.hooks.$event | Where-Object {
-            $matcherMatches =
-                ($null -eq $reg.matcher -and -not ($_.PSObject.Properties.Name -contains "matcher")) -or
-                ($_.PSObject.Properties.Name -contains "matcher" -and $_.matcher -eq $reg.matcher)
-            $matcherMatches -and @($_.hooks | Where-Object { $_.command -like "*\$($reg.file)*" }).Count -gt 0
-        })
-        if ($alreadyExists.Count -gt 0) {
-            Write-Host "  - $($reg.file): already registered, skipping" -ForegroundColor DarkGray
-        } else {
-            $settingsObj.hooks.$event += $hookEntry
-            Write-Host "  - $($reg.file): registered to $event$(if ($reg.matcher) { "[$($reg.matcher)]" })" -ForegroundColor Gray
-        }
-    }
-}
+$settings = $template -replace '\{\{REPO_DIR\}\}', $repoDirEscaped
+$null = $settings | ConvertFrom-Json
 
 # PS 5.1 の -Encoding UTF8 は BOM を付けるため、BOM なし UTF-8 を明示して書き出す
-$settingsJson = $settingsObj | ConvertTo-Json -Depth 10
-[System.IO.File]::WriteAllText($SettingsFile, $settingsJson, (New-Object System.Text.UTF8Encoding $false))
+[System.IO.File]::WriteAllText($SettingsFile, $settings, (New-Object System.Text.UTF8Encoding $false))
+Write-Host "  - $SettingsFile" -ForegroundColor Gray
 
 Write-Host ""
 Write-Host "Installation complete!" -ForegroundColor Green
-Write-Host ""
-Write-Host "Installed files:" -ForegroundColor Cyan
-Get-ChildItem $ClaudeDir -Filter "*.ps1" | ForEach-Object { Write-Host "  - $($_.FullName)" -ForegroundColor Gray }
-Write-Host "  - $SettingsFile" -ForegroundColor Gray
-if (Test-Path $SkillsDestDir) {
-    Write-Host "Installed skills:" -ForegroundColor Cyan
-    Get-ChildItem $SkillsDestDir -Directory | ForEach-Object { Write-Host "  - $($_.Name)" -ForegroundColor Gray }
-}
-Write-Host ""
+Write-Host "Run Install-DevTools to install the dotfiles plugins (skills, hooks, mods)." -ForegroundColor Yellow
 Write-Host "Note: Restart Claude Code for changes to take effect." -ForegroundColor Yellow

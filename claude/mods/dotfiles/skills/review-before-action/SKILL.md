@@ -52,8 +52,8 @@ description: まだ書いていない案を人に見せ、回答・訂正をも�
 
 以下の手順で `<skill dir>` と書いた箇所は、**この SKILL.md が置かれているディレクトリ**を指す。導入方法で変わる。
 
-- skill ディレクトリを配置した場合: `~/.claude/skills/review-before-action/` (この dotfiles では `claude/install.ps1` がここへ展開する)
-- plugin として入れた場合: `${CLAUDE_PLUGIN_ROOT}/skills/review-before-action/`
+- skill ディレクトリを配置した場合: `~/.claude/skills/review-before-action/`
+- plugin として入れた場合: `${CLAUDE_PLUGIN_ROOT}/skills/review-before-action/` (この dotfiles では dotfiles plugin として入る)
 
 分からなければ、この SKILL.md 自身のパスから求める。
 

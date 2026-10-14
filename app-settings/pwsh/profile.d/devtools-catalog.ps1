@@ -46,6 +46,7 @@ $script:DevTools = @(
     @{ Name = 'Orca keybindings.json'; Backend = 'remote-config'; RepoPath = 'app-settings/orca/keybindings.json'; Dest = (Join-Path $env:USERPROFILE '.orca\keybindings.json') }
     # Everything は終了時に Filters.csv を上書き保存するため、反映前に終了させておくこと。
     @{ Name = 'Everything Filters.csv'; Backend = 'remote-config'; RepoPath = 'app-settings/everything/Filters.csv'; Dest = (Join-Path $env:APPDATA 'Everything\Filters.csv') }
+    @{ Name = 'dotfiles (mod)'; Backend = 'claude-plugin'; Id = 'dotfiles@dotfiles-mods'; Marketplace = 'dotfiles-mods'; MarketplaceSource = 'ntaksh42/dotfiles'; RequiredCommand = 'claude' }
     @{ Name = 'auto-session-title (mod)'; Backend = 'claude-plugin'; Id = 'auto-session-title@dotfiles-mods'; Marketplace = 'dotfiles-mods'; MarketplaceSource = 'ntaksh42/dotfiles'; RequiredCommand = 'claude' }
     @{ Name = 'ado-pr-status (mod)'; Backend = 'claude-plugin'; Id = 'ado-pr-status@dotfiles-mods'; Marketplace = 'dotfiles-mods'; MarketplaceSource = 'ntaksh42/dotfiles'; RequiredCommand = 'claude' }
     @{ Name = 'ado-link-bar (mod)'; Backend = 'claude-plugin'; Id = 'ado-link-bar@dotfiles-mods'; Marketplace = 'dotfiles-mods'; MarketplaceSource = 'ntaksh42/dotfiles'; RequiredCommand = 'claude' }

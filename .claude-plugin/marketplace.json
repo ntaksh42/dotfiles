@@ -3,6 +3,11 @@
   "owner": { "name": "ntaksh42" },
   "plugins": [
     {
+      "name": "dotfiles",
+      "source": "./claude/mods/dotfiles",
+      "description": "Skills (drawio-diagram, html-report, jp-deslop, review-before-action) and the PostCompact hook that reminds Claude to re-read CLAUDE.md / AGENTS.md."
+    },
+    {
       "name": "auto-session-title",
       "source": "./claude/mods/auto-session-title",
       "description": "Names the session from the first prompt, then renames it from the conversation every 5 prompts."

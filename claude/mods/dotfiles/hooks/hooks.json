@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/compact-context-reinject.ps1\""
+          }
+        ]
+      }
+    ]
+  }
+}

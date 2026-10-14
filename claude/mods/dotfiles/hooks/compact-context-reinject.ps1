@@ -1,9 +1,3 @@
-<#
-.HOOK
-{
-  "event": "PostCompact"
-}
-#>
 # compact-context-reinject.ps1
 # コンテキスト圧縮後に指示ファイル（CLAUDE.md / AGENTS.md）の再読み込みを指示するhook（PostCompact）
 

@@ -69,8 +69,10 @@ Mermaid は CDN で描画する。オフラインでは図の代わりに定義�
 
 ### Step 3: 生成する
 
+`<skill dir>` はこの SKILL.md が置かれているディレクトリ（dotfiles plugin なら `${CLAUDE_PLUGIN_ROOT}/skills/html-report/`）。
+
 ```powershell
-& "$HOME\.claude\skills\html-report\scripts\New-HtmlReport.ps1" `
+& "<skill dir>\scripts\New-HtmlReport.ps1" `
   -Kind bug `
   -Title "ログイン断続失敗の調査" `
   -Subtitle "src/auth/session.ts" `
@@ -115,4 +117,4 @@ Mermaid は CDN で描画する。オフラインでは図の代わりに定義�
 
 **表が崩れる**: セル内の `|` は `\|` にエスケープする。
 
-**スクリプトが見つからない**: `claude/install.ps1` を再実行して `~/.claude/skills/` へ展開する。
+**スクリプトが見つからない**: dotfiles plugin が有効か `claude plugin list` で確認し、無ければ `Install-DevTools` で導入する。

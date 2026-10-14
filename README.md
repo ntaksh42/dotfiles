@@ -6,10 +6,10 @@ Windows 環境の Claude Code dotfiles（hooks・skills・settings）を一元�
 
 ```
 claude/
-  install.ps1              インストーラ（hooks・skills・settings を ~/.claude に展開）
+  install.ps1              インストーラ（CLAUDE.md・settings.json を ~/.claude に配置）
   settings.template.json   settings.json のテンプレート
-  hooks/                   Claude Code フック用スクリプト
-  skills/                  Claude Code スキル
+  mods/                    Claude Code プラグイン（dotfiles-mods マーケットプレイス）
+    dotfiles/              自作の skills・hooks をまとめた plugin
 app-settings/              アプリ設定ファイルのバックアップ
 tools/                     汎用 PowerShell ユーティリティ
 ```
@@ -98,7 +98,8 @@ ccstatusline はTUI上での編集で設定ファイル自身を書き換える�
 
 ## Claude Code Mods
 
-`Install-DevTools` は `claude/mods/` の Mod（`auto-session-title`、`toast-notify` など）も導入します。
+`Install-DevTools` は `claude/mods/` の Mod（`dotfiles`、`auto-session-title`、`toast-notify` など）も導入します。
+自作の skills と hooks は `dotfiles` plugin にまとめてあります（スキル名は `dotfiles:<name>`）。
 `dotfiles-mods` マーケットプレイスが未登録なら GitHub の `ntaksh42/dotfiles` から登録し、
 その後 `claude plugin install` を実行します。`claude/install.ps1` がクローン先のパスで
 登録済みの場合は、そのマーケットプレイスをそのまま使います。GitHub から登録する場合は、
@@ -148,13 +149,18 @@ powershell.exe -ExecutionPolicy Bypass -File claude\install.ps1
 ```
 
 インストーラが行うこと：
-- `claude/hooks/*.ps1` を `~/.claude/hooks/` にコピー
-- `claude/skills/` を `~/.claude/skills/` にコピー
-- `claude/agents/*.md` を `~/.claude/agents/` にコピー
+- `claude/CLAUDE.global.md` を `~/.claude/CLAUDE.md` にコピー
 - `settings.template.json` からパスを解決して `~/.claude/settings.json` を生成
-- 各フックスクリプト先頭の `.HOOK` メタデータを読み取り、settings.json に自動登録
 
-### 3. Claude Code を再起動
+### 3. plugin を導入
+
+```powershell
+Install-DevTools
+```
+
+skills・hooks・Mod を `claude plugin install` で導入します。
+
+### 4. Claude Code を再起動
 
 設定を反映するために Claude Code を再起動してください。
 
@@ -169,24 +175,6 @@ powershell.exe -ExecutionPolicy Bypass -File claude\install.ps1
 - `yq` v4.53.2: YAML / TOML / XML プロセッサ。jq 風構文で K8s や CI 設定を処理できます。
 
 ---
-
-## フックの仕組み
-
-各フックスクリプトは先頭に `.HOOK` メタデータブロックを持ちます：
-
-```powershell
-<#
-.HOOK
-{
-  "event": "PostToolUse",
-  "matcher": "Task",
-  "async": true
-}
-#>
-```
-
-`install.ps1` がこのブロックを解析して `settings.json` の `hooks` セクションに自動登録します。  
-新しいフックを追加する場合は、スクリプト先頭にこのブロックを含めるだけで自動的に反映されます。
 
 ## ユーティリティ
 
