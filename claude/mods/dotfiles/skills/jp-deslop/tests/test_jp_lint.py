@@ -20,7 +20,8 @@ class MetaphorVerb(unittest.TestCase):
                   "この設定が地味に効いてきます。",
                   "内部実装まで踏み込んで調べました。",
                   "この調査で丸2日が溶けました。",
-                  "警告を1個ずつ潰しました。"]:
+                  "警告を1個ずつ潰しました。",
+                  "調査で２日溶かしました。"]:
             self.assertIn("metaphor_verb", rules(s), s)
 
     def test_keeps_literal_and_technical_uses(self):
@@ -46,6 +47,16 @@ class Symbols(unittest.TestCase):
     def test_ignores_tilde_fence_and_html_comment(self):
         text = "説明です。\n~~~\n設計――境界――\n~~~\n<!-- 設計――境界 -->\n<!--\n設計――境界\n-->\n"
         self.assertEqual(rules(text), set())
+
+    def test_fence_closes_only_with_same_kind_and_length(self):
+        self.assertEqual(rules("本文\n````\n```\n設計――境界\n```\n````\n"), set())
+        self.assertIn("dash", rules("本文\n```\n~~~\n```\n設計――境界\n"))
+
+    def test_checks_text_after_comment_close(self):
+        self.assertIn("dash", rules("<!--\nメモ\n-->設計――境界\n"))
+
+    def test_broken_bold_ignores_escape(self):
+        self.assertNotIn("broken_bold", rules("次に\\**「保留」\\**を書きます。"))
 
     def test_ignores_ruled_line(self):
         self.assertNotIn("dash", rules("見出し\n──────────\n本文です。"))

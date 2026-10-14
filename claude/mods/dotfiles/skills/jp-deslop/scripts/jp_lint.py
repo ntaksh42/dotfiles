@@ -28,8 +28,8 @@ class Finding:
 METAPHOR_VERBS = [
     (r"(黙って|静かに|そっと)[ぁ-ん]{0,3}(無視|捨て|切り捨て|スキップ|破棄|止ま|落ち|壊れ|失敗|消え|劣化|崩れ|上書き)", "黙って・静かに＋失敗"),
     (r"(側|方向)[にへ]倒[すしせれ]", "〜側に倒す"),
-    (r"(時間|工数|半日|[0-9数一二三丸]+日)[をがも]?溶[かけ]", "時間を溶かす"),
-    (r"[0-9一二三ひと](つ|個|件)?ずつ[^。、]{0,4}潰", "一つずつ潰す"),
+    (r"(時間|工数|半日|[0-9０-９数一二三丸]+日)[をがも]?溶[かけ]", "時間を溶かす"),
+    (r"[0-9０-９一二三ひと](つ|個|件)?ずつ[^。、]{0,4}潰", "一つずつ潰す"),
     (r"(地味|じわじわ|ボディブロー)[にと]?[^。、]{0,4}効", "地味に効く"),
     (r"(設計|実装|内部|詳細|仕組み|領域|本質)[^。、]{0,3}(に|へ|まで)踏み込", "〜に踏み込む"),
 ]
@@ -42,7 +42,7 @@ WORDY_FORMS = [
     (r"において|における", "「で」「の」にする"),
     (r"ということ|という点", "「こと」「点」にする"),
     (r"まず最初|違和感を感じ|後で後悔|あらかじめ事前|一番最も|必ず必要", "二重表現"),
-    (r"(次の|以下の)(点|通り|3つ|ような)|注目すべき点|挙げられます", "予告だけの文。中身の文と1文にする"),
+    (r"(次の|以下の)(点|通り|3つ|ような)|注目すべき点|挙げられます", "予告だけの文なら、中身の文と1文にする"),
     (r"いかがでしたでしょうか|参考になれば幸いです", "定型の結び"),
 ]
 
@@ -61,22 +61,31 @@ BOLD_PAIR = re.compile(r"\*\*([^*\n]+?)\*\*")
 NEGATION = re.compile(r"ではなく")
 FRONT_MATTER = re.compile(r"---\r?\n.*?\r?\n---\r?\n", re.S)
 HTML_COMMENT = re.compile(r"<!--.*?-->")
+FENCE = re.compile(r"`{3,}|~{3,}")
 
 
 def prose_lines(text):
     """フロントマター、コードブロック、HTML コメント、引用、表を除いた (行番号, 行) を返す。インラインコードも消す。"""
     head = FRONT_MATTER.match(text)
     skip = head.group(0).count("\n") if head else 0
-    kept, in_fence, in_comment = [], False, False
+    kept, fence, in_comment = [], "", False
     for no, raw in enumerate(text.splitlines(), 1):
         stripped = raw.lstrip()
         if no <= skip:
             continue
         if in_comment:
-            in_comment = "-->" not in raw
-        elif stripped.startswith(("```", "~~~")):
-            in_fence = not in_fence
-        elif not in_fence and not stripped.startswith((">", "|")):
+            if "-->" not in raw:
+                continue
+            raw, in_comment = raw.split("-->", 1)[1], False
+            stripped = raw.lstrip()
+        mark = FENCE.match(stripped)
+        if fence:
+            # 閉じるのは、開始と同じ文字で、開始以上の長さのフェンスだけ
+            if mark and mark.group(0)[0] == fence[0] and len(mark.group(0)) >= len(fence) and not stripped[len(mark.group(0)):].strip():
+                fence = ""
+        elif mark:
+            fence = mark.group(0)
+        elif not stripped.startswith((">", "|")):
             line = HTML_COMMENT.sub("", re.sub(r"`[^`]*`", "", raw))
             if "<!--" in line:
                 line, in_comment = line.split("<!--")[0], True
@@ -107,7 +116,8 @@ def broken_bold(line):
         return line[i] if 0 <= i < len(line) else ""
 
     return [m.group(0) for m in BOLD_PAIR.finditer(line)
-            if not (_can_flank(at(m.start() - 1), at(m.start() + 2), True)
+            if at(m.start() - 1) != "\\" and at(m.end() - 3) != "\\"
+            and not (_can_flank(at(m.start() - 1), at(m.start() + 2), True)
                     and _can_flank(at(m.end() - 3), at(m.end()), False))]
 
 
