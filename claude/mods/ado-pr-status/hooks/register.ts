@@ -17,16 +17,28 @@ async function git($: EngineInterface, args: string[], cwd: string): Promise<str
   return ran.exitCode === 0 ? ran.stdout.trim() : ''
 }
 
-/**
- * az.cmd はシェル経由でないと起動できないので、Windows では cmd を挟む。
- * パイプ時の az はコンソールのコードページ (日本語環境では cp932) で JSON を出すため、
- * PYTHONUTF8=1 で UTF-8 に固定する（しないとタイトルが文字化けする）。
- */
-async function az($: EngineInterface, args: string[]) {
-  const isWindows = (await $.env.get('OS')) === 'Windows_NT'
-  const argv = isWindows ? ['cmd', '/d', '/c', 'set', 'PYTHONUTF8=1&&', 'az', ...args] : ['az', ...args]
+// az の起動方法。初回に一度だけ調べる
+let azArgv: string[] | undefined
 
-  return $.process.run(argv, { timeoutMs: 30_000 })
+/**
+ * パイプ時の az は ANSI コードページ (日本語環境では cp932) で JSON を出す。MSI 版の az.cmd は
+ * python を -I で起動するため PYTHONUTF8 が効かない。そこで Windows では az.cmd と同じ
+ * ..\python.exe を -X utf8 付きで直接起動する（しないとタイトルが文字化けする）。
+ * 見つからなければ従来どおり cmd 経由で az.cmd を起動する。
+ */
+async function azBase($: EngineInterface): Promise<string[]> {
+  if (azArgv) return azArgv
+  if ((await $.env.get('OS')) !== 'Windows_NT') return (azArgv = ['az'])
+  const where = await $.process.run(['where', 'az.cmd'])
+  const cmd = where.exitCode === 0 ? (where.stdout.split(/\r?\n/)[0] ?? '').trim() : ''
+  const python = cmd.replace(/[\\/][^\\/]+[\\/][^\\/]+$/, '\\python.exe')
+  const isFound = cmd !== '' && (await $.fs.stat(python).catch(() => null))?.kind === 'file'
+
+  return (azArgv = isFound ? [python, '-X', 'utf8', '-IBm', 'azure.cli'] : ['cmd', '/d', '/c', 'az'])
+}
+
+async function az($: EngineInterface, args: string[]) {
+  return $.process.run([...(await azBase($)), ...args], { timeoutMs: 30_000 })
 }
 
 async function statusPath($: EngineInterface): Promise<string> {

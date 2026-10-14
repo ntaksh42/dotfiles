@@ -142,7 +142,8 @@ function Test-ToolInstalled {
         'claude-plugin' {
             if (-not (Test-Cmd claude)) { return $false }
             try { $plugins = claude plugin list --json | ConvertFrom-Json } catch { return $false }
-            return [bool]($plugins | Where-Object { $_.id -eq $Tool.Id })
+            # インストール済みでも無効なら未導入扱いにし、Install-DevTools で有効化する。
+            return [bool]($plugins | Where-Object { $_.id -eq $Tool.Id -and $_.enabled })
         }
         'remote-config' {
             if (-not (Test-Path -LiteralPath $Tool.Dest -PathType Leaf)) { return $false }
@@ -322,6 +323,12 @@ function Install-DevTools {
                 }
                 'psmodule' { Install-Module $t.Id -Scope CurrentUser -Force -AcceptLicense }
                 'claude-plugin' {
+                    $plugins = claude plugin list --json | ConvertFrom-Json
+                    if ($plugins | Where-Object { $_.id -eq $t.Id }) {
+                        claude plugin enable $t.Id
+                        Assert-NativeCommandSucceeded "claude plugin enable $($t.Id)"
+                        break
+                    }
                     # claude/install.ps1 が同名マーケットプレイスをクローン先のパスで登録済みなら、それを使う。
                     $marketplaces = claude plugin marketplace list --json | ConvertFrom-Json
                     if (-not ($marketplaces | Where-Object { $_.name -eq $t.Marketplace })) {

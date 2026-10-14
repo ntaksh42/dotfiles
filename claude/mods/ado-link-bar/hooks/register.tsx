@@ -18,12 +18,24 @@ const cfg = { organization: '', prs: 5, workItems: 5 }
 // Work items whose title was already asked for, so each is fetched once.
 const requested = new Set<string>()
 
-// az.cmd only starts through a shell, so Windows goes through cmd. Piped, az writes JSON in the
-// console code page (cp932 on Japanese Windows), so PYTHONUTF8=1 pins it to UTF-8 for the titles.
+// How az is started, found once.
+let azArgv: string[] | undefined
+
+// Piped, az writes JSON in the ANSI code page (cp932 on Japanese Windows), and the MSI's az.cmd
+// starts its python with -I, which ignores PYTHONUTF8. So Windows runs that python (az.cmd's
+// ..\python.exe) itself with -X utf8, and falls back to az.cmd through cmd where it is not there.
+async function azBase($: EngineInterface): Promise<string[]> {
+  if (azArgv) return azArgv
+  if ((await $.env.get('OS')) !== 'Windows_NT') return (azArgv = ['az'])
+  const where = await $.process.run(['where', 'az.cmd'])
+  const cmd = where.exitCode === 0 ? (where.stdout.split(/\r?\n/)[0] ?? '').trim() : ''
+  const python = cmd.replace(/[\\/][^\\/]+[\\/][^\\/]+$/, '\\python.exe')
+  const isFound = cmd !== '' && (await $.fs.stat(python).catch(() => null))?.kind === 'file'
+  return (azArgv = isFound ? [python, '-X', 'utf8', '-IBm', 'azure.cli'] : ['cmd', '/d', '/c', 'az'])
+}
+
 async function az($: EngineInterface, args: string[]) {
-  const isWindows = (await $.env.get('OS')) === 'Windows_NT'
-  const argv = isWindows ? ['cmd', '/d', '/c', 'set', 'PYTHONUTF8=1&&', 'az', ...args] : ['az', ...args]
-  return $.process.run(argv, { timeoutMs: 30_000 })
+  return $.process.run([...(await azBase($)), ...args], { timeoutMs: 30_000 })
 }
 
 // Looks up a work item's title and state; on failure the link keeps its bare #id.
