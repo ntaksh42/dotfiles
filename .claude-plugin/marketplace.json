@@ -5,7 +5,7 @@
     {
       "name": "dotfiles",
       "source": "./claude/mods/dotfiles",
-      "description": "Skills (drawio-diagram, html-report, jp-deslop, review-before-action) and the PostCompact hook that reminds Claude to re-read CLAUDE.md / AGENTS.md."
+      "description": "Skills (drawio-diagram, jp-deslop, review-before-action) and the PostCompact hook that reminds Claude to re-read CLAUDE.md / AGENTS.md."
     },
     {
       "name": "auto-session-title",

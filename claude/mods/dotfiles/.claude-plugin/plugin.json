@@ -1,1 +1,1 @@
-{ "name": "dotfiles", "version": "0.1.0", "description": "Skills (drawio-diagram, html-report, jp-deslop, review-before-action) and the PostCompact hook that reminds Claude to re-read CLAUDE.md / AGENTS.md." }
+{ "name": "dotfiles", "version": "0.2.0", "description": "Skills (drawio-diagram, jp-deslop, review-before-action) and the PostCompact hook that reminds Claude to re-read CLAUDE.md / AGENTS.md." }
