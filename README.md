@@ -203,18 +203,3 @@ JSON の自動読み込みには対応していないため、`app-settings/orca
 署名証明書が未信頼の場合は `Cert:\LocalMachine\TrustedPeople` へ登録するため UAC の確認が出ます。
 x64 版の .NET 10 Desktop Runtime が無ければ winget で入れます（ARM64 の PC では `dotnet\x64` に入ります）。
 
-## PowerToys 設定
-
-PowerToys の設定（FancyZones のレイアウト・ホットキーを含む）は
-`app-settings/powertoys/` に保存します。対象は PowerToys 公式の Back up & restore と
-同じ設定ファイルです。ユーザー名入りのパスを含む `Workspaces\workspaces.json` と
-`NewPlus\settings.json` は公開リポジトリに載せないため対象外です。
-
-新しい PC では `Install-DevTools` が PowerToys 本体（winget）に続いて設定を GitHub の `main`
-から配置します（`PowerToys settings`）。`FancyZones\custom-layouts.json` が未作成の環境にだけ
-一度実行し、既存ファイルが異なる場合は `.backup.<日時>` を残します。配置するファイルは
-`app-settings/powertoys/manifest.txt` に載ったものだけなので、ファイルを足したら manifest にも追記します。
-
-配置時は PowerToys を停止してコピーし、起動していた場合は再起動します。
-FancyZones のモニターごとの適用レイアウト（`applied-layouts.json`）は対象外なので、
-復元後に各モニターへレイアウトを選び直してください。

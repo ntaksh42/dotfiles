@@ -10,9 +10,7 @@ $script:DevTools = @(
     @{ Name = 'Everything'; Backend = 'winget'; Id = 'voidtools.Everything' }
     @{ Name = 'Orca'; Backend = 'winget'; Id = 'StablyAI.Orca' }
     @{ Name = 'PC Manager'; Backend = 'msstore'; Id = '9PM860492SZD' }
-    @{ Name = 'PowerToys'; Backend = 'winget'; Id = 'Microsoft.PowerToys' }
     # 既存の設定を上書きしないよう、レイアウトが未作成（custom-layouts.json なし）の環境にだけ一度配置する。
-    @{ Name = 'PowerToys settings'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-PowerToysSettings.ps1"; Path = (Join-Path $env:LOCALAPPDATA 'Microsoft\PowerToys\FancyZones\custom-layouts.json'); InstallOnly = $true }
     @{ Name = 'Waypoint'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/waypoint/main/installer/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\waypoint\waypoint.exe'); Args = @{ Silent = $true }; RebootRequiredExitCode = 3010; Repo = 'ntaksh42/waypoint'; VersionSource = 'product' }
     @{ Name = 'Windows-Operation-Cli'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/Windows-Operation-Cli/main/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\windows-operation-cli\windows-operation-cli.exe'); Args = @{ FromRelease = $true }; RequiredCommand = 'claude'; Repo = 'ntaksh42/Windows-Operation-Cli' }
     @{ Name = 'Crit'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-Crit.ps1"; Path = (Join-Path $env:USERPROFILE '.local\bin\crit.exe'); Repo = 'tomasz-tomczyk/crit'; VersionSource = 'command' }
