@@ -38,6 +38,7 @@ const cfg = { minTurnMs: 30_000, minCommandMs: 60_000, stallMs: 300_000 }
 const stall = { active: false, last: 0, dirty: false, notified: false }
 const touch = () => { stall.dirty = true }
 // セッション名。/rename や auto-session-title の命名はプロンプト送信・セッション開始の入出力で拾う
+// 組織管理下では classic.* が個人インストールの mod に回ってこないため、/rename の実行からも拾う
 let sessionTitle = ''
 
 export const formatDuration = (ms: number) => {
@@ -129,6 +130,11 @@ export const register: Register = (on, options) => {
   on('classic.UserPromptSubmit', async ($, e, next) => {
     const ran = await next(e)
     sessionTitle = ran.sessionTitle ?? e.session_title ?? sessionTitle
+    return ran
+  })
+  on('command.run', { command: 'rename' }, async ($, e, next) => {
+    const ran = await next(e)
+    sessionTitle = e.args.trim() || sessionTitle
     return ran
   })
 

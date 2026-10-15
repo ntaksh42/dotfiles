@@ -209,4 +209,14 @@ describe('セッション名', () => {
     await settle()
     expect(toasts.map(t => t.session)).toEqual(['', '決済画面の修正', 'リネーム後'])
   })
+
+  test('/rename で付けた名前をトーストに載せる', async ($, on) => {
+    const toasts: Toast[] = []
+    engine(on, toasts)
+    on('command.run', () => ({ text: '' }))
+    await $.command.run({ command: 'rename', args: '組織環境での命名' })
+    await $.turn.complete(turn(45_000))
+    await settle()
+    expect(toasts.map(t => t.session)).toEqual(['組織環境での命名'])
+  })
 })
