@@ -92,3 +92,24 @@ if ($admin) { icacls $file /inheritance:r /grant '*S-1-5-32-544:F' /grant '*S-1-
     if ($LASTEXITCODE -eq 0) { Write-Host "完了: ssh $Alias で接続できます。" -ForegroundColor Green }
     else { Write-Error "鍵での接続確認に失敗しました: ssh $Alias" }
 }
+
+# Run a command on every host in ~/.ssh/hosts.txt (one ~/.ssh/config Host name per line, # for
+# comments) in parallel. Key login is required (see Add-SshHost); returns Host / ExitCode / Output.
+function Invoke-SshAll {
+    param(
+        [Parameter(Mandatory, Position = 0)][string]$Command,
+        [string]$Path = (Join-Path $HOME '.ssh\hosts.txt'),
+        [int]$ThrottleLimit = 16
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        Write-Error "ホスト一覧がありません: $Path（1 行に 1 つ、~/.ssh/config の Host 名を書いてください）"
+        return
+    }
+    $hosts = Get-Content -LiteralPath $Path | ForEach-Object Trim | Where-Object { $_ -and -not $_.StartsWith('#') }
+
+    $hosts | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
+        $output = ssh -o BatchMode=yes -o ConnectTimeout=10 $_ $using:Command 2>&1
+        [pscustomobject]@{ Host = $_; ExitCode = $LASTEXITCODE; Output = ($output -join "`n") }
+    }
+}

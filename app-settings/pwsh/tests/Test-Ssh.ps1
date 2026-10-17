@@ -55,6 +55,27 @@ try {
         Add-SshHost -HostName h2 -User u -Port 2222 6>$null
         (Get-Content -LiteralPath $config -Raw) -match '(?s)Host h2\s+HostName h2\s+User u\s+Port 2222'
     }
+
+    # --- Invoke-SshAll with a fake ssh on PATH (parallel runspaces cannot see the ssh function) ---
+    $bin = Join-Path $tmp 'bin'
+    New-Item -ItemType Directory -Path $bin | Out-Null
+    Set-Content -LiteralPath (Join-Path $bin 'ssh.ps1') -Value @'
+if ($args -contains 'bad') { 'connection refused'; exit 255 }
+"$($args -join ' ')"; exit 0
+'@
+    $env:PATH = $bin
+    $hostsFile = Join-Path $tmp '.ssh\hosts.txt'
+    Set-Content -LiteralPath $hostsFile -Value @('# lab PCs', '', '  pc1  ', 'bad')
+
+    Test-Case 'Invoke-SshAll runs the command on each listed host, skipping comments and blanks' {
+        $r = Invoke-SshAll 'hostname' | Sort-Object Host
+        $r.Count -eq 2 -and
+        $r[0].Host -eq 'bad' -and $r[0].ExitCode -eq 255 -and $r[0].Output -eq 'connection refused' -and
+        $r[1].Host -eq 'pc1' -and $r[1].ExitCode -eq 0 -and $r[1].Output -eq '-o BatchMode=yes -o ConnectTimeout=10 pc1 hostname'
+    }
+    Test-Case 'Invoke-SshAll reports a missing host list' {
+        try { Invoke-SshAll 'hostname' -Path (Join-Path $tmp 'none.txt'); $false } catch { "$_" -like '*ホスト一覧がありません*' }
+    }
 }
 finally {
     $env:PATH = $originalPath

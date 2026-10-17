@@ -94,6 +94,7 @@ $script:ProfileHelp = [ordered]@{
         @{ Cmd = 'Set-WindowsSettings [-Check]'; Desc = 'Windows 設定（レジストリ）を適用 (-Check で差分のみ)' }
         @{ Cmd = 'Enable-SshServer'; Desc = '接続される側: OpenSSH Server を導入・自動起動・pwsh を既定シェルに (要管理者)' }
         @{ Cmd = 'Add-SshHost <host> <user> [-Alias]'; Desc = '接続する側: 鍵を作って相手に登録し ~/.ssh/config に追記' }
+        @{ Cmd = 'Invoke-SshAll <command> [-Path]'; Desc = '~/.ssh/hosts.txt の全ホストでコマンドを並列実行し、Host / ExitCode / Output を返す' }
     )
     'Aliases'               = @(
         @{ Cmd = 'cop'; Desc = 'copilot' }
