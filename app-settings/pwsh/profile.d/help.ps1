@@ -21,28 +21,29 @@ $script:ProfileHelp = [ordered]@{
         @{ Cmd = 'Update-Profile [-Force]'; Desc = 'GitHub 上のリポジトリ版でプロファイルを更新 (差分確認・バックアップ・再読込)' }
     )
     'Git / GitHub'          = @(
-        @{ Cmd = 'gs'; Desc = 'git status -sb' }
-        @{ Cmd = 'gl'; Desc = 'git log をグラフ表示 (直近 20)' }
-        @{ Cmd = 'git-undo'; Desc = '直前コミットを取り消し (staging へ戻す)' }
-        @{ Cmd = 'ga / gaa'; Desc = 'git add / git add -A' }
-        @{ Cmd = 'gb'; Desc = 'git branch' }
-        @{ Cmd = 'gd / gds'; Desc = 'git diff / git diff --staged' }
-        @{ Cmd = 'gp / gpf'; Desc = 'git push / push --force-with-lease' }
-        @{ Cmd = 'gpl'; Desc = '安全な git pull: 衝突ファイルを .git/pull-backup へ退避 + 未コミット変更を自動 stash/復元 (引数は git pull へ)' }
-        @{ Cmd = 'gf'; Desc = 'git fetch --all --prune (大文字小文字違いの ref 衝突を回避)' }
-        @{ Cmd = 'gsta/gstp/gstl'; Desc = 'git stash push/pop/list' }
-        @{ Cmd = 'gcm <msg>'; Desc = 'git commit -m' }
-        @{ Cmd = 'gco [branch]'; Desc = 'checkout (引数なしは fzf で選択)' }
-        @{ Cmd = 'lg'; Desc = 'lazygit (あれば)' }
-        @{ Cmd = 'prc/prv/prl/prs'; Desc = 'gh pr create/view/list/status (あれば)' }
-        @{ Cmd = 'groot'; Desc = 'リポジトリのルートへ cd' }
-        @{ Cmd = 'gclone <url>'; Desc = 'clone して cd' }
-        @{ Cmd = 'glog'; Desc = 'fzf でコミット閲覧 (delta プレビュー)' }
-        @{ Cmd = 'clean-pull-all'; Desc = 'gita 全リポジトリを掃除して pull (-Fallback で切替先指定)' }
-        @{ Cmd = 'git-switch'; Desc = 'fzf でブランチ切替 (無ければ origin から作成)' }
-        @{ Cmd = 'git-clean-branches'; Desc = 'マージ済みローカルブランチを一括削除' }
-        @{ Cmd = 'git-nuke'; Desc = 'reset --hard + clean -ffdx で完全クリーン (-Ref/-Force)' }
+        @{ Cmd = 'gs'; Desc = '状態を短い形式で表示 (ブランチ情報つき)' }
+        @{ Cmd = 'gl'; Desc = 'コミット履歴を枝分かれ図つきで直近 20 件表示' }
+        @{ Cmd = 'ga / gaa'; Desc = '指定ファイルをステージ / 変更すべてをステージ' }
+        @{ Cmd = 'gb'; Desc = 'ブランチ一覧の表示・操作' }
+        @{ Cmd = 'gd / gds'; Desc = '作業ツリーの差分 / ステージ済みの差分を表示' }
+        @{ Cmd = 'gp / gpf'; Desc = 'プッシュ / 他者の更新を上書きしない安全な強制プッシュ' }
+        @{ Cmd = 'gsta/gstp/gstl'; Desc = '変更を退避 / 退避した変更を復元 / 退避の一覧表示' }
+        @{ Cmd = 'gcm <msg>'; Desc = 'メッセージ付きでコミット' }
+        @{ Cmd = 'gco [branch]'; Desc = 'ブランチ切替 (引数なしは fzf で選択)' }
+        @{ Cmd = 'git-undo'; Desc = '直前のコミットを取り消し、変更はステージ済みのまま残す' }
+        @{ Cmd = 'git-switch'; Desc = 'fzf でブランチ切替 (ローカルに無ければ origin から作成して追跡)' }
+        @{ Cmd = 'git-clean-branches'; Desc = 'マージ済みのローカルブランチを確認後に一括削除 (main/master/develop は残す)' }
+        @{ Cmd = 'git-reset-clean'; Desc = '変更破棄 + 未追跡・ignore 対象も削除して完全クリーン (-Ref/-Force)' }
+        @{ Cmd = 'git-root'; Desc = 'リポジトリのルートへ移動' }
+        @{ Cmd = 'git-clone <url>'; Desc = 'クローンして、そのフォルダへ移動' }
+        @{ Cmd = 'git-log-browse'; Desc = 'fzf でコミットを閲覧 (差分プレビュー。delta があれば色付き)' }
+        @{ Cmd = 'lg'; Desc = 'lazygit を起動 (あれば)' }
+        @{ Cmd = 'prc/prv/prl/prs'; Desc = 'GitHub PR の作成 / ブラウザ表示 / 一覧 / 状況 (gh があれば)' }
+        @{ Cmd = 'git-fetch / gf'; Desc = '全リモートを取得して削除済みを掃除 (大文字小文字違いの ref 衝突を回避)' }
+        @{ Cmd = 'git-pull / gpl'; Desc = '安全な pull: 未コミット変更を退避 → 衝突ファイルを .git/pull-backup へ避難 → pull → 復元 (引数は git pull へ)' }
+        @{ Cmd = 'gita-pull-all'; Desc = 'gita 全リポジトリの nul ファイルを掃除して pull (-Fallback で切替先指定)' }
         @{ Cmd = 'gita-scan [path]'; Desc = '直下の git リポジトリを gita に一括登録' }
+        @{ Cmd = 'git-help'; Desc = 'この Git コマンド一覧だけを表示' }
     )
     'Visual Studio / build' = @(
         @{ Cmd = 'vsdev'; Desc = '現セッションを VS Developer 環境化' }
@@ -103,9 +104,10 @@ $script:ProfileHelp = [ordered]@{
 
 # Show the commands this profile provides. Optional keyword filters cmd/desc/section.
 function Show-ProfileHelp {
-    param([string]$Filter)
+    param([string]$Filter, [string]$OnlySection)
 
     foreach ($section in $script:ProfileHelp.Keys) {
+        if ($OnlySection -and $section -ne $OnlySection) { continue }
         $items = $script:ProfileHelp[$section]
         if ($Filter) {
             $items = @($items | Where-Object {
@@ -125,3 +127,6 @@ function Show-ProfileHelp {
     Write-Host "tip: 'phelp <keyword>' で絞り込み (例: phelp git) / Ctrl+g でコマンドパレット検索 / Ctrl+r で履歴検索" -ForegroundColor DarkGray
 }
 Set-Alias phelp Show-ProfileHelp
+
+# Git 系コマンドの一覧だけを表示
+function git-help { Show-ProfileHelp -OnlySection 'Git / GitHub' }

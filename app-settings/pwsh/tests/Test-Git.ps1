@@ -520,88 +520,88 @@ try {
         }
     }
 
-    # --- gclone / groot (real Set-Location inside scratch dirs) ---------------------------
-    Test-Case 'gclone clones the URL and enters the directory named after the repository' {
+    # --- git-clone / git-root (real Set-Location inside scratch dirs) ---------------------------
+    Test-Case 'git-clone clones the URL and enters the directory named after the repository' {
         Reset-Fake
         $dir = New-ScratchDir
         $script:g.CloneDir = 'repo'
         Push-Location -LiteralPath $dir
-        try { $null = Get-Output { gclone 'https://github.com/o/repo.git' }; $here = (Get-Location).Path } finally { Pop-Location }
+        try { $null = Get-Output { git-clone 'https://github.com/o/repo.git' }; $here = (Get-Location).Path } finally { Pop-Location }
         ($script:calls[0] -join '|') -ceq 'clone|https://github.com/o/repo.git' -and (Split-Path -Leaf $here) -eq 'repo'
     }
-    Test-Case 'gclone handles a trailing slash and a URL without .git' {
+    Test-Case 'git-clone handles a trailing slash and a URL without .git' {
         Reset-Fake
         $dir = New-ScratchDir
         $script:g.CloneDir = 'proj'
         Push-Location -LiteralPath $dir
-        try { $null = Get-Output { gclone 'https://host.example/o/proj/' }; $here = (Get-Location).Path } finally { Pop-Location }
+        try { $null = Get-Output { git-clone 'https://host.example/o/proj/' }; $here = (Get-Location).Path } finally { Pop-Location }
         (Split-Path -Leaf $here) -eq 'proj'
     }
-    Test-Case 'gclone handles an scp-style URL' {
+    Test-Case 'git-clone handles an scp-style URL' {
         Reset-Fake
         $dir = New-ScratchDir
         $script:g.CloneDir = 'scp-repo'
         Push-Location -LiteralPath $dir
-        try { $null = Get-Output { gclone 'git@github.com:o/scp-repo.git' }; $here = (Get-Location).Path } finally { Pop-Location }
+        try { $null = Get-Output { git-clone 'git@github.com:o/scp-repo.git' }; $here = (Get-Location).Path } finally { Pop-Location }
         (Split-Path -Leaf $here) -eq 'scp-repo'
     }
-    Test-Case 'gclone stays put when git clone fails, even if the directory exists' {
+    Test-Case 'git-clone stays put when git clone fails, even if the directory exists' {
         Reset-Fake
         $dir = New-ScratchDir
         New-Item -ItemType Directory -Path (Join-Path $dir 'repo') | Out-Null
         $script:g.Fail = @('clone*')
         Push-Location -LiteralPath $dir
-        try { $null = Get-Output { gclone 'https://github.com/o/repo.git' }; $here = (Get-Location).Path } finally { Pop-Location }
+        try { $null = Get-Output { git-clone 'https://github.com/o/repo.git' }; $here = (Get-Location).Path } finally { Pop-Location }
         $here -eq $dir
     }
-    Test-Case 'gclone stays put when the clone succeeded but the directory is missing' {
+    Test-Case 'git-clone stays put when the clone succeeded but the directory is missing' {
         Reset-Fake
         $dir = New-ScratchDir
         Push-Location -LiteralPath $dir
-        try { $null = Get-Output { gclone 'https://github.com/o/repo.git' }; $here = (Get-Location).Path } finally { Pop-Location }
+        try { $null = Get-Output { git-clone 'https://github.com/o/repo.git' }; $here = (Get-Location).Path } finally { Pop-Location }
         $here -eq $dir
     }
-    Test-Case 'groot changes to the repository top level' {
+    Test-Case 'git-root changes to the repository top level' {
         Reset-Fake
         $top = New-ScratchDir
         $elsewhere = New-ScratchDir
         $script:g.Top = $top
         Push-Location -LiteralPath $elsewhere
-        try { $null = Get-Output { groot }; $here = (Get-Location).Path } finally { Pop-Location }
+        try { $null = Get-Output { git-root }; $here = (Get-Location).Path } finally { Pop-Location }
         $here -eq $top -and ($script:calls[0] -join '|') -ceq 'rev-parse|--show-toplevel'
     }
-    Test-Case 'groot warns and stays put outside a repository' {
+    Test-Case 'git-root warns and stays put outside a repository' {
         Reset-Fake
         $elsewhere = New-ScratchDir
         Push-Location -LiteralPath $elsewhere
-        try { $out = Get-Output { groot }; $here = (Get-Location).Path } finally { Pop-Location }
+        try { $out = Get-Output { git-root }; $here = (Get-Location).Path } finally { Pop-Location }
         (Test-Line $out 'Not a git repository') -and $here -eq $elsewhere
     }
 
-    # --- glog ----------------------------------------------------------------------------
-    Test-Case 'glog warns and runs nothing without fzf' {
+    # --- git-log-browse ----------------------------------------------------------------------------
+    Test-Case 'git-log-browse warns and runs nothing without fzf' {
         Reset-Fake
         $script:_cmdCache['fzf'] = $false
-        $out = Get-Output { glog }
-        (Test-Line $out 'glog needs fzf') -and $script:calls.Count -eq 0 -and $null -eq $script:fzfArgs
+        $out = Get-Output { git-log-browse }
+        (Test-Line $out 'git-log-browse needs fzf') -and $script:calls.Count -eq 0 -and $null -eq $script:fzfArgs
     }
-    Test-Case 'glog feeds the colored log to fzf with a plain git show preview when delta is absent' {
+    Test-Case 'git-log-browse feeds the colored log to fzf with a plain git show preview when delta is absent' {
         Reset-Fake
         $script:g.LogLines = @('abc1234 first', 'def5678 second')
-        $null = Get-Output { glog }
+        $null = Get-Output { git-log-browse }
         ($script:calls[0] -join '|') -ceq 'log|--color=always|--format=%C(auto)%h %s %C(dim)%an, %ar' -and
         ($script:fzfArgs -join '|') -ceq '--ansi|--no-sort|--reverse|--preview|git show --color=always {1}' -and
         ($script:fzfInput -join '|') -ceq 'abc1234 first|def5678 second'
     }
-    Test-Case 'glog pipes the preview through delta when it is available' {
+    Test-Case 'git-log-browse pipes the preview through delta when it is available' {
         Reset-Fake
         $script:_cmdCache['delta'] = $true
-        $null = Get-Output { glog }
+        $null = Get-Output { git-log-browse }
         $script:fzfArgs[-1] -ceq 'git show --color=always {1} | delta'
     }
-    Test-Case 'glog passes extra arguments to git log' {
+    Test-Case 'git-log-browse passes extra arguments to git log' {
         Reset-Fake
-        $null = Get-Output { glog --author=me -5 }
+        $null = Get-Output { git-log-browse --author=me -5 }
         ($script:calls[0] -join '|') -ceq 'log|--color=always|--format=%C(auto)%h %s %C(dim)%an, %ar|--author=me|-5'
     }
 
@@ -699,61 +699,61 @@ try {
         }
     }
 
-    # --- git-nuke ------------------------------------------------------------------------
-    Test-Case 'git-nuke reports an already clean tree without prompting or resetting' {
+    # --- git-reset-clean ------------------------------------------------------------------------
+    Test-Case 'git-reset-clean reports an already clean tree without prompting or resetting' {
         Reset-Fake
-        $out = Get-Output { git-nuke }
+        $out = Get-Output { git-reset-clean }
         (Test-Line $out 'Already clean.') -and $script:prompts.Count -eq 0 -and
         (Get-Calls) -join ';' -ceq 'status --porcelain;clean -ffdxn'
     }
-    Test-Case 'git-nuke shows the preview and aborts on a negative answer' {
+    Test-Case 'git-reset-clean shows the preview and aborts on a negative answer' {
         Reset-Fake
         $script:g.Dirty = 'M a.txt'; $script:g.CleanPreview = @('Would remove junk/')
         $script:answer = 'n'
-        $out = Get-Output { git-nuke }
+        $out = Get-Output { git-reset-clean }
         (Test-Line $out "git reset --hard HEAD") -and (Test-Line $out '  Would remove junk/') -and (Test-Line $out 'Aborted.') -and
         -not (Test-Called 'reset*') -and -not (Test-Called 'clean -ffdx')
     }
-    Test-Case 'git-nuke resets hard then cleans after a positive answer' {
+    Test-Case 'git-reset-clean resets hard then cleans after a positive answer' {
         Reset-Fake
         $script:g.Dirty = 'M a.txt'
         $script:answer = 'y'
-        $null = Get-Output { git-nuke }
+        $null = Get-Output { git-reset-clean }
         $reset = Get-CallIndex 'reset --hard HEAD'
         $clean = Get-CallIndex 'clean -ffdx'
         $script:prompts.Count -eq 1 -and $reset -ge 0 -and $reset -lt $clean
     }
-    Test-Case 'git-nuke -Force skips the prompt' {
+    Test-Case 'git-reset-clean -Force skips the prompt' {
         Reset-Fake
         $script:g.Dirty = 'M a.txt'
-        $null = Get-Output { git-nuke -Force }
+        $null = Get-Output { git-reset-clean -Force }
         $script:prompts.Count -eq 0 -and (Test-Called 'reset --hard HEAD') -and (Test-Called 'clean -ffdx')
     }
-    Test-Case 'git-nuke -Ref resets to that ref' {
+    Test-Case 'git-reset-clean -Ref resets to that ref' {
         Reset-Fake
         $script:g.Dirty = 'M a.txt'
-        $out = Get-Output { git-nuke -Ref origin/main -Force }
+        $out = Get-Output { git-reset-clean -Ref origin/main -Force }
         (Test-Called 'reset --hard origin/main') -and (Test-Line $out "git reset --hard origin/main") -and
         -not (Test-Called 'reset --hard HEAD')
     }
-    Test-Case 'git-nuke proceeds when only untracked or ignored files exist' {
+    Test-Case 'git-reset-clean proceeds when only untracked or ignored files exist' {
         Reset-Fake
         $script:g.CleanPreview = @('Would remove build/')
-        $null = Get-Output { git-nuke -Force }
+        $null = Get-Output { git-reset-clean -Force }
         (Test-Called 'reset --hard HEAD') -and (Test-Called 'clean -ffdx')
     }
-    Test-Case 'git-nuke throws and skips the clean when reset fails' {
+    Test-Case 'git-reset-clean throws and skips the clean when reset fails' {
         Reset-Fake
         $script:g.Dirty = 'M a.txt'; $script:g.Fail = @('reset*')
         $msg = $null
-        try { $null = Get-Output { git-nuke -Force } } catch { $msg = $_.Exception.Message }
+        try { $null = Get-Output { git-reset-clean -Force } } catch { $msg = $_.Exception.Message }
         $msg -like '*git reset --hard HEAD failed with exit code 1*' -and -not (Test-Called 'clean -ffdx')
     }
-    Test-Case 'git-nuke throws when the clean fails' {
+    Test-Case 'git-reset-clean throws when the clean fails' {
         Reset-Fake
         $script:g.Dirty = 'M a.txt'; $script:g.Fail = @('clean -ffdx')
         $msg = $null
-        try { $null = Get-Output { git-nuke -Force } } catch { $msg = $_.Exception.Message }
+        try { $null = Get-Output { git-reset-clean -Force } } catch { $msg = $_.Exception.Message }
         $msg -like '*git clean -ffdx failed with exit code 1*' -and (Test-Called 'reset --hard HEAD')
     }
 
@@ -804,22 +804,22 @@ try {
         $script:gitaCalls.Count -eq 1 -and $script:gitaCalls[0][1] -eq (Resolve-Path -LiteralPath $d).Path
     }
 
-    # --- clean-pull-all ------------------------------------------------------------------
-    Test-Case 'clean-pull-all warns and does nothing without gita' {
+    # --- gita-pull-all ------------------------------------------------------------------
+    Test-Case 'gita-pull-all warns and does nothing without gita' {
         Reset-Fake
         $script:_cmdCache['gita'] = $false
-        $out = Get-Output { clean-pull-all }
-        (Test-Line $out 'clean-pull-all needs gita') -and $script:calls.Count -eq 0 -and $script:gitaCalls.Count -eq 0
+        $out = Get-Output { gita-pull-all }
+        (Test-Line $out 'gita-pull-all needs gita') -and $script:calls.Count -eq 0 -and $script:gitaCalls.Count -eq 0
     }
-    Test-Case 'clean-pull-all warns when gita has no repositories' {
+    Test-Case 'gita-pull-all warns when gita has no repositories' {
         Reset-Fake
-        $out = Get-Output { clean-pull-all }
+        $out = Get-Output { gita-pull-all }
         (Test-Line $out 'No repos registered in gita') -and $script:calls.Count -eq 0
     }
-    Test-Case 'clean-pull-all fetches then fast-forward pulls a repo whose branch has an origin counterpart' {
+    Test-Case 'gita-pull-all fetches then fast-forward pulls a repo whose branch has an origin counterpart' {
         Reset-Fake
         $repo = New-FakeRepo 'alpha'
-        $null = Get-Output { clean-pull-all }
+        $null = Get-Output { gita-pull-all }
         $expected = @(
             "-C $repo ls-files"
             "-C $repo ls-files --others --exclude-standard"
@@ -830,64 +830,64 @@ try {
         )
         (Get-Calls) -join ';' -ceq ($expected -join ';')
     }
-    Test-Case 'clean-pull-all switches to the fallback branch when the current one has no origin branch' {
+    Test-Case 'gita-pull-all switches to the fallback branch when the current one has no origin branch' {
         Reset-Fake
         $repo = New-FakeRepo 'alpha' @{ Branch = 'wip'; HasOrigin = $false }
-        $out = Get-Output { clean-pull-all }
+        $out = Get-Output { gita-pull-all }
         $c = @(Get-Calls)
         $co = $c.IndexOf("-C $repo checkout main")
         (Test-Line $out 'no origin/wip -> switching to main') -and $co -ge 0 -and $c[-1] -ceq "-C $repo pull --ff-only" -and
         $c.IndexOf("-C $repo rev-parse --verify --quiet origin/wip") -lt $co
     }
-    Test-Case 'clean-pull-all -Fallback selects the branch to switch to' {
+    Test-Case 'gita-pull-all -Fallback selects the branch to switch to' {
         Reset-Fake
         $repo = New-FakeRepo 'alpha' @{ Branch = 'wip'; HasOrigin = $false }
-        $null = Get-Output { clean-pull-all -Fallback develop }
+        $null = Get-Output { gita-pull-all -Fallback develop }
         (Test-Called "-C $repo checkout develop") -and -not (Test-Called "-C $repo checkout main")
     }
-    Test-Case 'clean-pull-all warns and skips the pull when the fallback checkout fails, then continues with the next repo' {
+    Test-Case 'gita-pull-all warns and skips the pull when the fallback checkout fails, then continues with the next repo' {
         Reset-Fake
         $bad = New-FakeRepo 'alpha' @{ Branch = 'wip'; HasOrigin = $false }
         $good = New-FakeRepo 'beta'
         $script:g.Fail = @('checkout*')
-        $out = Get-Output { clean-pull-all }
+        $out = Get-Output { gita-pull-all }
         (Test-Line $out 'checkout main failed') -and -not (Test-Called "-C $bad pull*") -and (Test-Called "-C $good pull --ff-only")
     }
-    Test-Case 'clean-pull-all warns about a registered path that no longer exists and continues' {
+    Test-Case 'gita-pull-all warns about a registered path that no longer exists and continues' {
         Reset-Fake
         $good = New-FakeRepo 'beta'
         $ghost = Join-Path $scratch 'ghost-repo'
         $script:g.GitaNames = @('ghost', 'beta')
         $script:g.GitaPaths['ghost'] = $ghost
-        $out = Get-Output { clean-pull-all }
+        $out = Get-Output { gita-pull-all }
         (Test-Line $out "path not found: $ghost") -and -not (Test-Called "-C $ghost*") -and (Test-Called "-C $good pull --ff-only")
     }
-    Test-Case 'clean-pull-all accepts gita ls output as one space-separated line' {
+    Test-Case 'gita-pull-all accepts gita ls output as one space-separated line' {
         Reset-Fake
         $a = New-FakeRepo 'alpha'
         $b = New-FakeRepo 'beta'
         $script:g.GitaNames = @('alpha beta')
-        $null = Get-Output { clean-pull-all }
+        $null = Get-Output { gita-pull-all }
         (Test-Called "-C $a pull --ff-only") -and (Test-Called "-C $b pull --ff-only")
     }
-    Test-Case 'clean-pull-all removes stray nul files (tracked or untracked, once each) and nothing else' {
+    Test-Case 'gita-pull-all removes stray nul files (tracked or untracked, once each) and nothing else' {
         Reset-Fake
         $repo = New-FakeRepo 'alpha' @{
             Tracked   = @('nul', 'sub/nul', 'src/nullable.txt', 'nul.txt')
             Untracked = @('other/nul', 'nul')
         }
         foreach ($f in 'nul', 'sub/nul', 'other/nul', 'nul.txt', 'src/nullable.txt') { New-TestFile $repo $f }
-        $out = Get-Output { clean-pull-all }
+        $out = Get-Output { gita-pull-all }
         $removedLines = @($out | Where-Object { $_.Contains('removed stray file:') })
         -not (Test-TestFile $repo 'nul') -and -not (Test-TestFile $repo 'sub/nul') -and -not (Test-TestFile $repo 'other/nul') -and
         (Test-TestFile $repo 'nul.txt') -and (Test-TestFile $repo 'src/nullable.txt') -and
         $removedLines.Count -eq 3 -and (Test-Line $out 'removed stray file: sub/nul')
     }
-    Test-Case 'clean-pull-all removes stray files before it fetches' {
+    Test-Case 'gita-pull-all removes stray files before it fetches' {
         Reset-Fake
         $repo = New-FakeRepo 'alpha' @{ Tracked = @('nul') }
         New-TestFile $repo 'nul'
-        $null = Get-Output { clean-pull-all }
+        $null = Get-Output { gita-pull-all }
         (Get-CallIndex "-C $repo ls-files*") -ge 0 -and (Get-CallIndex "-C $repo ls-files*") -lt (Get-CallIndex "-C $repo fetch*")
     }
 }

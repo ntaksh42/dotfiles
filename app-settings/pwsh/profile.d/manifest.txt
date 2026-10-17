@@ -1,6 +1,8 @@
 # profile.d の読み込み順。ローダー・Update-Profile・テストがこの一覧を参照する。
 navigation.ps1
 git.ps1
+git-pull.ps1
+gita.ps1
 vs-build.ps1
 integrations.ps1
 ai-cli.ps1
