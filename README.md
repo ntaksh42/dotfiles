@@ -19,7 +19,7 @@ tools/                     汎用 PowerShell ユーティリティ
 `app-settings/pwsh/Microsoft.PowerShell_profile.ps1` は基本ヘルパー・エイリアスと
 `Update-Profile` を持つローダーで、機能本体は `app-settings/pwsh/profile.d/` に
 分割しています（`navigation` / `git` / `vs-build` / `integrations` / `ai-cli` /
-`devtools-catalog` / `devtools` / `extra-tools` / `windows-settings` / `psreadline` / `help`）。
+`devtools-catalog` / `devtools` / `extra-tools` / `windows-settings` / `ssh` / `psreadline` / `help`）。
 読み込み順は `profile.d/manifest.txt` が決めます。新しいファイルを足すときは
 `profile.d/` に置いて `manifest.txt` に 1 行追加します。配置時はローダーと
 `profile.d/` の両方が必要です。
