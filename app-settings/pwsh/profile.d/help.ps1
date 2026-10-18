@@ -43,6 +43,7 @@ $script:ProfileHelp = [ordered]@{
         @{ Cmd = 'git-pull / gpl'; Desc = '安全な pull: 未コミット変更を退避 → 衝突ファイルを .git/pull-backup へ避難 → pull → 復元 (引数は git pull へ)' }
         @{ Cmd = 'gita-pull-all'; Desc = 'gita 全リポジトリの nul ファイルを掃除して pull (-Fallback で切替先指定)' }
         @{ Cmd = 'gita-scan [path]'; Desc = '直下の git リポジトリを gita に一括登録' }
+        @{ Cmd = 'gita-doctor'; Desc = 'gita の登録から壊れた行 (フォルダなし / 名前が空 / git でない) を探し、確認して削除' }
         @{ Cmd = 'git-help'; Desc = 'この Git コマンド一覧だけを表示' }
     )
     'Visual Studio / build' = @(

@@ -74,6 +74,7 @@ try {
             }
             'rev-parse --verify --quiet origin/*' { if (-not $repo.HasOrigin) { $global:LASTEXITCODE = 1 }; return }
             'rev-parse --absolute-git-dir' { $script:g.GitDir; return }
+            'rev-parse --git-dir' { if ($repo.NotRepo) { $global:LASTEXITCODE = 128 }; return }
             'rev-parse --show-toplevel' {
                 if ($script:g.Top) { $script:g.Top } else { $global:LASTEXITCODE = 128 }
                 return
@@ -889,6 +890,49 @@ try {
         New-TestFile $repo 'nul'
         $null = Get-Output { gita-pull-all }
         (Get-CallIndex "-C $repo ls-files*") -ge 0 -and (Get-CallIndex "-C $repo ls-files*") -lt (Get-CallIndex "-C $repo fetch*")
+    }
+
+    # --- gita-doctor --------------------------------------------------------------------
+    # Registry with one healthy repo and one entry for each kind of problem.
+    function New-GitaRegistry {
+        $good = New-FakeRepo 'good'
+        $notRepo = New-FakeRepo 'plain' @{ NotRepo = $true }
+        $noName = New-FakeRepo 'noname'
+        $ghost = Join-Path $scratch 'ghost-repo'
+        $csv = Join-Path (New-ScratchDir) 'repos.csv'
+        Set-Content -LiteralPath $csv -Value @("$good,good,,", "$notRepo,plain,,", "$noName,,,", "$ghost,ghost,,")
+        @{ Csv = $csv; Good = "$good,good,," }
+    }
+    Test-Case 'gita-doctor warns about a missing registry' {
+        Reset-Fake
+        $out = Get-Output { gita-doctor -Path (Join-Path $scratch 'none.csv') }
+        Test-Line $out 'gita registry not found'
+    }
+    Test-Case 'gita-doctor reports a healthy registry without prompting' {
+        Reset-Fake
+        $good = New-FakeRepo 'good'
+        $csv = Join-Path (New-ScratchDir) 'repos.csv'
+        Set-Content -LiteralPath $csv -Value "$good,good,,"
+        $out = Get-Output { gita-doctor -Path $csv }
+        (Test-Line $out 'No problems in 1 gita entries.') -and $script:prompts.Count -eq 0
+    }
+    Test-Case 'gita-doctor lists every kind of broken entry and removes them on yes, keeping a backup' {
+        Reset-Fake
+        $r = New-GitaRegistry
+        $before = Get-Content -LiteralPath $r.Csv -Raw
+        $out = Get-Output { gita-doctor -Path $r.Csv }
+        (Test-Line $out 'not a git repository') -and (Test-Line $out 'empty name') -and (Test-Line $out 'folder not found') -and
+        (Test-Line $out 'Removed 3 entries') -and
+        ((Get-Content -LiteralPath $r.Csv) -join ';') -ceq $r.Good -and
+        (Get-Content -LiteralPath "$($r.Csv).bak" -Raw) -ceq $before
+    }
+    Test-Case 'gita-doctor changes nothing when the prompt is declined' {
+        Reset-Fake
+        $r = New-GitaRegistry
+        $before = Get-Content -LiteralPath $r.Csv -Raw
+        $script:answer = 'n'
+        $out = Get-Output { gita-doctor -Path $r.Csv }
+        (Test-Line $out 'Aborted.') -and (Get-Content -LiteralPath $r.Csv -Raw) -ceq $before -and -not (Test-Path -LiteralPath "$($r.Csv).bak")
     }
 }
 finally {

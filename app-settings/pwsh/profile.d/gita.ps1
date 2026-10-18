@@ -64,3 +64,31 @@ function gita-scan {
     foreach ($t in $targets) { gita add $t }
     Write-Host "Registered $($targets.Count) repo(s) with gita." -ForegroundColor Green
 }
+
+# gita の登録 (repos.csv) から gita ll を失敗させる行を探す: フォルダがない / 名前が空 / git で開けない。
+# 一覧を出し、確認のうえ削除する (元のファイルは .bak に残す)。名前が空の行は gita rm で消せないため直接編集する。
+function gita-doctor {
+    param([string]$Path = (Join-Path $HOME '.config\gita\repos.csv'))
+    if (-not (Test-Path -LiteralPath $Path)) { Write-Warning "gita registry not found: $Path"; return }
+
+    $lines = @(Get-Content -LiteralPath $Path | Where-Object { $_.Trim() })
+    $bad = @(foreach ($line in $lines) {
+            $fields = $line -split ','
+            $repo = $fields[0]; $name = $fields[1]
+            $reason = if (-not (Test-Path -LiteralPath $repo)) { 'folder not found' }
+            elseif (-not $name) { 'empty name' }
+            else {
+                git -C $repo rev-parse --git-dir *> $null
+                if ($LASTEXITCODE -ne 0) { 'not a git repository' }
+            }
+            if ($reason) { [pscustomobject]@{ Name = $name; Path = $repo; Reason = $reason; Line = $line } }
+        })
+
+    if ($bad.Count -eq 0) { Write-Host "No problems in $($lines.Count) gita entries." -ForegroundColor Green; return }
+    foreach ($b in $bad) { Write-Host ("  {0,-22} {1,-12} {2}" -f $b.Reason, $b.Name, $b.Path) -ForegroundColor Yellow }
+    if ((Read-Host "Remove these $($bad.Count) entries? (y/N)") -notmatch '^(y|yes)$') { Write-Host 'Aborted.'; return }
+
+    Copy-Item -LiteralPath $Path -Destination "$Path.bak" -Force
+    Set-Content -LiteralPath $Path -Value @($lines | Where-Object { $_ -notin $bad.Line }) -Encoding utf8NoBOM
+    Write-Host "Removed $($bad.Count) entries (backup: $Path.bak)." -ForegroundColor Green
+}
