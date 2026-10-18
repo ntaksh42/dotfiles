@@ -2,6 +2,10 @@
 # §3c gita (複数リポジトリ管理)
 # ---------------------------------------------------------------------------
 
+# gita reads git output with the locale codec (cp932), which fails on UTF-8 commit messages
+# (gita ll -> UnicodeDecodeError). Python's UTF-8 mode fixes that.
+$env:PYTHONUTF8 = '1'
+
 # gita wrapper: clean each repo's stray "nul" file, then pull every repo.
 # A repo whose current branch has no origin upstream is switched to -Fallback first.
 function gita-pull-all {
