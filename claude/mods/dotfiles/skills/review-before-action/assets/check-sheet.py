@@ -2,6 +2,7 @@
 """レビュー 標準モード — シートの埋め忘れ検査。
 
   python3 check-sheet.py ./review/<topic>-01.html
+  python3 check-sheet.py --crit ./review/<topic>-01.html   # Crit 経路 (回答フォームを外したシート)
 
 sheet-template.html を埋めて作ったシートを、人に見せる前に機械的に検査する。
 狙いは「無言で壊れる不備」だけを捕まえること — 人が回答しても agent に届かない、
@@ -15,6 +16,7 @@ sheet-template.html を埋めて作ったシートを、人に見せる前に機
   - crypto.randomUUID の混入 (file:// で undefined になる)
   - 相対 URL の外部参照 (self-contained 違反)
   - 問い数が 5 以上 (判断コスト過多)
+  - --crit のとき: 回答フォームの消し忘れ (Crit ではコメントで答えるので貼り付け欄は不要)
 
 終了コード 0 = 出題してよい / 1 = 直してから出す。標準ライブラリのみ (python3.8+)。
 """
@@ -36,6 +38,29 @@ def strip_comments(html: str) -> str:
     """HTML コメントを除いた本体。雛形の注意書き自体を検出しないため
     (例: 「crypto.randomUUID は使わない」というコメントを違反として数えない)。"""
     return re.sub(r'<!--.*?-->', '', html, flags=re.DOTALL)
+
+
+def check_crit(path: Path):
+    """Crit 経路のシート。回答フォームは無いのが正しい。"""
+    html = path.read_text(encoding='utf-8')
+    live = strip_comments(html)
+    errors, warns = [], []
+    n_todo = len(re.findall(r'TODO', html))
+    if n_todo:
+        errors.append(f'TODO が {n_todo} 箇所残っている (雛形のコメントを埋めるか削る)')
+    if re.search(r'id=["\']akForm["\']', live) or 'generatePrompt' in live:
+        errors.append('回答フォーム (#akForm / script) が残っている — Crit ではコメントで答えるので削る')
+    n_qcard = len(re.findall(r'class=["\'][^"\']*\bqcard\b', html))
+    if n_qcard == 0:
+        warns.append('問いカード (.qcard) が 0 枚。問いが無いならシートではなく普通の報告で足りる')
+    elif n_qcard >= 5:
+        warns.append(f'問いカードが {n_qcard} 枚。3±1 問に絞る (人の判断コストが本体)')
+    for m in re.finditer(r'<(?:script|link|img)[^>]*(?:src|href)=["\'](?!https:|data:|file:|#|mailto:)([^"\']+)["\']', live):
+        if not m.group(1).startswith('//'):
+            warns.append(f'相対 URL の外部参照: {m.group(1)} (self-contained 規約違反)')
+    if 'review-sheet-format: v3' not in html:
+        warns.append('<!-- review-sheet-format: v3 --> が無い (どの規約で書いたシートかの目印)')
+    return errors, warns
 
 
 def check(path: Path):
@@ -122,13 +147,14 @@ def main() -> None:
         description='レビュー 標準モードのシートを、人に見せる前に検査する。',
         epilog='終了コード 0 = 出題してよい / 1 = 直してから出す。')
     ap.add_argument('sheet', help='検査するシート HTML (例: ./review/topic-01.html)')
+    ap.add_argument('--crit', action='store_true', help='Crit 経路のシート (回答フォーム無し) として検査する')
     a = ap.parse_args()
 
     path = Path(a.sheet)
     if not path.is_file():
         sys.exit(f'check-sheet: シートが見つからない: {path}')
 
-    errors, warns = check(path)
+    errors, warns = check_crit(path) if a.crit else check(path)
     out = []
     for e in errors:
         out.append(f'  NG  {e}')
