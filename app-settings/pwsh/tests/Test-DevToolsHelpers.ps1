@@ -930,163 +930,136 @@ try {
     }
 
     # =====================================================================================
-    # Sync-DevToolSkills (SymbolicLink creation is faked; everything else is real, in a temp dir)
+    # Sync-DevToolSkills (real links in an isolated temporary directory)
     # =====================================================================================
-    $script:linkCalls = @(); $script:linkFails = $false
-    function New-Item {
-        [CmdletBinding()]
-        param($Path, $ItemType, $Target, $Value, $Name, [switch]$Force)
-        if ($ItemType -eq 'SymbolicLink') {
-            $script:linkCalls += [pscustomobject]@{ Path = $Path; Target = $Target }
-            if ($script:linkFails) { throw 'A required privilege is not held by the client.' }
-            Microsoft.PowerShell.Management\New-Item -ItemType Directory -Path $Path | Out-Null
-            return
-        }
-        Microsoft.PowerShell.Management\New-Item @PSBoundParameters
-    }
     function New-SkillsFixture {
-        param([string[]]$Skills = @(), [string[]]$NoManifest = @())
         $base = New-Scratch
         $agents = Join-Path $base 'agents-skills'
         $claude = Join-Path $base 'claude-skills'
         New-Item -ItemType Directory -Path $agents | Out-Null
-        foreach ($s in $Skills) {
-            New-Item -ItemType Directory -Path (Join-Path $agents $s) | Out-Null
-            Set-Content -LiteralPath (Join-Path $agents "$s\SKILL.md") -Value "skill $s"
-            Set-Content -LiteralPath (Join-Path $agents "$s\extra.txt") -Value "extra $s"
-        }
-        foreach ($s in $NoManifest) {
-            New-Item -ItemType Directory -Path (Join-Path $agents $s) | Out-Null
-            Set-Content -LiteralPath (Join-Path $agents "$s\readme.txt") -Value 'no skill file'
-        }
+        New-Item -ItemType Directory -Path (Join-Path $agents 'alpha') | Out-Null
+        Set-Content -LiteralPath (Join-Path $agents 'alpha\SKILL.md') -Value 'skill alpha'
         @{ Agents = $agents; Claude = $claude }
     }
-    function Reset-Links { $script:linkCalls = @(); $script:linkFails = $false }
-
-    Test-Case 'Sync skills: does nothing when the agents skills directory does not exist' {
-        Reset-Links
+    Test-Case 'Sync skills: does nothing when the shared directory does not exist' {
         $base = New-Scratch
         $claude = Join-Path $base 'claude-skills'
         Sync-DevToolSkills -AgentsSkillsDir (Join-Path $base 'absent') -ClaudeSkillsDir $claude
-        $script:linkCalls.Count -eq 0 -and -not (Test-Path -LiteralPath $claude)
+        -not (Test-Path -LiteralPath $claude)
     }
-    Test-Case 'Sync skills: does nothing when the agents skills directory is empty' {
-        Reset-Links
+    Test-Case 'Sync skills: links the whole directory and exposes subsequently added skills' {
         $f = New-SkillsFixture
-        Sync-DevToolSkills -AgentsSkillsDir $f.Agents -ClaudeSkillsDir $f.Claude
-        $script:linkCalls.Count -eq 0 -and -not (Test-Path -LiteralPath $f.Claude)
-    }
-    Test-Case 'Sync skills: moves a skill (with all its files) into the Claude skills directory' {
-        Reset-Links
-        $f = New-SkillsFixture -Skills 'alpha'
-        Sync-DevToolSkills -AgentsSkillsDir $f.Agents -ClaudeSkillsDir $f.Claude 6>$null
-        (Get-Content -LiteralPath (Join-Path $f.Claude 'alpha\SKILL.md')) -ceq 'skill alpha' -and
-        (Get-Content -LiteralPath (Join-Path $f.Claude 'alpha\extra.txt')) -ceq 'extra alpha'
-    }
-    Test-Case 'Sync skills: leaves a symbolic link at the original location pointing to the moved skill' {
-        Reset-Links
-        $f = New-SkillsFixture -Skills 'alpha'
-        Sync-DevToolSkills -AgentsSkillsDir $f.Agents -ClaudeSkillsDir $f.Claude 6>$null
-        $script:linkCalls.Count -eq 1 -and $script:linkCalls[0].Path -ceq (Join-Path $f.Agents 'alpha') -and
-        $script:linkCalls[0].Target -ceq (Join-Path $f.Claude 'alpha')
-    }
-    Test-Case 'Sync skills: reports each linked skill' {
-        Reset-Links
-        $f = New-SkillsFixture -Skills 'alpha'
-        $o = Invoke-Captured { Sync-DevToolSkills -AgentsSkillsDir $f.Agents -ClaudeSkillsDir $f.Claude }
-        $o.Host.Count -eq 1 -and $o.Host[0] -ceq 'Linked skill: alpha' -and $o.Result.Count -eq 0
-    }
-    Test-Case 'Sync skills: creates the Claude skills directory when it does not exist' {
-        Reset-Links
-        $f = New-SkillsFixture -Skills 'alpha'
-        $before = Test-Path -LiteralPath $f.Claude
-        Sync-DevToolSkills -AgentsSkillsDir $f.Agents -ClaudeSkillsDir $f.Claude 6>$null
-        -not $before -and (Test-Path -LiteralPath $f.Claude -PathType Container)
-    }
-    Test-Case 'Sync skills: processes several skills' {
-        Reset-Links
-        $f = New-SkillsFixture -Skills 'a', 'b', 'c'
-        Sync-DevToolSkills -AgentsSkillsDir $f.Agents -ClaudeSkillsDir $f.Claude 6>$null
-        $script:linkCalls.Count -eq 3 -and @('a', 'b', 'c' | Where-Object { Test-Path -LiteralPath (Join-Path $f.Claude "$_\SKILL.md") }).Count -eq 3
-    }
-    Test-Case 'Sync skills: ignores directories without SKILL.md' {
-        Reset-Links
-        $f = New-SkillsFixture -NoManifest 'notaskill'
-        Sync-DevToolSkills -AgentsSkillsDir $f.Agents -ClaudeSkillsDir $f.Claude 6>$null
-        $script:linkCalls.Count -eq 0 -and (Test-Path -LiteralPath (Join-Path $f.Agents 'notaskill\readme.txt')) -and -not (Test-Path -LiteralPath $f.Claude)
-    }
-    Test-Case 'Sync skills: ignores loose files in the agents skills directory' {
-        Reset-Links
-        $f = New-SkillsFixture
-        Set-Content -LiteralPath (Join-Path $f.Agents 'SKILL.md') -Value 'stray'
-        Sync-DevToolSkills -AgentsSkillsDir $f.Agents -ClaudeSkillsDir $f.Claude 6>$null
-        $script:linkCalls.Count -eq 0 -and (Test-Path -LiteralPath (Join-Path $f.Agents 'SKILL.md'))
-    }
-    Test-Case 'Sync skills: does not overwrite a skill that already exists in the Claude skills directory' {
-        Reset-Links
-        $f = New-SkillsFixture -Skills 'alpha'
-        New-Item -ItemType Directory -Path (Join-Path $f.Claude 'alpha') -Force | Out-Null
-        Set-Content -LiteralPath (Join-Path $f.Claude 'alpha\SKILL.md') -Value 'existing claude copy'
-        Sync-DevToolSkills -AgentsSkillsDir $f.Agents -ClaudeSkillsDir $f.Claude 6>$null
-        $script:linkCalls.Count -eq 0 -and
-        (Get-Content -LiteralPath (Join-Path $f.Claude 'alpha\SKILL.md')) -ceq 'existing claude copy' -and
-        (Get-Content -LiteralPath (Join-Path $f.Agents 'alpha\SKILL.md')) -ceq 'skill alpha'
-    }
-    Test-Case 'Sync skills: a conflicting file at the destination also blocks the move' {
-        Reset-Links
-        $f = New-SkillsFixture -Skills 'alpha'
-        New-Item -ItemType Directory -Path $f.Claude -Force | Out-Null
-        Set-Content -LiteralPath (Join-Path $f.Claude 'alpha') -Value 'a file named alpha'
-        Sync-DevToolSkills -AgentsSkillsDir $f.Agents -ClaudeSkillsDir $f.Claude 6>$null
-        $script:linkCalls.Count -eq 0 -and (Test-Path -LiteralPath (Join-Path $f.Agents 'alpha\SKILL.md'))
-    }
-    Test-Case 'Sync skills: skips a skill that is already a link (junction) and leaves its target alone' {
-        Reset-Links
-        $f = New-SkillsFixture
-        $realDir = Join-Path (New-Scratch) 'real-skill'
-        New-Item -ItemType Directory -Path $realDir | Out-Null
-        Set-Content -LiteralPath (Join-Path $realDir 'SKILL.md') -Value 'linked skill'
-        $junction = Join-Path $f.Agents 'linked'
-        New-Item -ItemType Junction -Path $junction -Target $realDir | Out-Null
         try {
             Sync-DevToolSkills -AgentsSkillsDir $f.Agents -ClaudeSkillsDir $f.Claude 6>$null
-            $script:linkCalls.Count -eq 0 -and -not (Test-Path -LiteralPath $f.Claude) -and (Test-Path -LiteralPath (Join-Path $realDir 'SKILL.md'))
+            New-Item -ItemType Directory -Path (Join-Path $f.Agents 'beta') | Out-Null
+            Set-Content -LiteralPath (Join-Path $f.Agents 'beta\SKILL.md') -Value 'skill beta'
+            (Get-Item -LiteralPath $f.Claude).LinkType -eq 'Junction' -and
+            (Get-Item -LiteralPath (Join-Path $f.Agents 'alpha')).LinkType -eq $null -and
+            (Get-Content -LiteralPath (Join-Path $f.Claude 'alpha\SKILL.md')) -ceq 'skill alpha' -and
+            (Get-Content -LiteralPath (Join-Path $f.Claude 'beta\SKILL.md')) -ceq 'skill beta'
         }
-        finally { [IO.Directory]::Delete($junction) }
+        finally { if ((Get-Item -LiteralPath $f.Claude -ErrorAction SilentlyContinue).LinkType) { [IO.Directory]::Delete($f.Claude) } }
     }
-    Test-Case 'Sync skills: moves only unlinked skills when linked, unlinked and non-skill directories are mixed' {
-        Reset-Links
-        $f = New-SkillsFixture -Skills 'good' -NoManifest 'plain'
-        Sync-DevToolSkills -AgentsSkillsDir $f.Agents -ClaudeSkillsDir $f.Claude 6>$null
-        $script:linkCalls.Count -eq 1 -and $script:linkCalls[0].Path -ceq (Join-Path $f.Agents 'good') -and
-        -not (Test-Path -LiteralPath (Join-Path $f.Claude 'plain'))
+    Test-Case 'Sync skills: a correct link is unchanged on repeated runs' {
+        $f = New-SkillsFixture
+        try {
+            Sync-DevToolSkills -AgentsSkillsDir $f.Agents -ClaudeSkillsDir $f.Claude 6>$null
+            $o = Invoke-Captured { Sync-DevToolSkills -AgentsSkillsDir $f.Agents -ClaudeSkillsDir $f.Claude }
+            $o.Warnings.Count -eq 0 -and $o.Host.Count -eq 0 -and
+            (Get-Content -LiteralPath (Join-Path $f.Claude 'alpha\SKILL.md')) -ceq 'skill alpha'
+        }
+        finally { if ((Get-Item -LiteralPath $f.Claude -ErrorAction SilentlyContinue).LinkType) { [IO.Directory]::Delete($f.Claude) } }
     }
-    Test-Case 'Sync skills: rolls the skill back and rethrows when the link cannot be created' {
-        Reset-Links; $script:linkFails = $true
-        $f = New-SkillsFixture -Skills 'alpha'
-        $msg = $null
-        try { Sync-DevToolSkills -AgentsSkillsDir $f.Agents -ClaudeSkillsDir $f.Claude 6>$null } catch { $msg = $_.Exception.Message }
-        $script:linkFails = $false
-        $msg -like '*privilege*' -and
-        (Get-Content -LiteralPath (Join-Path $f.Agents 'alpha\SKILL.md')) -ceq 'skill alpha' -and
-        (Get-Content -LiteralPath (Join-Path $f.Agents 'alpha\extra.txt')) -ceq 'extra alpha' -and
-        -not (Test-Path -LiteralPath (Join-Path $f.Claude 'alpha'))
+    Test-Case 'Sync skills: migrates Claude skills, preserves Codex-only skills and backs up conflicts' {
+        $f = New-SkillsFixture
+        New-Item -ItemType Directory -Path (Join-Path $f.Claude 'alpha') -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $f.Claude 'alpha\SKILL.md') -Value 'claude alpha'
+        New-Item -ItemType Directory -Path (Join-Path $f.Agents 'codex-only') | Out-Null
+        Set-Content -LiteralPath (Join-Path $f.Agents 'codex-only\SKILL.md') -Value 'codex only'
+        try {
+            Sync-DevToolSkills -AgentsSkillsDir $f.Agents -ClaudeSkillsDir $f.Claude 6>$null
+            $backup = Get-ChildItem -LiteralPath (Split-Path $f.Agents) -Directory -Filter 'agents-skills-backup-*'
+            (Get-Content (Join-Path $f.Agents 'alpha\SKILL.md')) -ceq 'claude alpha' -and
+            (Get-Content (Join-Path $f.Claude 'codex-only\SKILL.md')) -ceq 'codex only' -and
+            (Get-Content (Join-Path $backup.FullName 'alpha\SKILL.md')) -ceq 'skill alpha'
+        }
+        finally { if ((Get-Item -LiteralPath $f.Claude).LinkType) { [IO.Directory]::Delete($f.Claude) } }
     }
-    Test-Case 'Sync skills: stops at the first failed link and leaves every skill in place' {
-        Reset-Links; $script:linkFails = $true
-        $f = New-SkillsFixture -Skills 'a', 'b'
-        try { Sync-DevToolSkills -AgentsSkillsDir $f.Agents -ClaudeSkillsDir $f.Claude 6>$null } catch {}
-        $script:linkFails = $false
-        $script:linkCalls.Count -eq 1 -and
-        (Test-Path -LiteralPath (Join-Path $f.Agents 'a\SKILL.md')) -and (Test-Path -LiteralPath (Join-Path $f.Agents 'b\SKILL.md'))
+    Test-Case 'Sync skills: migrates when only Claude has a skills directory' {
+        $base = New-Scratch
+        $agents = Join-Path $base 'agents'
+        $claude = Join-Path $base 'claude'
+        New-Item -ItemType Directory -Path (Join-Path $claude 'alpha') -Force | Out-Null
+        Set-Content (Join-Path $claude 'alpha\SKILL.md') 'alpha'
+        try {
+            Sync-DevToolSkills -AgentsSkillsDir $agents -ClaudeSkillsDir $claude 6>$null
+            (Get-Content (Join-Path $agents 'alpha\SKILL.md')) -ceq 'alpha' -and
+            (Get-Item $claude).LinkType -eq 'Junction'
+        }
+        finally { if ((Get-Item $claude).LinkType) { [IO.Directory]::Delete($claude) } }
     }
-    Test-Case 'Sync skills: defaults point at USERPROFILE\.agents\skills and USERPROFILE\.claude\skills' {
-        $ast = (Get-Command Sync-DevToolSkills).ScriptBlock.Ast
-        $defaults = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.ParameterAst] }, $true)
-        $text = ($defaults | ForEach-Object { $_.DefaultValue.Extent.Text }) -join '|'
-        $text -like "*'.agents\skills'*" -and $text -like "*'.claude\skills'*" -and $text -like '*$env:USERPROFILE*'
+    Test-Case 'Sync skills: migrates old Codex links without creating cycles' {
+        $f = New-SkillsFixture
+        New-Item -ItemType Directory -Path (Join-Path $f.Claude 'linked') -Force | Out-Null
+        Set-Content (Join-Path $f.Claude 'linked\SKILL.md') 'linked'
+        New-Item -ItemType Junction -Path (Join-Path $f.Agents 'linked') -Target (Join-Path $f.Claude 'linked') | Out-Null
+        try {
+            Sync-DevToolSkills -AgentsSkillsDir $f.Agents -ClaudeSkillsDir $f.Claude 6>$null
+            (Get-Item (Join-Path $f.Agents 'linked')).LinkType -eq $null -and
+            (Get-Content (Join-Path $f.Claude 'linked\SKILL.md')) -ceq 'linked'
+        }
+        finally {
+            $backup = Get-ChildItem -LiteralPath (Split-Path $f.Agents) -Directory -Filter 'agents-skills-backup-*'
+            if ($backup) { [IO.Directory]::Delete((Join-Path $backup.FullName 'linked')) }
+            if ((Get-Item $f.Claude).LinkType) { [IO.Directory]::Delete($f.Claude) }
+        }
     }
-    Remove-Item Function:\New-Item
+    Test-Case 'Sync skills: rejects unrelated links before changing anything' {
+        $f = New-SkillsFixture
+        $other = New-Scratch
+        New-Item -ItemType Junction -Path $f.Claude -Target $other | Out-Null
+        try {
+            $message = $null
+            try { Sync-DevToolSkills -AgentsSkillsDir $f.Agents -ClaudeSkillsDir $f.Claude } catch { $message = $_.Exception.Message }
+            $message -like '*points elsewhere*' -and (Get-Item $f.Claude).Target -eq $other -and
+            (Get-Content (Join-Path $f.Agents 'alpha\SKILL.md')) -ceq 'skill alpha'
+        }
+        finally { [IO.Directory]::Delete($f.Claude) }
+    }
+    Test-Case 'Sync skills: refuses external skill links without moving either directory' {
+        $f = New-SkillsFixture
+        $other = New-Scratch
+        New-Item -ItemType Directory -Path $f.Claude | Out-Null
+        New-Item -ItemType Junction -Path (Join-Path $f.Claude 'external') -Target $other | Out-Null
+        try {
+            $message = $null
+            try { Sync-DevToolSkills -AgentsSkillsDir $f.Agents -ClaudeSkillsDir $f.Claude } catch { $message = $_.Exception.Message }
+            $message -like '*Resolve the linked skill*' -and
+            -not (Get-Item $f.Claude).LinkType -and
+            (Get-Content (Join-Path $f.Agents 'alpha\SKILL.md')) -ceq 'skill alpha'
+        }
+        finally { [IO.Directory]::Delete((Join-Path $f.Claude 'external')) }
+    }
+    Test-Case 'Sync skills: rolls every move back when directory linking fails' {
+        $f = New-SkillsFixture
+        New-Item -ItemType Directory -Path (Join-Path $f.Claude 'beta') -Force | Out-Null
+        Set-Content (Join-Path $f.Claude 'beta\SKILL.md') 'beta'
+        function New-Item {
+            [CmdletBinding()]
+            param($Path, $ItemType, $Target, [switch]$Force)
+            if ($ItemType -eq 'Junction') { throw 'link creation failed' }
+            Microsoft.PowerShell.Management\New-Item @PSBoundParameters
+        }
+        try {
+            $message = $null
+            try { Sync-DevToolSkills -AgentsSkillsDir $f.Agents -ClaudeSkillsDir $f.Claude } catch { $message = $_.Exception.Message }
+            $message -eq 'link creation failed' -and
+            (Get-Content (Join-Path $f.Agents 'alpha\SKILL.md')) -ceq 'skill alpha' -and
+            (Get-Content (Join-Path $f.Claude 'beta\SKILL.md')) -ceq 'beta' -and
+            -not (Test-Path (Join-Path $f.Agents 'beta'))
+        }
+        finally { Remove-Item Function:\New-Item }
+    }
 
     # =====================================================================================
     # Disable-CodexStatusline

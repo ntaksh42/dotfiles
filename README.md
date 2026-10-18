@@ -90,8 +90,19 @@ ccstatusline はTUI上での編集で設定ファイル自身を書き換える�
 `-Force` を付けても省略されません）。上書き確認も含めてすべての確認に「はい」と
 答える場合は `Install-DevTools -Yes` を使います（差分表示とバックアップは行われます）。
 
-`Install-DevTools` は `~/.agents/skills/` にだけあるスキルを `~/.claude/skills/` へ移し、
-元の場所にシンボリックリンクを作ります。同名の既存スキルと `SKILL.md` のないディレクトリは変更しません。
+スキルの実体は `~/.agents/skills/` に置き、Claude Code と Codex で共有します。
+`Install-DevTools` は既存の Claude スキルをそこへ移し、`~/.claude/skills` から
+共通ディレクトリへのジャンクションを作ります（管理者権限・開発者モードは不要）。
+同名のスキルは Claude 版を採用し、元の Codex 版は `~/.agents/skills-backup-<ID>/`
+に退避します。従来の Codex 側から Claude 側への個別リンクも移行できます。
+無関係な場所へのリンクがある場合は、変更前にエラーにして手動解決を求めます。
+
+別環境でスキルの共通化だけを行う場合は、このリポジトリで次を実行します。
+再実行しても移行済みの構成は変更しません。
+
+```powershell
+pwsh -NoProfile -File tools/Sync-DevToolSkills.ps1
+```
 
 配置後は Claude Code を再起動すると、モデル・コンテキスト使用率・git ブランチ・
 セッション使用量などの構成が反映されます。

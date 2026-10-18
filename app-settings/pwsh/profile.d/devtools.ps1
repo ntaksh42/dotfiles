@@ -194,23 +194,79 @@ function Sync-DevToolSkills {
         [string]$ClaudeSkillsDir = (Join-Path $env:USERPROFILE '.claude\skills')
     )
 
-    if (-not (Test-Path -LiteralPath $AgentsSkillsDir -PathType Container)) { return }
-    foreach ($skill in (Get-ChildItem -LiteralPath $AgentsSkillsDir -Directory -Force)) {
-        if ($skill.LinkType -or -not (Test-Path -LiteralPath (Join-Path $skill.FullName 'SKILL.md') -PathType Leaf)) { continue }
-        $destination = Join-Path $ClaudeSkillsDir $skill.Name
-        if (Get-Item -LiteralPath $destination -Force -ErrorAction SilentlyContinue) { continue }
+    $ErrorActionPreference = 'Stop'
+    $AgentsSkillsDir = [IO.Path]::GetFullPath($AgentsSkillsDir).TrimEnd('\', '/')
+    $ClaudeSkillsDir = [IO.Path]::GetFullPath($ClaudeSkillsDir).TrimEnd('\', '/')
+    if ($AgentsSkillsDir -eq $ClaudeSkillsDir -or
+        $AgentsSkillsDir.StartsWith("$ClaudeSkillsDir\", [StringComparison]::OrdinalIgnoreCase) -or
+        $ClaudeSkillsDir.StartsWith("$AgentsSkillsDir\", [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Skills directories must be separate, non-nested paths.'
+    }
+    $agents = Get-Item -LiteralPath $AgentsSkillsDir -Force -ErrorAction SilentlyContinue
+    $claude = Get-Item -LiteralPath $ClaudeSkillsDir -Force -ErrorAction SilentlyContinue
+    if ($claude.LinkType) {
+        if ([IO.Path]::GetFullPath($claude.Target) -eq $AgentsSkillsDir) { return }
+        throw "Skills directory points elsewhere: $ClaudeSkillsDir"
+    }
+    if (-not $agents -and -not $claude) { return }
+    if (($agents -and (-not $agents.PSIsContainer -or $agents.LinkType)) -or
+        ($claude -and -not $claude.PSIsContainer)) {
+        throw 'Skills source paths must be ordinary directories.'
+    }
 
-        New-Item -ItemType Directory -Path $ClaudeSkillsDir -Force | Out-Null
-        Move-Item -LiteralPath $skill.FullName -Destination $destination -ErrorAction Stop
-        try {
-            New-Item -ItemType SymbolicLink -Path $skill.FullName -Target $destination -ErrorAction Stop | Out-Null
-            Write-Host "Linked skill: $($skill.Name)" -ForegroundColor Gray
-        }
-        catch {
-            Move-Item -LiteralPath $destination -Destination $skill.FullName -ErrorAction Stop
-            throw
+    if ($claude) {
+        foreach ($entry in Get-ChildItem -LiteralPath $ClaudeSkillsDir -Force) {
+            if ($entry.LinkType) { throw "Resolve the linked skill before migration: $($entry.FullName)" }
         }
     }
+
+    # Reject unrelated links before moving anything. Old links into Claude are
+    # superseded by the real Claude directories during migration.
+    if ($agents) {
+        foreach ($entry in Get-ChildItem -LiteralPath $AgentsSkillsDir -Force) {
+            if ($entry.LinkType) {
+                $target = [IO.Path]::GetFullPath($entry.Target)
+                if ($target.StartsWith('\\?\')) { $target = $target.Substring(4) }
+                if ($target -ne (Join-Path $ClaudeSkillsDir $entry.Name) -or
+                    -not (Test-Path -LiteralPath $target -PathType Container)) {
+                    throw "Resolve the linked skill before migration: $($entry.FullName)"
+                }
+            }
+        }
+    }
+
+    $backup = "$AgentsSkillsDir-backup-$([guid]::NewGuid().ToString('N'))"
+    $moves = [Collections.Generic.List[object]]::new()
+    try {
+        New-Item -ItemType Directory -Path (Split-Path -Parent $AgentsSkillsDir) -Force | Out-Null
+        if ($claude) {
+            if ($agents) {
+                Move-Item -LiteralPath $AgentsSkillsDir -Destination $backup
+                $moves.Add(@($AgentsSkillsDir, $backup))
+            }
+            Move-Item -LiteralPath $ClaudeSkillsDir -Destination $AgentsSkillsDir
+            $moves.Add(@($ClaudeSkillsDir, $AgentsSkillsDir))
+            if ($agents) {
+                foreach ($entry in Get-ChildItem -LiteralPath $backup -Force) {
+                    $destination = Join-Path $AgentsSkillsDir $entry.Name
+                    if ($entry.LinkType -or (Get-Item -LiteralPath $destination -Force -ErrorAction SilentlyContinue)) { continue }
+                    Move-Item -LiteralPath $entry.FullName -Destination $destination
+                    $moves.Add(@($entry.FullName, $destination))
+                }
+            }
+        }
+        New-Item -ItemType Directory -Path (Split-Path -Parent $ClaudeSkillsDir) -Force | Out-Null
+        # Junctions work on Windows without Developer Mode or administrator rights.
+        New-Item -ItemType Junction -Path $ClaudeSkillsDir -Target $AgentsSkillsDir | Out-Null
+    }
+    catch {
+        for ($i = $moves.Count - 1; $i -ge 0; $i--) {
+            Move-Item -LiteralPath $moves[$i][1] -Destination $moves[$i][0]
+        }
+        throw
+    }
+    if (Test-Path -LiteralPath $backup) { Write-Host "Previous Codex skills: $backup" -ForegroundColor Gray }
+    Write-Host "Linked skills: $ClaudeSkillsDir -> $AgentsSkillsDir" -ForegroundColor Gray
 }
 
 # Codex statusline は一時的に無効化中。導入済みの環境ではラッパーを退避する
