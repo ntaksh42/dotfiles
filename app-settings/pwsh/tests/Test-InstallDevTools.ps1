@@ -75,6 +75,9 @@ if ($h.Throw) { throw $h.Throw }
         if ($args[0] -eq 'plugin' -and $args[1] -eq 'marketplace' -and $args[2] -eq 'list') {
             return (ConvertTo-Json -InputObject @($script:marketplaces | ForEach-Object { @{ name = $_ } }) -Compress)
         }
+        if ($args[0] -eq 'plugin' -and $args[1] -eq 'list') {
+            return (ConvertTo-Json -InputObject @($script:pluginList | ForEach-Object { @{ id = $_; enabled = $true } }) -Compress)
+        }
         if ($args[2] -eq 'add' -and $global:LASTEXITCODE -eq 0) { $script:marketplaces += $script:marketplaceNameFor[$args[3]] }
     }
     function refreshenv { $script:refreshCount++; Add-Event 'refreshenv' }
@@ -157,6 +160,7 @@ if ($h.Throw) { throw $h.Throw }
         $script:answers = [System.Collections.Generic.Queue[string]]::new()
         $script:failIds = @{}
         $script:marketplaces = @()
+        $script:pluginList = @()
         $script:marketplaceNameFor = @{ 'owner/repo' = 'mods' }   # the name "marketplace add <source>" registers
         $script:modules = @()
         $script:running = @()
@@ -513,6 +517,15 @@ if ($h.Throw) { throw $h.Throw }
         $script:DevTools = @((& $plugin 'p1'))
         Invoke-Install -Yes
         ($script:claudeCalls -join '|') -ceq 'claude plugin marketplace list --json|claude plugin install p1@mods'
+    }
+    Test-Case 'claude-plugin: Replaces are uninstalled, and an installed plugin is updated then enabled' {
+        Reset-Fake
+        Set-Present 'claude'
+        $script:pluginList = @('p1@mods', 'old1@mods', 'old2@mods')
+        $script:DevTools = @((New-Tool 'p1' 'claude-plugin' @{ Id = 'p1@mods'; Marketplace = 'mods'; MarketplaceSource = 'owner/repo'; RequiredCommand = 'claude'; Replaces = @('old1@mods', 'old2@mods', 'absent@mods') }))
+        Invoke-Install -Yes
+        ($script:claudeCalls -join '|') -ceq 'claude plugin list --json|claude plugin uninstall old1@mods|claude plugin uninstall old2@mods|claude plugin marketplace update mods|claude plugin update p1@mods|claude plugin enable p1@mods' -and
+        (Get-Row 'p1').Result -ceq 'OK'
     }
     Test-Case 'claude-plugin: a marketplace with a different name is not mistaken for the wanted one' {
         Reset-Fake

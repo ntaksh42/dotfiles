@@ -54,7 +54,7 @@ try {
         'psmodule'      = 'Id'
         'script'        = 'Id', 'Path', 'Args', 'RebootRequiredExitCode', 'RequiredCommand', 'Repo', 'VersionSource', 'InstallOnly', 'RemoteFiles', 'AppxName'
         'remote-config' = 'RepoPath', 'Dest', 'StripCommentLines'
-        'claude-plugin' = 'Id', 'Marketplace', 'MarketplaceSource', 'RequiredCommand'
+        'claude-plugin' = 'Id', 'Marketplace', 'MarketplaceSource', 'RequiredCommand', 'Replaces'
     }
     $tools = @($origCatalog)
     function Get-ToolsByBackend($Backend) { @($tools | Where-Object { $_.Backend -eq $Backend }) }
@@ -709,6 +709,18 @@ try {
         Reset-Fakes; $script:claudeCalls = @(); Set-CmdAvailable -Present claude
         $script:claudeOut = '[{"id":"other@m"},{"id":"ado-link-bar@dotfiles-mods","version":"1"}]'
         (Test-ToolInstalled $pluginTool) -eq $true -and ($script:claudeCalls[0] -join ' ') -ceq 'plugin list --json'
+    }
+    Test-Case 'claude-plugin: not installed while a plugin named in Replaces is still installed' {
+        Reset-Fakes; $script:claudeCalls = @(); Set-CmdAvailable -Present claude
+        $script:claudeOut = '[{"id":"ado-link-bar@dotfiles-mods","enabled":true},{"id":"old@dotfiles-mods","enabled":true}]'
+        $tool = @{ Backend = 'claude-plugin'; Id = 'ado-link-bar@dotfiles-mods'; Replaces = @('old@dotfiles-mods') }
+        (Test-ToolInstalled $tool) -eq $false
+    }
+    Test-Case 'claude-plugin: installed when no plugin named in Replaces is installed' {
+        Reset-Fakes; $script:claudeCalls = @(); Set-CmdAvailable -Present claude
+        $script:claudeOut = '[{"id":"ado-link-bar@dotfiles-mods","enabled":true}]'
+        $tool = @{ Backend = 'claude-plugin'; Id = 'ado-link-bar@dotfiles-mods'; Replaces = @('old@dotfiles-mods') }
+        (Test-ToolInstalled $tool) -eq $true
     }
     Test-Case 'claude-plugin: installed when the list contains exactly one plugin (single-element JSON array)' {
         Reset-Fakes; Set-CmdAvailable -Present claude

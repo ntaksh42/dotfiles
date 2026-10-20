@@ -1,36 +1,13 @@
 {
   "name": "dotfiles-mods",
-  "owner": { "name": "ntaksh42" },
+  "owner": {
+    "name": "ntaksh42"
+  },
   "plugins": [
     {
       "name": "dotfiles",
       "source": "./claude/mods/dotfiles",
-      "description": "Skills (drawio-diagram, jp-deslop, review-before-action) and the PostCompact hook that reminds Claude to re-read CLAUDE.md / AGENTS.md."
-    },
-    {
-      "name": "auto-session-title",
-      "source": "./claude/mods/auto-session-title",
-      "description": "Names the session from the first prompt, then renames it from the conversation every 5 prompts."
-    },
-    {
-      "name": "ado-pr-status",
-      "source": "./claude/mods/ado-pr-status",
-      "description": "Fetches the current branch's Azure DevOps PR in the background for the ccstatusline widget."
-    },
-    {
-      "name": "ado-link-bar",
-      "source": "./claude/mods/ado-link-bar",
-      "description": "Links in the band above the prompt to the Azure DevOps pull requests and work items mentioned most recently in the conversation."
-    },
-    {
-      "name": "toast-notify",
-      "source": "./claude/mods/toast-notify",
-      "description": "Windows toast notifications when a long turn or command finishes, when Claude waits for permission, when a turn stalls, and when a turn fails. Inside an rdpmanager RDP session they go to the client instead."
-    },
-    {
-      "name": "cmdHistory",
-      "source": "./claude/mods/cmdHistory",
-      "description": "/cmdHistory lists PowerShell (PSReadLine) history in a pane and puts the picked command in the prompt as a ! shell command."
+      "description": "Skills (drawio-diagram, jp-deslop, review-before-action), the PostCompact hook, and the mods: auto-session-title, ado-pr-status, ado-link-bar, toast-notify, cmdHistory."
     }
   ]
 }

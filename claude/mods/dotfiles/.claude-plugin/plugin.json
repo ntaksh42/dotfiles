@@ -1,1 +1,56 @@
-{ "name": "dotfiles", "version": "0.2.2", "description": "Skills (drawio-diagram, jp-deslop, review-before-action) and the PostCompact hook that reminds Claude to re-read CLAUDE.md / AGENTS.md." }
+{
+  "name": "dotfiles",
+  "version": "0.4.0",
+  "description": "Skills (drawio-diagram, jp-deslop, review-before-action, cmd-history), the PostCompact hook, the mods (auto-session-title, ado-link-bar, toast-notify, cmdHistory), and settings-hook fallbacks (scripts/lite-hook.mjs, statusline/pr-line.mjs) for environments where mods are refused.",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "linkBarEnabled": {
+      "type": "boolean",
+      "title": "Link bar: enabled",
+      "description": "Show Azure DevOps links in the band above the prompt.",
+      "default": true
+    },
+    "linkBarOrganization": {
+      "type": "string",
+      "title": "Link bar: organization",
+      "description": "Azure DevOps organization used to link AB#1234 mentions (dev.azure.com/<organization>). Empty: AB# mentions are ignored.",
+      "default": ""
+    },
+    "linkBarPullRequests": {
+      "type": "number",
+      "title": "Link bar: pull requests",
+      "description": "How many of the most recently mentioned pull requests to link. 0 shows none.",
+      "default": 5
+    },
+    "linkBarWorkItems": {
+      "type": "number",
+      "title": "Link bar: work items",
+      "description": "How many of the most recently mentioned work items to link. 0 shows none.",
+      "default": 5
+    },
+    "toastEnabled": {
+      "type": "boolean",
+      "title": "Toast: enabled",
+      "description": "Show Windows toast notifications.",
+      "default": true
+    },
+    "toastMinTurnSeconds": {
+      "type": "number",
+      "title": "Toast: minimum turn seconds",
+      "description": "A finished turn shorter than this raises no toast. Failed turns always do.",
+      "default": 30
+    },
+    "toastMinCommandSeconds": {
+      "type": "number",
+      "title": "Toast: minimum command seconds",
+      "description": "A Bash or PowerShell command that ran at least this long raises a toast when it finishes.",
+      "default": 60
+    },
+    "toastStallSeconds": {
+      "type": "number",
+      "title": "Toast: stall seconds",
+      "description": "A turn with no model output or tool call for this long raises a toast. 0 disables it.",
+      "default": 300
+    }
+  }
+}

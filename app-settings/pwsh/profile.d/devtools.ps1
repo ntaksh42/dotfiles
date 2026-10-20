@@ -143,6 +143,8 @@ function Test-ToolInstalled {
             if (-not (Test-Cmd claude)) { return $false }
             try { $plugins = claude plugin list --json | ConvertFrom-Json } catch { return $false }
             # インストール済みでも無効なら未導入扱いにし、Install-DevTools で有効化する。
+            # Replaces に挙げた旧 plugin が残っている間も未導入扱いにし、Install-DevTools で外す。
+            if ($Tool.Replaces -and ($plugins | Where-Object { $Tool.Replaces -contains $_.id })) { return $false }
             return [bool]($plugins | Where-Object { $_.id -eq $Tool.Id -and $_.enabled })
         }
         'remote-config' {
@@ -380,7 +382,18 @@ function Install-DevTools {
                 'psmodule' { Install-Module $t.Id -Scope CurrentUser -Force -AcceptLicense }
                 'claude-plugin' {
                     $plugins = claude plugin list --json | ConvertFrom-Json
+                    foreach ($old in $t.Replaces) {
+                        if ($plugins | Where-Object { $_.id -eq $old }) {
+                            claude plugin uninstall $old
+                            Assert-NativeCommandSucceeded "claude plugin uninstall $old"
+                        }
+                    }
                     if ($plugins | Where-Object { $_.id -eq $t.Id }) {
+                        # 統合などで中身が変わっていることがあるので、有効化の前に更新する。
+                        claude plugin marketplace update $t.Marketplace
+                        Assert-NativeCommandSucceeded "claude plugin marketplace update $($t.Marketplace)"
+                        claude plugin update $t.Id
+                        Assert-NativeCommandSucceeded "claude plugin update $($t.Id)"
                         claude plugin enable $t.Id
                         Assert-NativeCommandSucceeded "claude plugin enable $($t.Id)"
                         break

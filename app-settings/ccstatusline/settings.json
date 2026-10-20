@@ -73,7 +73,7 @@
       {
         "id": "1395f165-c444-4b51-9775-7de2a1ac14d1",
         "type": "custom-command",
-        "commandPath": "node \"E:/dotfiles/claude/mods/ado-pr-status/statusline/pr-line.mjs\"",
+        "commandPath": "node \"E:/dotfiles/claude/mods/dotfiles/statusline/pr-line.mjs\"",
         "preserveColors": true,
         "timeout": 1000,
         "color": "magenta"

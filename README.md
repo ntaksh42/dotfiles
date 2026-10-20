@@ -109,12 +109,16 @@ pwsh -NoProfile -File tools/Sync-DevToolSkills.ps1
 
 ## Claude Code Mods
 
-`Install-DevTools` は `claude/mods/` の Mod（`dotfiles`、`auto-session-title`、`toast-notify` など）も導入します。
-自作の skills と hooks は `dotfiles` plugin にまとめてあります（スキル名は `dotfiles:<name>`）。
+`Install-DevTools` は `claude/mods/dotfiles` plugin を導入します。自作の skills・hooks・Mod（`auto-session-title`、`ado-link-bar`、`toast-notify`、`cmdHistory`）はすべてこの 1 つの plugin にまとめてあります（スキル名は `dotfiles:<name>`）。
 `dotfiles-mods` マーケットプレイスが未登録なら GitHub の `ntaksh42/dotfiles` から登録し、
 その後 `claude plugin install` を実行します。`claude/install.ps1` がクローン先のパスで
 登録済みの場合は、そのマーケットプレイスをそのまま使います。GitHub から登録する場合は、
 Mod が `main` に取り込まれている必要があります。`claude` が PATH に無いとスキップされます。
+
+組織の管理設定（`allowManagedModsOnly` など）で Mod が拒否される環境では、同じ plugin の代替が働きます。
+トースト通知とセッション名は settings hook（`scripts/lite-hook.mjs`）、PR 表示は ccstatusline の
+`statusline/pr-line.mjs`、`/cmdHistory` は `/dotfiles:cmd-history` スキルです。代替では停滞検知、
+モデルによるセッション名の要約、リンクバー（ado-link-bar）は使えません。Node 22.18 以上が必要です。
 
 ## Codex ステータスライン
 
