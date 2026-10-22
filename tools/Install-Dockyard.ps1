@@ -17,7 +17,9 @@ if (-not $msixAsset -or -not $cerAsset) { throw "Dockyard $($release.tag_name) h
 $dotnetRoot = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq 'Arm64' ?
     "$env:ProgramFiles\dotnet\x64" : "$env:ProgramFiles\dotnet"
 if (-not (Get-ChildItem -Path "$dotnetRoot\shared\Microsoft.WindowsDesktop.App\10.*" -Directory -ErrorAction Ignore)) {
-    winget install --id Microsoft.DotNet.DesktopRuntime.10 --exact --architecture x64 --source winget --accept-package-agreements --accept-source-agreements
+    # 同じ ID の ARM64 版が入っていると winget は導入済みとみなし、更新を探すだけで終わる (0x8A15002B)。
+    # --force で x64 版を並べて入れさせる。
+    winget install --id Microsoft.DotNet.DesktopRuntime.10 --exact --architecture x64 --force --source winget --accept-package-agreements --accept-source-agreements
     if ($LASTEXITCODE -ne 0) { throw "winget install Microsoft.DotNet.DesktopRuntime.10 failed with exit code $LASTEXITCODE" }
 }
 
