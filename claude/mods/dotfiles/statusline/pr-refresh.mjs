@@ -33,7 +33,7 @@ const azBase = async () => {
   if (process.platform !== 'win32') return ['az']
   try {
     const cmd = (await run('where', ['az.cmd'])).stdout.split(/\r?\n/)[0]?.trim() ?? ''
-    const python = cmd.replace(/[\/][^\/]+[\/][^\/]+$/, '\python.exe')
+    const python = cmd.replace(/[\\/][^\\/]+[\\/][^\\/]+$/, '\\python.exe')
     if (cmd !== '' && existsSync(python)) return [python, '-X', 'utf8', '-IBm', 'azure.cli']
   } catch {
     // az.cmd が見つからない

@@ -1,15 +1,19 @@
 // mod が使えない環境（組織の allowManagedModsOnly など）向けの代替。plugin の hooks/hooks.json から
 // settings hook として呼ばれ、toast-notify と auto-session-title の主な機能を肩代わりする。
 // mod が動いているセッションでは、mod が DOTFILES_MOD_TOAST / DOTFILES_MOD_TITLE を設定するので何もしない。
-// 使い方: node lite-hook.mjs <prompt|stop|stop-failure|notification|post-tool>（標準入力は hook の JSON）
+// 使い方: node lite-hook.mjs <prompt|stop|stop-failure|notification|post-tool|post-tool-failure>（標準入力は hook の JSON）
 import { spawn } from 'node:child_process'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const MIN_TURN_MS = 30_000
-const MIN_COMMAND_MS = 60_000
+// plugin.json の userConfig。hook には CLAUDE_PLUGIN_OPTION_<KEY>（KEY は大文字）で渡る
+const option = (key, fallback) => process.env[`CLAUDE_PLUGIN_OPTION_${key.toUpperCase()}`] ?? fallback
+const isEnabled = !['false', '0'].includes(String(option('toastEnabled', 'true')).toLowerCase())
+const seconds = (key, fallback) => Math.max(0, Number(option(key, fallback)) || 0) * 1000
+const MIN_TURN_MS = seconds('toastMinTurnSeconds', 30)
+const MIN_COMMAND_MS = seconds('toastMinCommandSeconds', 60)
 const MAX_BODY = 200
 const TITLE_MAX = 40
 // Windows PowerShell 5.1 の AppUserModelID（mod 側と同じ）
@@ -89,12 +93,17 @@ const handlers = {
       toast(input, `コマンド完了 (${formatDuration(input.duration_ms)})`, firstLine(input.tool_input?.command))
     }
   },
+  'post-tool-failure'(input) {
+    if (Number(input.duration_ms) >= MIN_COMMAND_MS) {
+      toast(input, `コマンド失敗 (${formatDuration(input.duration_ms)})`, firstLine(input.tool_input?.command), 'warn')
+    }
+  },
 }
 
 const mode = process.argv[2] ?? ''
 const isToastMode = mode !== 'prompt'
 // mod が動いている間は mod に任せる。prompt はタイトルと所要時間の記録を別々に判定する
-if (handlers[mode] && !(isToastMode && process.env.DOTFILES_MOD_TOAST)) {
+if (handlers[mode] && !(isToastMode && (process.env.DOTFILES_MOD_TOAST || !isEnabled))) {
   let raw = ''
   process.stdin.setEncoding('utf8')
   process.stdin.on('data', chunk => (raw += chunk))
