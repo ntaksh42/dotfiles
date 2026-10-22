@@ -121,6 +121,27 @@ function Test-DevToolRemoteFilesUpToDate {
     return $upToDate
 }
 
+# 導入済み plugin の版がマーケットプレイスの plugin.json と同じか確認する。読めなければ $null。
+# マーケットプレイスの手元の写しを先に更新してから比べる（GitHub 由来の写しは古いことがある）。
+function Test-DevToolPluginUpToDate {
+    param([Parameter(Mandatory)]$Tool)
+    try {
+        claude plugin marketplace update $Tool.Marketplace | Out-Null
+        if ($LASTEXITCODE -ne 0) { return $null }
+        $installed = (claude plugin list --json | ConvertFrom-Json | Where-Object { $_.id -eq $Tool.Id }).version
+        $location = (claude plugin marketplace list --json | ConvertFrom-Json | Where-Object { $_.name -eq $Tool.Marketplace }).installLocation
+        if (-not $installed -or -not $location) { return $null }
+        $name = ($Tool.Id -split '@')[0]
+        $manifest = Read-DevToolLocalText (Join-Path $location '.claude-plugin\marketplace.json') | ConvertFrom-Json
+        $source = ($manifest.plugins | Where-Object { $_.name -eq $name }).source
+        if ($source -isnot [string]) { return $null }
+        $latest = (Read-DevToolLocalText (Join-Path (Join-Path $location $source) '.claude-plugin\plugin.json') | ConvertFrom-Json).version
+        if (-not $latest) { return $null }
+        return (Test-DevToolVersionCurrent $installed $latest)
+    }
+    catch { return $null }
+}
+
 # Detect whether a catalog tool is installed
 function Test-ToolInstalled {
     param([Parameter(Mandatory)]$Tool)
@@ -301,7 +322,14 @@ function Install-DevTools {
     $toInstall = @($script:DevTools | Where-Object { -not $installed[$_.Name] })
     $latestVersions = @{}
     $toUpdate = @(foreach ($tool in $script:DevTools) {
-        if ($tool.Backend -ne 'script' -or -not $installed[$tool.Name] -or $tool.InstallOnly) { continue }
+        if (-not $installed[$tool.Name] -or $tool.InstallOnly) { continue }
+        if ($tool.Backend -eq 'claude-plugin') {
+            $upToDate = Test-DevToolPluginUpToDate $tool
+            if ($null -eq $upToDate) { Write-Warning "$($tool.Name): plugin version could not be checked; skipping update." }
+            elseif (-not $upToDate) { $tool }
+            continue
+        }
+        if ($tool.Backend -ne 'script') { continue }
         if ($tool.Repo) {
             $latest = Get-DevToolLatestVersion $tool
             if (-not $latest) {

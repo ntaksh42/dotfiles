@@ -621,6 +621,52 @@ try {
         $t = New-RemoteFilesFixture @{ 'a.ps1' = 'old'; 'b.ps1' = 'B' } @{ 'a.ps1' = 'new' }
         $null -eq (Test-DevToolRemoteFilesUpToDate $t)
     }
+
+    # =====================================================================================
+    # Test-DevToolPluginUpToDate
+    # =====================================================================================
+    # claude is faked: "plugin list" reports $script:pluginVersion, "marketplace list" points
+    # at a scratch marketplace whose plugin.json holds $Latest.
+    function claude {
+        $script:claudeCalls += ($args -join ' ')
+        $global:LASTEXITCODE = if ($args[2] -eq 'update') { $script:mpUpdateExit } else { 0 }
+        if ($args[1] -eq 'list') { return (ConvertTo-Json -Compress -InputObject @(@{ id = 'p@mp'; version = $script:pluginVersion; enabled = $true })) }
+        if ($args[2] -eq 'list') { return (ConvertTo-Json -Compress -InputObject @(@{ name = 'mp'; installLocation = $script:mpDir })) }
+    }
+    function New-PluginFixture {
+        param([string]$Installed, [AllowNull()][string]$Latest)
+        $script:claudeCalls = @(); $script:mpUpdateExit = 0; $script:pluginVersion = $Installed
+        $script:mpDir = New-Scratch
+        New-Item -ItemType Directory -Path (Join-Path $script:mpDir '.claude-plugin'), (Join-Path $script:mpDir 'plugins\p\.claude-plugin') | Out-Null
+        Set-Content -LiteralPath (Join-Path $script:mpDir '.claude-plugin\marketplace.json') -Value '{"name":"mp","plugins":[{"name":"p","source":"./plugins/p"}]}'
+        if ($null -ne $Latest) {
+            Set-Content -LiteralPath (Join-Path $script:mpDir 'plugins\p\.claude-plugin\plugin.json') -Value (@{ name = 'p'; version = $Latest } | ConvertTo-Json)
+        }
+        @{ Name = 'p'; Id = 'p@mp'; Marketplace = 'mp' }
+    }
+    Test-Case 'Plugin up to date: true when the installed version equals plugin.json' {
+        $t = New-PluginFixture '0.6.0' '0.6.0'
+        (Test-DevToolPluginUpToDate $t) -eq $true
+    }
+    Test-Case 'Plugin up to date: false when plugin.json is newer' {
+        $t = New-PluginFixture '0.2.0' '0.6.0'
+        (Test-DevToolPluginUpToDate $t) -eq $false
+    }
+    Test-Case 'Plugin up to date: refreshes the marketplace before comparing' {
+        $t = New-PluginFixture '0.6.0' '0.6.0'
+        $null = Test-DevToolPluginUpToDate $t
+        $script:claudeCalls[0] -ceq 'plugin marketplace update mp'
+    }
+    Test-Case 'Plugin up to date: null when the marketplace refresh fails' {
+        $t = New-PluginFixture '0.2.0' '0.6.0'
+        $script:mpUpdateExit = 1
+        $null -eq (Test-DevToolPluginUpToDate $t)
+    }
+    Test-Case 'Plugin up to date: null when plugin.json is missing' {
+        $t = New-PluginFixture '0.2.0' $null
+        $null -eq (Test-DevToolPluginUpToDate $t)
+    }
+    Remove-Item function:claude
     Test-Case 'Remote files up to date: true when the tool lists no remote files' {
         Reset-Fakes
         (Test-DevToolRemoteFilesUpToDate @{ Name = 'n'; Path = (Join-Path (New-Scratch) 'm.ps1'); RemoteFiles = @() }) -eq $true -and

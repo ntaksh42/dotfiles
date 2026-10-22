@@ -131,6 +131,7 @@ if ($h.Throw) { throw $h.Throw }
     function Get-DevToolLatestVersion { param($Tool) $script:latestCalls.Add($Tool.Name); $script:latest[$Tool.Name] }
     function Get-DevToolInstalledVersion { param($Tool) $script:installedVersion[$Tool.Name] }
     function Test-DevToolRemoteFilesUpToDate { param($Tool) $script:remoteUpToDate[$Tool.Name] }
+    function Test-DevToolPluginUpToDate { param($Tool) $script:pluginUpToDate[$Tool.Name] }
     function Get-DotfilesRemoteConfig {
         param($Tool)
         if (-not $script:remoteContent.ContainsKey($Tool.RepoPath)) { throw "fetch failed: $($Tool.RepoPath)" }
@@ -169,6 +170,7 @@ if ($h.Throw) { throw $h.Throw }
         $script:latest = @{}
         $script:installedVersion = @{}
         $script:remoteUpToDate = @{}
+        $script:pluginUpToDate = @{}
         $script:remoteContent = @{}
         $script:refreshCount = 0
         $script:syncCount = 0
@@ -568,13 +570,33 @@ if ($h.Throw) { throw $h.Throw }
         Invoke-Install -Yes
         $script:claudeCalls.Count -eq 0 -and $null -eq (Get-Row 'p1') -and $script:log.Contains("p1: 'claude' not found; skipping.")
     }
-    Test-Case 'claude-plugin: an installed plugin is skipped without any claude call' {
+    Test-Case 'claude-plugin: an installed, up-to-date plugin is skipped without any claude call' {
+        Reset-Fake
+        Set-Present 'claude'
+        $script:DevTools = @((& $plugin 'p1'))
+        $script:installedNames = @('p1')
+        $script:pluginUpToDate['p1'] = $true
+        Invoke-Install -Yes
+        $script:claudeCalls.Count -eq 0
+    }
+    Test-Case 'claude-plugin: an installed plugin older than the marketplace is updated' {
+        Reset-Fake
+        Set-Present 'claude'
+        $script:pluginList = @('p1@mods')
+        $script:DevTools = @((& $plugin 'p1'))
+        $script:installedNames = @('p1')
+        $script:pluginUpToDate['p1'] = $false
+        Invoke-Install -Yes
+        ($script:claudeCalls -join '|') -ceq 'claude plugin list --json|claude plugin marketplace update mods|claude plugin update p1@mods|claude plugin enable p1@mods' -and
+        (Get-Row 'p1').Action -ceq 'Updating' -and (Get-Row 'p1').Result -ceq 'OK'
+    }
+    Test-Case 'claude-plugin: an installed plugin whose version cannot be checked warns and is left alone' {
         Reset-Fake
         Set-Present 'claude'
         $script:DevTools = @((& $plugin 'p1'))
         $script:installedNames = @('p1')
         Invoke-Install -Yes
-        $script:claudeCalls.Count -eq 0
+        $script:claudeCalls.Count -eq 0 -and $script:log.Contains('p1: plugin version could not be checked; skipping update.')
     }
 
     # ======================================================================================
