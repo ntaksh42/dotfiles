@@ -7,7 +7,7 @@
     {
       "name": "dotfiles",
       "source": "./claude/mods/dotfiles",
-      "description": "Skills (drawio-diagram, jp-deslop, review-before-action) and the mods: auto-session-title, ado-pr-status, ado-link-bar, toast-notify, cmdHistory."
+      "description": "Skills (drawio-diagram, jp-deslop, approval-gate) and the mods: auto-session-title, ado-pr-status, ado-link-bar, toast-notify, cmdHistory."
     }
   ]
 }

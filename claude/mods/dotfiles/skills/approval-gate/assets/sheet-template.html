@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- review-sheet-format: v4 -->
+<!--
+  review sheet template (標準モード) — シートの規約 v4。crit preview で開き、Crit のインラインコメントで答えてもらう。
+  使い方: ./review/<topic>-01.html としてコピーし、TODO を埋める。
+  - 骨格は固定: 結論 → 全体図 SVG (赤①②③) → 短い説明 (現物スクショ/モック) → 論点ごとの絵 (#p1, #p2, …) → 対比表 → 畳み付録
+  - 問いや選択肢の一覧はシートに書かない。問いは Claude が [判断] コメントとして #p1, #p2, … にピン留めする
+  - 相対 URL 禁止 (画像は https 絶対 URL か data URI)。外部 JS ライブラリ禁止。Google Fonts は絶対 URL なので合法
+  - 色は 7 トークンのみ。赤 = 提案・訂正・論点の専任 / 青 = 導線 (リンク・ボタン・summary) の専任 / 残りは無彩色
+-->
+<title><!-- TODO: タイトル (主張) --> — レビュー</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#212529;--muted:#64707C;--line:#DEE2E6;--paper:#FFFFFF;--paper-dim:#F6F8FA;--accent:#2563EB;--red:#DC2626}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans JP','Hiragino Kaku Gothic ProN','Hiragino Sans',-apple-system,sans-serif;font-size:14.5px;line-height:1.9;margin:0;border-top:3px solid var(--red);padding:8px 16px 40px}
+main{max-width:760px;margin:0 auto}
+.kicker{font-family:'IBM Plex Mono',Menlo,monospace;font-size:12.5px;letter-spacing:.08em;color:var(--red);font-weight:600}
+h1{font-size:25px;line-height:1.45;margin:8px 0 12px}
+h2{font-size:19px;line-height:1.45;margin:30px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+p{margin:8px 0}
+a{color:var(--accent)}
+.concl{border:1px solid var(--line);border-left:3px solid var(--red);border-radius:10px;padding:14px 18px}
+.red{color:var(--red)}
+.m{color:var(--muted);font-size:12.5px;line-height:1.7}
+.mono{font-family:'IBM Plex Mono',Menlo,monospace;font-size:13.5px}
+.gl{font-size:12.5px;color:var(--muted);line-height:1.75;border-left:2px solid var(--line);padding-left:10px;margin:8px 0}
+.btn{display:inline-block;border:1px solid var(--accent);color:var(--accent);background:var(--paper);border-radius:8px;padding:4px 14px;font-size:13px;text-decoration:none;cursor:pointer;font-family:inherit;line-height:1.7}
+.btn:hover{background:var(--paper-dim)}
+figure{margin:14px 0 6px}
+figcaption{font-size:12.5px;color:var(--muted);line-height:1.6;padding-top:4px}
+svg{max-width:100%;height:auto;display:block}
+table{border-collapse:collapse;width:100%;font-size:13.5px;line-height:1.6;margin:8px 0}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{font-size:11.5px;letter-spacing:.06em;color:var(--muted);font-weight:500;white-space:nowrap;border-bottom:1.5px solid var(--ink)}
+td.n{font-family:'IBM Plex Mono',Menlo,monospace;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+details{border:1px solid var(--line);border-radius:10px;padding:10px 16px;margin:10px 0}
+summary{cursor:pointer;color:var(--accent);font-weight:500;font-size:13.5px}
+/* 論点 (#p1, #p2, …) — [判断] コメントのピン先。左の赤線と番号で場所を示す */
+.pt{border-left:3px solid var(--red);padding-left:14px;margin:18px 0}
+.pt .no{font-family:'IBM Plex Mono',Menlo,monospace;font-weight:600;color:var(--red);margin-right:6px}
+/* overlay 注記 (赤を画像の上に乗せる部品 — 座標は画像に対する %) */
+.shotwrap{position:relative;line-height:0;margin:8px 0 4px}
+.shotwrap img{width:100%;border:1px solid var(--line);border-radius:8px;display:block}
+.shotwrap .mark{position:absolute;transform:translate(-50%,-50%);width:26px;height:26px;border:2.5px solid var(--red);border-radius:50%;background:rgba(255,255,255,.78);color:var(--red);font:600 13px/21px 'IBM Plex Mono',Menlo,monospace;text-align:center}
+.shotwrap .lbl{position:absolute;transform:translateX(-50%);background:var(--red);color:#fff;font:700 11px/1.5 sans-serif;padding:2px 8px;border-radius:4px;white-space:nowrap}
+/* A/B 対比 (選択肢の対立軸を並べる部品) */
+.ab{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ab figure{margin:0}.ab figcaption{font-size:12.5px;color:var(--muted);line-height:1.6;padding-top:4px}
+@media (max-width:640px){.ab{grid-template-columns:1fr}}
+del{color:var(--muted)}
+footer{margin-top:28px;border-top:1px solid var(--line);padding-top:10px}
+@media print{summary{color:var(--ink)}details{border:none;padding:0}details[open] summary{display:none}}
+</style></head>
+<body><main>
+
+<div class="kicker">✎ REVIEW — <!-- TODO: YYYY-MM-DD --></div>
+<h1><!-- TODO: タイトル — 内容の要約でなく主張 (言い切り) --></h1>
+<div class="concl"><b>結論:</b> <!-- TODO: 3 文以内、1 文も短く。何をどこに、なぜ。ここで読むのをやめても判断に要る情報が揃う形 --></div>
+<div class="gl"><b>このシートで使う言葉</b>: <!-- TODO: 読者が知らない語だけ 1 行ずつ定義。無ければこの div ごと削除 --></div>
+
+<!-- TODO (任意): 動く論点 (操作感・頻度) があるときだけ。モックを ./review/mock/ に置き、絶対パスの file:// URL で。無ければ削除 -->
+<!-- <p><a class="btn" href="file:///ABS/PATH/review/mock/index.html" target="_blank">▶ モックを触って確認</a></p> -->
+
+<!-- 全体図: 論点 3 つ以上または h2 節 3 つ以上なら必須。インライン SVG で題材の全体像を描き、論点の場所に赤の ①②③ を打つ -->
+<figure>
+<!-- TODO: インライン SVG (viewBox 720 幅推奨)。図の中の 1 行目は主張型タイトル。赤 #DC2626 は提案・論点だけに使い、現状は無彩色 -->
+<svg viewBox="0 0 720 200" role="img" aria-label="TODO: 全体図の説明">
+  <style>
+    .bt{font:600 12px 'IBM Plex Sans JP',sans-serif;fill:#212529}
+    .bl{font:400 11px 'IBM Plex Sans JP',sans-serif;fill:#64707C}
+    .rd{font:600 11px 'IBM Plex Sans JP',sans-serif;fill:#DC2626}
+    .num{font:600 12px 'IBM Plex Mono',monospace;fill:#DC2626}
+    .box{fill:#F6F8FA;stroke:#DEE2E6;stroke-width:1}
+    .boxr{fill:#FFF5F5;stroke:#DC2626;stroke-width:1.4}
+  </style>
+  <text x="20" y="20" class="bt">TODO: 図の主張 (1 行目)</text>
+  <rect x="20" y="40" width="200" height="60" rx="6" class="box"/><text x="32" y="74" class="bl">現状の部品</text>
+  <rect x="260" y="40" width="200" height="60" rx="6" class="boxr"/><text x="272" y="74" class="rd">提案で変わる部品</text>
+  <circle cx="446" cy="52" r="11" fill="none" stroke="#DC2626" stroke-width="2"/><text x="442" y="56" class="num">1</text>
+</svg>
+<figcaption>図 1 — 何を見るか: <!-- TODO: 赤の ①②③ が論点 1〜3 の場所 --></figcaption>
+</figure>
+
+<h2><!-- TODO: 短い説明の見出し (主張型) --></h2>
+<p><!-- TODO: 1 段落 1 トピック・2〜4 文。提案する変更は <span class="red">赤の注記</span> で示し、詳細は畳みへ --></p>
+
+<!-- 現物スクショ / モック: 既存画面に加えるなら必ず現物再現。①②③ は画像の上に赤 overlay で乗せる (座標は画像に対する %)。
+     画像は https 絶対 URL か data URI (相対 URL 禁止)。ゼロからの構想なら .shotwrap ごと削除して図解だけでよい -->
+<div class="shotwrap">
+  <img src="data:image/png;base64,TODO" alt="TODO: 現行画面のスクショ">
+  <span class="mark" style="left:20%;top:30%">1</span>
+  <span class="lbl" style="left:20%;top:36%">TODO: ① の変更</span>
+</div>
+<p class="m">図 2 — <!-- TODO: 何を見るか --></p>
+
+<!-- 論点: 1 論点 = 1 つの .pt。id は p1, p2, … で、[判断] コメントの selector (#p1 …) と一致させる。
+     中身は選択肢 A / B の絵 (.ab) と 1〜2 文の説明だけ。問い文・選択肢の利点/代償・推奨はコメント側に書く -->
+<section class="pt" id="p1">
+  <h2><span class="no">①</span><!-- TODO: 論点の見出し (何の違いを見るか。問いの形にしない) --></h2>
+  <div class="ab">
+    <figure><!-- TODO: A の絵 (インライン SVG / data URI の img / DOM 再現) --><figcaption>A — <!-- TODO --></figcaption></figure>
+    <figure><!-- TODO: B の絵 --><figcaption>B — <!-- TODO --></figcaption></figure>
+  </div>
+</section>
+
+<!-- TODO: #p2, #p3 … (3±1。5 つ以上並べない) -->
+
+<!-- 案の対比: 2 案以上 × 2 観点以上は表 1 枚を標準にする。行 = 案、列 = 観点、セル 1〜2 文。無ければ削除 -->
+<table>
+<tr><th>案</th><th><!-- TODO: 観点 1 --></th><th><!-- TODO: 観点 2 --></th></tr>
+<tr><td>A. <!-- TODO: 案 --></td><td><!-- TODO: 1〜2 文 --></td><td><!-- TODO --></td></tr>
+<tr><td>B. <!-- TODO: 案 --></td><td><!-- TODO --></td><td><!-- TODO --></td></tr>
+</table>
+
+<!-- 畳み付録: 比較の詳細・落とした案・実測ログ。summary は中身と分量を予告する文言 (「詳細」「その他」は禁止)。核心の判断材料は畳まない -->
+<details><summary><!-- TODO: 例「検討して落とした 4 案と採点表 (表 1 枚)」 --></summary>
+<p class="m"><!-- TODO --></p>
+</details>
+
+<!-- TODO (2 枚目以降のみ): 前のシートで撤回した案を <del>取り消し線</del> で残す -->
+
+<footer class="m"><!-- TODO: このシートの出所 (何を見て書いたか) -->。①②③ の [判断] コメントに返信し、ほかに気になる箇所があれば Crit でコメントしてください。返信の無い判断は推奨で確定します。</footer>
+
+</main>
+</body>
+</html>
