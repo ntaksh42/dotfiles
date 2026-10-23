@@ -93,7 +93,7 @@ $script:ProfileHelp = [ordered]@{
         @{ Cmd = 'Update-DevTools'; Desc = 'winget/PS モジュールを更新' }
         @{ Cmd = 'Install-ExtraTools [-Name DevDeck,RdpManager] [-Yes]'; Desc = '一部の端末だけに入れる自作アプリを導入・更新（Install-DevTools には含まれない）' }
         @{ Cmd = 'Set-WindowsSettings [-Check]'; Desc = 'Windows 設定（レジストリ）を適用 (-Check で差分のみ)' }
-        @{ Cmd = 'Enable-SshServer'; Desc = '接続される側: OpenSSH Server を導入・自動起動・pwsh を既定シェルに (要管理者)' }
+        @{ Cmd = 'Enable-SshServer [-SetPrivate]'; Desc = '接続される側: OpenSSH Server を導入・自動起動・pwsh を既定シェルに、Domain/Private で port 22 を開放 (-SetPrivate で Public を Private に、要管理者)' }
         @{ Cmd = 'Add-SshHost <host> <user> [-Alias]'; Desc = '接続する側: 鍵を作って相手に登録し ~/.ssh/config に追記' }
         @{ Cmd = 'Invoke-SshAll <command> [-Path]'; Desc = '~/.ssh/hosts.txt の全ホストでコマンドを並列実行し、Host / ExitCode / Output を返す' }
     )

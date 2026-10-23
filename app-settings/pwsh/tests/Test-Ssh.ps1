@@ -20,6 +20,47 @@ try {
         try { Enable-SshServer; $false } catch { "$_" -like '*管理者*' }
     }
 
+    # Admin path with every system cmdlet faked; records changes in $script:calls, warnings in $script:warnings.
+    function Invoke-FakeEnableSshServer {
+        param([switch]$SetPrivate, [string]$RuleProfile = 'Any')
+        function Test-IsAdministrator { $true }
+        function Get-WindowsCapability { [pscustomobject]@{ Name = 'OpenSSH.Server~~~~0.0.1.0'; State = 'Installed' } }
+        function Set-Service {}
+        function Start-Service {}
+        function Get-Command {}
+        function Test-Path { $false }
+        function Get-NetFirewallRule { [pscustomobject]@{ Profile = $RuleProfile } }
+        function Enable-NetFirewallRule {}
+        function Set-NetFirewallRule { param($Name, $Profile) $script:calls += "rule=$($Profile -join ',')" }
+        function Get-NetFirewallProfile { [pscustomobject]@{ Name = 'Domain'; AllowLocalFirewallRules = 'False' } }
+        function Get-NetIPAddress {}
+        function Get-NetConnectionProfile {
+            [pscustomobject]@{ Name = 'Cafe'; InterfaceAlias = 'Wi-Fi'; InterfaceIndex = 5; NetworkCategory = 'Public' }
+            [pscustomobject]@{ Name = 'corp.example'; InterfaceAlias = 'Ethernet'; InterfaceIndex = 7; NetworkCategory = 'DomainAuthenticated' }
+        }
+        function Set-NetConnectionProfile { param($InterfaceIndex, $NetworkCategory) $script:calls += "$InterfaceIndex=$NetworkCategory" }
+        $script:calls = @()
+        $w = Enable-SshServer -SetPrivate:$SetPrivate 3>&1 6>$null | Where-Object { $_ -is [Management.Automation.WarningRecord] }
+        $script:warnings = $w.Message -join "`n"
+    }
+
+    Test-Case 'Enable-SshServer only warns about Public networks by default' {
+        Invoke-FakeEnableSshServer
+        $script:calls.Count -eq 0 -and $script:warnings -like "*'Cafe'*-SetPrivate*"
+    }
+    Test-Case 'Enable-SshServer -SetPrivate switches only Public networks to Private' {
+        Invoke-FakeEnableSshServer -SetPrivate
+        $script:calls.Count -eq 1 -and $script:calls[0] -eq '5=Private'
+    }
+    Test-Case 'Enable-SshServer adds Domain to an sshd rule that lacks it, keeping Public' {
+        Invoke-FakeEnableSshServer -RuleProfile 'Private, Public'
+        $script:calls -contains 'rule=Domain,Private,Public'
+    }
+    Test-Case 'Enable-SshServer warns when GPO ignores local firewall rules' {
+        Invoke-FakeEnableSshServer
+        $script:warnings -like '*ローカルのファイアウォール規則が無効*'
+    }
+
     # --- Add-SshHost with ssh / ssh-keygen faked -----------------------------------------
     $script:sshCalls = @()
     function ssh-keygen {
