@@ -34,8 +34,13 @@ async function azBase($: EngineInterface): Promise<string[]> {
   return (azArgv = isFound ? [python, '-X', 'utf8', '-IBm', 'azure.cli'] : ['cmd', '/d', '/c', 'az'])
 }
 
+// cmd reads & | < > ^ % " ( ) itself, so an org taken from a link must not carry them through cmd.
+const CMD_UNSAFE = /[&|<>^%"!()\r\n]/
+
 async function az($: EngineInterface, args: string[]) {
-  return $.process.run([...(await azBase($)), ...args], { timeoutMs: 30_000 })
+  const base = await azBase($)
+  if (base[0] === 'cmd' && args.some(a => CMD_UNSAFE.test(a))) throw new Error(`not passing ${args.join(' ')} through cmd`)
+  return $.process.run([...base, ...args], { timeoutMs: 30_000 })
 }
 
 // Looks up a work item's title and state; on failure the link keeps its bare #id.

@@ -74,8 +74,9 @@ notepad ~/.gitconfig.local
 
 ## ステータスライン設定
 
-`claude/settings.template.json` の `statusLine` は `npx -y ccstatusline@latest`
-を呼び出します。ccstatusline はレイアウト設定を
+`claude/settings.template.json` の `statusLine` は `npx -y ccstatusline@2.2.32`
+を呼び出します（npm 上の新版を無検証で実行しないよう版を固定しています。更新するときはこの版を書き換えます）。
+ccstatusline はレイアウト設定を
 `~/.config/ccstatusline/settings.json` から読み込みます。この設定は
 `app-settings/ccstatusline/settings.json` を管理元として `Install-DevTools`
 （remote-config バックエンド）が配置・更新します。
@@ -134,7 +135,8 @@ Mod が `main` に取り込まれている必要があります。`claude` が P
 
 ## Crit
 
-`Install-DevTools` は Crit 本体と Codex 連携もインストールします。インストール時に
+`Install-DevTools` は Crit 本体と Codex 連携もインストールします。取得した実行ファイルは
+リリースの `checksums.txt` と SHA256 を照合し、一致しなければ入れません。インストール時に
 `~/.crit.config.json` の既存項目を維持しつつ、社内利用向けの安全設定として
 ローカルホスト限定、更新確認の無効化、Share の無効化、`agent_cmd` の無効化を設定します。
 
@@ -216,5 +218,6 @@ JSON の自動読み込みには対応していないため、`app-settings/orca
 `Install-DevTools` は [Dockyard](https://github.com/ntaksh42/dockyard) の最新リリース（MSIX）も
 インストール・更新します（`tools/Install-Dockyard.ps1`）。ARM64 の PC でも x64 版を入れます。
 署名証明書が未信頼の場合は `Cert:\LocalMachine\TrustedPeople` へ登録するため UAC の確認が出ます。
+登録するのはスクリプトに書いた拇印と一致する証明書だけです（証明書を作り直したらスクリプトの拇印も更新します）。
 x64 版の .NET 10 Desktop Runtime が無ければ winget で入れます（ARM64 の PC では `dotnet\x64` に入ります）。
 

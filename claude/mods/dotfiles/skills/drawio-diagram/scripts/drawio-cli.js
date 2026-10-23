@@ -44105,7 +44105,7 @@ const embeddedServer = {
 	"command": {
 		"kind": "stdio",
 		"command": "npx",
-		"args": ["-y", "@drawio/mcp"]
+		"args": ["-y", "@drawio/mcp@1.6.3"]
 	},
 	"source": {
 		"kind": "local",
@@ -44226,7 +44226,7 @@ const embeddedMetadata = {
 			"command": {
 				"kind": "stdio",
 				"command": "npx",
-				"args": ["-y", "@drawio/mcp"]
+				"args": ["-y", "@drawio/mcp@1.6.3"]
 			}
 		}
 	},
@@ -44235,7 +44235,7 @@ const embeddedMetadata = {
 		"kind": "template"
 	},
 	"invocation": {
-		"serverRef": "{\"name\":\"drawio\",\"command\":{\"kind\":\"stdio\",\"command\":\"npx\",\"args\":[\"-y\",\"@drawio/mcp\"]},\"source\":{\"kind\":\"local\",\"path\":\"<adhoc>\"}}",
+		"serverRef": "{\"name\":\"drawio\",\"command\":{\"kind\":\"stdio\",\"command\":\"npx\",\"args\":[\"-y\",\"@drawio/mcp@1.6.3\"]},\"source\":{\"kind\":\"local\",\"path\":\"<adhoc>\"}}",
 		"configPath": "<adhoc>",
 		"runtime": "node",
 		"bundler": "rolldown",

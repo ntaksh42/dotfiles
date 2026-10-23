@@ -5,6 +5,8 @@ $ErrorActionPreference = 'Stop'
 
 # ARM64 の PC でも x64 版を入れる（エミュレーションで動く）。
 $runtime = 'x64'
+# Dockyard の署名証明書（CN=Dockyard Dev）の拇印。
+$expectedThumbprint = 'DA3BDF984785F9827AC97F771288E4F7429CC88E'
 
 $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/ntaksh42/dockyard/releases/latest' `
     -Headers @{ 'User-Agent' = 'dotfiles-install-devtools' }
@@ -31,7 +33,10 @@ try {
     Invoke-WebRequest -Uri $msixAsset.browser_download_url -OutFile $msixPath -UseBasicParsing
     Invoke-WebRequest -Uri $cerAsset.browser_download_url -OutFile $cerPath -UseBasicParsing
 
+    # リリースに置かれた証明書をそのまま信頼しないよう、既知の拇印と一致するものだけを入れる。
+    # 証明書を作り直したら（期限 2027-10-23）、ここを新しい拇印に書き換える。
     $thumbprint = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($cerPath).Thumbprint
+    if ($thumbprint -ne $expectedThumbprint) { throw "Dockyard.cer thumbprint $thumbprint does not match the expected $expectedThumbprint." }
     if (-not (Test-Path -LiteralPath "Cert:\LocalMachine\TrustedPeople\$thumbprint")) {
         $command = "Import-Certificate -FilePath '$cerPath' -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null"
         $proc = Start-Process -FilePath (Get-Process -Id $PID).Path -Verb RunAs -Wait -PassThru `

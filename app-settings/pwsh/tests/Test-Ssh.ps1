@@ -22,11 +22,12 @@ try {
 
     # Admin path with every system cmdlet faked; records changes in $script:calls, warnings in $script:warnings.
     function Invoke-FakeEnableSshServer {
-        param([switch]$SetPrivate, [string]$RuleProfile = 'Any')
+        param([switch]$SetPrivate, [switch]$DisablePasswordAuth, [string]$RuleProfile = 'Any')
         function Test-IsAdministrator { $true }
         function Get-WindowsCapability { [pscustomobject]@{ Name = 'OpenSSH.Server~~~~0.0.1.0'; State = 'Installed' } }
         function Set-Service {}
         function Start-Service {}
+        function Restart-Service { $script:calls += 'restart' }
         function Get-Command {}
         function Test-Path { $false }
         function Get-NetFirewallRule { [pscustomobject]@{ Profile = $RuleProfile } }
@@ -40,7 +41,7 @@ try {
         }
         function Set-NetConnectionProfile { param($InterfaceIndex, $NetworkCategory) $script:calls += "$InterfaceIndex=$NetworkCategory" }
         $script:calls = @()
-        $w = Enable-SshServer -SetPrivate:$SetPrivate 3>&1 6>$null | Where-Object { $_ -is [Management.Automation.WarningRecord] }
+        $w = Enable-SshServer -SetPrivate:$SetPrivate -DisablePasswordAuth:$DisablePasswordAuth 3>&1 6>$null | Where-Object { $_ -is [Management.Automation.WarningRecord] }
         $script:warnings = $w.Message -join "`n"
     }
 
@@ -61,9 +62,42 @@ try {
         $script:warnings -like '*ローカルのファイアウォール規則が無効*'
     }
 
-    # --- Add-SshHost with ssh / ssh-keygen faked -----------------------------------------
+    $originalProgramData = $env:ProgramData
+    $env:ProgramData = $tmp
+    New-Item -ItemType Directory -Path (Join-Path $tmp 'ssh') | Out-Null
+    $sshdConfig = Join-Path $tmp 'ssh\sshd_config'
+    try {
+        Test-Case 'Enable-SshServer leaves sshd_config alone without -DisablePasswordAuth' {
+            Set-Content -LiteralPath $sshdConfig -Value @('#PasswordAuthentication yes', 'Port 22')
+            Invoke-FakeEnableSshServer
+            (Get-Content -LiteralPath $sshdConfig -Raw) -notmatch '(?m)^PasswordAuthentication' -and $script:calls -notcontains 'restart'
+        }
+        Test-Case 'Enable-SshServer -DisablePasswordAuth puts the setting first when only a comment has it' {
+            Set-Content -LiteralPath $sshdConfig -Value @('#PasswordAuthentication yes', 'Port 22', 'Match Group administrators', '       AuthorizedKeysFile x')
+            Invoke-FakeEnableSshServer -DisablePasswordAuth
+            $lines = @(Get-Content -LiteralPath $sshdConfig)
+            $lines[0] -eq 'PasswordAuthentication no' -and $lines.Count -eq 5 -and $script:calls -contains 'restart'
+        }
+        Test-Case 'Enable-SshServer -DisablePasswordAuth rewrites the global line, not the one under Match' {
+            Set-Content -LiteralPath $sshdConfig -Value @('PasswordAuthentication yes', 'Match User lab', '  PasswordAuthentication yes')
+            Invoke-FakeEnableSshServer -DisablePasswordAuth
+            $lines = @(Get-Content -LiteralPath $sshdConfig)
+            $lines[0] -eq 'PasswordAuthentication no' -and $lines[2] -eq '  PasswordAuthentication yes' -and $lines.Count -eq 3
+        }
+    }
+    finally { $env:ProgramData = $originalProgramData }
+
+    # --- Add-SshHost with ssh / ssh-keygen / ssh-agent faked ----------------------------
     $script:sshCalls = @()
+    $script:keygenArgs = @()
+    $script:addedKeys = @()
+    $script:agent = [pscustomobject]@{ Status = 'Running'; StartType = 'Automatic' }
+    function Get-Service { $script:agent }
+    function Start-Service { $script:agent.Status = 'Running' }
+    function Set-Service { param($Name, $StartupType) $script:agent.StartType = $StartupType }
+    function ssh-add { $script:addedKeys += $args[0]; $global:LASTEXITCODE = 0 }
     function ssh-keygen {
+        $script:keygenArgs = $args
         $f = $args[$args.IndexOf('-f') + 1]
         Set-Content -LiteralPath $f -Value 'PRIVATE'
         Set-Content -LiteralPath "$f.pub" -Value 'ssh-ed25519 AAAATEST test'
@@ -81,6 +115,9 @@ try {
         $text -notmatch 'Port' -and
         $script:sshCalls.Count -eq 2 -and $script:sshCalls[1] -contains 'desktop'
     }
+    Test-Case 'Add-SshHost asks for a passphrase and adds the new key to ssh-agent' {
+        $script:keygenArgs -notcontains '-N' -and $script:addedKeys.Count -eq 1 -and $script:addedKeys[0] -eq (Join-Path $tmp '.ssh\id_ed25519')
+    }
     Test-Case 'Add-SshHost sends the public key to the host inside the encoded command' {
         $enc = ($script:sshCalls[0] | Where-Object { $_ -like 'powershell -NoProfile -EncodedCommand *' }) -replace '^.*EncodedCommand ', ''
         [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($enc)) -like '*ssh-ed25519 AAAATEST test*'
@@ -91,6 +128,17 @@ try {
         Add-SshHost -HostName 192.168.3.20 -User aksh0 -Alias desktop 3>$null 6>$null
         $count = ([regex]::Matches((Get-Content -LiteralPath $config -Raw), 'Host desktop')).Count
         $count -eq 1 -and (Get-Content -LiteralPath (Join-Path $tmp '.ssh\id_ed25519') -Raw).Trim() -eq 'KEEP'
+    }
+    Test-Case 'Add-SshHost without admin cannot enable a disabled ssh-agent: warns and skips the key check' {
+        $keyDir = Join-Path $tmp 'other'
+        Set-Variable -Name HOME -Value $keyDir -Force -Option AllScope
+        $script:agent = [pscustomobject]@{ Status = 'Stopped'; StartType = 'Disabled' }
+        $script:sshCalls = @(); $script:addedKeys = @()
+        try {
+            $w = Add-SshHost -HostName h3 -User u 3>&1 6>$null | Where-Object { $_ -is [Management.Automation.WarningRecord] }
+        }
+        finally { Set-Variable -Name HOME -Value $tmp -Force -Option AllScope }
+        "$w" -like '*ssh-agent が無効*' -and $script:addedKeys.Count -eq 0 -and $script:sshCalls.Count -eq 1 -and $script:agent.StartType -eq 'Disabled'
     }
     Test-Case 'Add-SshHost writes Port only when it is not 22' {
         Add-SshHost -HostName h2 -User u -Port 2222 6>$null

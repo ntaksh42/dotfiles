@@ -148,6 +148,25 @@ describe('work item titles', () => {
     expect(calls).toEqual(['11'])
     await ui.unmount()
   })
+
+  // Without az's own python, az runs through cmd, which would run whatever follows a & in a link.
+  test('a link with cmd metacharacters never reaches cmd', async ($, on) => {
+    engine(on)
+    const argvs: string[][] = []
+    mock.env(on, { OS: 'Windows_NT' })
+    on('ui.log', () => ({ value: undefined }))
+    on('process.run', (_$, e) => {
+      argvs.push(e.argv)
+      return { value: { exitCode: 1, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+    })
+    await $.session.start(START)
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    await append($, say('assistant', 'https://dev.azure.com/x&calc/_workitems/edit/12'))
+    expect(await ui.find({ type: 'Link', text: /#12$/ })).toBeDefined()
+    for (let i = 0; i < 50; i++) await Promise.resolve()
+    expect(argvs.map(a => a[0])).toEqual(['where'])
+    await ui.unmount()
+  })
 })
 
 describe('bar', () => {

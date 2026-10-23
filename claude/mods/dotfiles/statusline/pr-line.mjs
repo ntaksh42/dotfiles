@@ -44,7 +44,9 @@ const format = status => {
   if (!pr) {
     return status.error ? 'PR: az error' : ''
   }
-  const title = pr.title.length > TITLE_MAX ? `${pr.title.slice(0, TITLE_MAX - 1)}…` : pr.title
+  // PR タイトルは他人が書ける。エスケープシーケンスで表示やリンクを偽装されないよう制御文字を落とす
+  const plain = String(pr.title).replace(/[\x00-\x1f\x7f-\x9f]/g, '')
+  const title = plain.length > TITLE_MAX ? `${plain.slice(0, TITLE_MAX - 1)}…` : plain
   const marks = [
     pr.reviewers > 0 ? `✓${pr.approved}/${pr.reviewers}` : '',
     pr.isRejected ? '✗' : '',

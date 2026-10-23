@@ -1,8 +1,9 @@
 # Make this PC reachable over SSH: install OpenSSH Server, start sshd at boot, use pwsh as
 # the login shell, and make sure port 22 is open on Domain and Private networks. Idempotent; needs admin.
 # -SetPrivate also switches Public networks to Private (only for networks you trust).
+# -DisablePasswordAuth turns off password login (run it after registering keys with Add-SshHost).
 function Enable-SshServer {
-    param([switch]$SetPrivate)
+    param([switch]$SetPrivate, [switch]$DisablePasswordAuth)
 
     if (-not (Test-IsAdministrator)) {
         Write-Error '管理者権限の PowerShell で実行してください。'
@@ -23,6 +24,21 @@ function Enable-SshServer {
     }
     Set-Service -Name sshd -StartupType Automatic
     Start-Service -Name sshd
+
+    if ($DisablePasswordAuth) {
+        # sshd uses the first value it reads, so set the global lines (before any Match) or put one at the top.
+        $configPath = Join-Path $env:ProgramData 'ssh\sshd_config'
+        $lines = @(Get-Content -LiteralPath $configPath)
+        $inMatch = $false; $found = $false
+        $lines = foreach ($line in $lines) {
+            if ($line -match '^\s*Match\s') { $inMatch = $true }
+            if (-not $inMatch -and $line -match '^\s*PasswordAuthentication\s') { $found = $true; 'PasswordAuthentication no' } else { $line }
+        }
+        if (-not $found) { $lines = @('PasswordAuthentication no') + $lines }
+        Set-Content -LiteralPath $configPath -Value $lines -Encoding ascii
+        Restart-Service -Name sshd
+        Write-Host 'パスワードでのログインを無効にしました（鍵でのみ接続できます）。'
+    }
 
     $pwsh = (Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1).Source
     if (-not $pwsh) {
@@ -93,10 +109,28 @@ function Add-SshHost {
 
     $sshDir = Join-Path $HOME '.ssh'
     $keyPath = Join-Path $sshDir 'id_ed25519'
+    # A new key gets a passphrase (ssh-keygen asks) and goes into ssh-agent, so BatchMode logins
+    # (the check below, Invoke-SshAll) work without asking again.
+    $agentReady = $true
     if (-not (Test-Path -LiteralPath $keyPath)) {
         New-Item -ItemType Directory -Path $sshDir -Force | Out-Null
-        ssh-keygen -t ed25519 -N '' -f $keyPath -q
+        Write-Host '秘密鍵のパスフレーズを決めて入力してください。'
+        ssh-keygen -t ed25519 -f $keyPath -q
         if ($LASTEXITCODE -ne 0) { Write-Error 'ssh-keygen に失敗しました。'; return }
+
+        $agent = Get-Service -Name ssh-agent -ErrorAction SilentlyContinue
+        if ($agent -and $agent.Status -ne 'Running' -and "$($agent.StartType)" -eq 'Disabled' -and -not (Test-IsAdministrator)) {
+            $agent = $null
+            Write-Warning 'ssh-agent が無効です。管理者の PowerShell で Set-Service ssh-agent -StartupType Automatic; Start-Service ssh-agent を実行し、ssh-add で鍵を登録してください。'
+        }
+        if ($agent) {
+            if ($agent.Status -ne 'Running') {
+                if ("$($agent.StartType)" -eq 'Disabled') { Set-Service -Name ssh-agent -StartupType Automatic }
+                Start-Service -Name ssh-agent
+            }
+            ssh-add $keyPath
+        }
+        $agentReady = $agent -and $LASTEXITCODE -eq 0
     }
     $publicKey = (Get-Content -LiteralPath "$keyPath.pub" -Raw).Trim()
 
@@ -127,6 +161,10 @@ if ($admin) { icacls $file /inheritance:r /grant '*S-1-5-32-544:F' /grant '*S-1-
         Add-Content -LiteralPath $configPath -Value $entry
     }
 
+    if (-not $agentReady) {
+        Write-Host "完了: ssh $Alias で接続できます（パスフレーズを聞かれます）。" -ForegroundColor Green
+        return
+    }
     ssh -o BatchMode=yes $Alias 'echo ok' | Out-Null
     if ($LASTEXITCODE -eq 0) { Write-Host "完了: ssh $Alias で接続できます。" -ForegroundColor Green }
     else { Write-Error "鍵での接続確認に失敗しました: ssh $Alias" }

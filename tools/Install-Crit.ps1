@@ -10,11 +10,21 @@ $assetArchitecture = switch ($architecture) {
 $installDir = Join-Path $env:USERPROFILE '.local\bin'
 $critPath = Join-Path $installDir 'crit.exe'
 $downloadPath = Join-Path $env:TEMP "crit-$([guid]::NewGuid().ToString('N')).exe"
-$downloadUrl = "https://github.com/tomasz-tomczyk/crit/releases/latest/download/crit-windows-$assetArchitecture.exe"
+$assetName = "crit-windows-$assetArchitecture.exe"
+$downloadUrl = "https://github.com/tomasz-tomczyk/crit/releases/latest/download/$assetName"
+$checksumsUrl = 'https://github.com/tomasz-tomczyk/crit/releases/latest/download/checksums.txt'
 
 New-Item -ItemType Directory -Path $installDir -Force | Out-Null
 try {
     Invoke-WebRequest -Uri $downloadUrl -OutFile $downloadPath
+    # 配布元の checksums.txt（"<sha256>  <ファイル名>" の行）と照合し、一致しなければ入れない。
+    $checksums = (Invoke-WebRequest -Uri $checksumsUrl -UseBasicParsing).Content
+    if ($checksums -is [byte[]]) { $checksums = [Text.Encoding]::UTF8.GetString($checksums) }
+    $line = $checksums -split "`r?`n" | Where-Object { ($_ -split '\s+')[-1] -eq $assetName } | Select-Object -First 1
+    if (-not $line) { throw "checksums.txt has no entry for $assetName." }
+    $expected = ($line -split '\s+')[0]
+    $actual = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash
+    if ($actual -ne $expected) { throw "SHA256 mismatch for ${assetName}: expected $expected, got $actual." }
     # 常駐中の crit.exe (_serve 等) は exe をロックし上書きに失敗するため、差し替え前に終了させる。
     $running = @(Get-Process -Name 'crit' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $critPath })
     if ($running) {

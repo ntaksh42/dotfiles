@@ -41,6 +41,9 @@ const azBase = async () => {
   return ['cmd', '/d', '/c', 'az']
 }
 
+// cmd reads & | < > ^ % " ( ) itself. A branch name or remote URL may carry them, so they never go through cmd.
+const CMD_UNSAFE = /[&|<>^%"!()\r\n]/
+
 mkdirSync(dir, { recursive: true })
 try {
   const branch = await git(['rev-parse', '--abbrev-ref', 'HEAD'])
@@ -49,17 +52,19 @@ try {
   const status = { updatedAt: Date.now(), branch, pr: null }
   if (repo !== null && branch !== '' && branch !== 'HEAD') {
     const [file, ...head] = await azBase()
+    const args = [
+      'repos', 'pr', 'list',
+      '--organization', repo.orgUrl,
+      '--project', repo.project,
+      '--repository', repo.repo,
+      '--source-branch', `refs/heads/${branch}`,
+      '--status', 'active',
+      '--top', '1',
+      '-o', 'json',
+    ]
     try {
-      const { stdout } = await run(file, [
-        ...head, 'repos', 'pr', 'list',
-        '--organization', repo.orgUrl,
-        '--project', repo.project,
-        '--repository', repo.repo,
-        '--source-branch', `refs/heads/${branch}`,
-        '--status', 'active',
-        '--top', '1',
-        '-o', 'json',
-      ], { timeout: 30_000, maxBuffer: 8 * 1024 * 1024 })
+      if (file === 'cmd' && args.some(a => CMD_UNSAFE.test(a))) throw new Error('branch or remote has characters cmd would run')
+      const { stdout } = await run(file, [...head, ...args], { timeout: 30_000, maxBuffer: 8 * 1024 * 1024 })
       const first = JSON.parse(stdout)[0]
       status.pr = first === undefined ? null : summarize(repo, first)
     } catch (error) {
