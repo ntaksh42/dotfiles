@@ -21,30 +21,21 @@ $script:ProfileHelp = [ordered]@{
         @{ Cmd = 'Update-Profile [-Force]'; Desc = 'GitHub 上のリポジトリ版でプロファイルを更新 (差分確認・バックアップ・再読込)' }
     )
     'Git / GitHub'          = @(
-        @{ Cmd = 'gs'; Desc = '状態を短い形式で表示 (ブランチ情報つき)' }
-        @{ Cmd = 'gl'; Desc = 'コミット履歴を枝分かれ図つきで直近 20 件表示' }
-        @{ Cmd = 'ga / gaa'; Desc = '指定ファイルをステージ / 変更すべてをステージ' }
-        @{ Cmd = 'gb'; Desc = 'ブランチ一覧の表示・操作' }
-        @{ Cmd = 'gd / gds'; Desc = '作業ツリーの差分 / ステージ済みの差分を表示' }
-        @{ Cmd = 'gp / gpf'; Desc = 'プッシュ / 他者の更新を上書きしない安全な強制プッシュ' }
-        @{ Cmd = 'gsta/gstp/gstl'; Desc = '変更を退避 / 退避した変更を復元 / 退避の一覧表示' }
-        @{ Cmd = 'gcm <msg>'; Desc = 'メッセージ付きでコミット' }
-        @{ Cmd = 'gco [branch]'; Desc = 'ブランチ切替 (引数なしは fzf で選択)' }
-        @{ Cmd = 'git-undo'; Desc = '直前のコミットを取り消し、変更はステージ済みのまま残す' }
-        @{ Cmd = 'git-switch'; Desc = 'fzf でブランチ切替 (ローカルに無ければ origin から作成して追跡)' }
-        @{ Cmd = 'git-clean-branches'; Desc = 'マージ済みのローカルブランチを確認後に一括削除 (main/master/develop は残す)' }
-        @{ Cmd = 'git-reset-clean'; Desc = '変更破棄 + 未追跡・ignore 対象も削除して完全クリーン (-Ref/-Force)' }
-        @{ Cmd = 'git-root'; Desc = 'リポジトリのルートへ移動' }
-        @{ Cmd = 'git-clone <url>'; Desc = 'クローンして、そのフォルダへ移動' }
-        @{ Cmd = 'git-log-browse'; Desc = 'fzf でコミットを閲覧 (差分プレビュー。delta があれば色付き)' }
-        @{ Cmd = 'lg'; Desc = 'lazygit を起動 (あれば)' }
-        @{ Cmd = 'prc/prv/prl/prs'; Desc = 'GitHub PR の作成 / ブラウザ表示 / 一覧 / 状況 (gh があれば)' }
-        @{ Cmd = 'git-fetch / gf'; Desc = '全リモートを取得して削除済みを掃除 (大文字小文字違いの ref 衝突を回避)' }
-        @{ Cmd = 'git-pull / gpl'; Desc = '安全な pull: 未コミット変更を退避 → 衝突ファイルを .git/pull-backup へ避難 → pull → 復元 (引数は git pull へ)' }
-        @{ Cmd = 'gita-pull-all'; Desc = 'gita 全リポジトリの nul ファイルを掃除して pull (-Fallback で切替先指定)' }
-        @{ Cmd = 'gita-scan [path]'; Desc = '直下の git リポジトリを gita に一括登録' }
-        @{ Cmd = 'gita-doctor'; Desc = 'gita の登録から壊れた行 (フォルダなし / 名前が空 / git でない) を探し、確認して削除' }
-        @{ Cmd = 'git-help'; Desc = 'この Git コマンド一覧だけを表示' }
+        @{ Group = '状態と履歴'; Cmd = 'gl'; Desc = 'コミット履歴を枝分かれ図つきで直近 20 件表示' }
+        @{ Group = '状態と履歴'; Cmd = 'git-log-browse'; Desc = 'fzf でコミットを閲覧 (差分プレビュー。delta があれば色付き)' }
+        @{ Group = '状態と履歴'; Cmd = 'lg'; Desc = 'lazygit を起動 (あれば)' }
+        @{ Group = 'ブランチ'; Cmd = 'git-switch'; Desc = 'fzf でブランチ切替 (ローカルに無ければ origin から作成して追跡)' }
+        @{ Group = 'ブランチ'; Cmd = 'git-clean-branches'; Desc = 'マージ済みのローカルブランチを確認後に一括削除 (main/master/develop は残す)' }
+        @{ Group = '取得と同期'; Cmd = 'git-fetch / gf'; Desc = '全リモートを取得して削除済みを掃除 (大文字小文字違いの ref 衝突を回避)' }
+        @{ Group = '取得と同期'; Cmd = 'git-pull / gpl'; Desc = '安全な pull: 未コミット変更を退避 → 衝突ファイルを .git/pull-backup へ避難 → pull → 復元 (引数は git pull へ)' }
+        @{ Group = '移動とクローン'; Cmd = 'git-root'; Desc = 'リポジトリのルートへ移動' }
+        @{ Group = '移動とクローン'; Cmd = 'git-clone <url>'; Desc = 'クローンして、そのフォルダへ移動' }
+        @{ Group = '破壊的操作'; Cmd = 'git-reset-clean'; Desc = '変更破棄 + 未追跡・ignore 対象も削除して完全クリーン (-Ref/-Force)' }
+        @{ Group = 'GitHub PR'; Cmd = 'prc/prv/prl/prs'; Desc = 'GitHub PR の作成 / ブラウザ表示 / 一覧 / 状況 (gh があれば)' }
+        @{ Group = '複数リポジトリ (gita)'; Cmd = 'gita-pull-all'; Desc = 'gita 全リポジトリの nul ファイルを掃除して pull (-Fallback で切替先指定)' }
+        @{ Group = '複数リポジトリ (gita)'; Cmd = 'gita-scan [path]'; Desc = '直下の git リポジトリを gita に一括登録' }
+        @{ Group = '複数リポジトリ (gita)'; Cmd = 'gita-doctor'; Desc = 'gita の登録から壊れた行 (フォルダなし / 名前が空 / git でない) を探し、確認して削除' }
+        @{ Group = 'ヘルプ'; Cmd = 'git-help'; Desc = 'この一覧と .gitconfig の git alias をまとめて表示' }
     )
     'Visual Studio / build' = @(
         @{ Cmd = 'vsdev'; Desc = '現セッションを VS Developer 環境化' }
@@ -105,8 +96,10 @@ $script:ProfileHelp = [ordered]@{
 }
 
 # Show the commands this profile provides. Optional keyword filters cmd/desc/section.
+# Items carrying a Group key are printed under that group's heading, in catalog order.
+# Group headings sit at indent 2 and command rows at indent 4, so the two never look alike.
 function Show-ProfileHelp {
-    param([string]$Filter, [string]$OnlySection)
+    param([string]$Filter, [string]$OnlySection, [switch]$NoTip)
 
     foreach ($section in $script:ProfileHelp.Keys) {
         if ($OnlySection -and $section -ne $OnlySection) { continue }
@@ -120,15 +113,43 @@ function Show-ProfileHelp {
 
         Write-Host ''
         Write-Host "[$section]" -ForegroundColor Cyan
+        $lastGroup = $null
         foreach ($i in $items) {
-            Write-Host ('  {0,-22}' -f $i.Cmd) -ForegroundColor Yellow -NoNewline
+            if ($i.Group -and $i.Group -ne $lastGroup) {
+                Write-Host "  $($i.Group)" -ForegroundColor DarkCyan
+                $lastGroup = $i.Group
+            }
+            Write-Host ('    {0,-22}' -f $i.Cmd) -ForegroundColor Yellow -NoNewline
             Write-Host $i.Desc -ForegroundColor Gray
         }
     }
+    if ($NoTip) { return }
     Write-Host ''
     Write-Host "tip: 'phelp <keyword>' で絞り込み (例: phelp git) / Ctrl+g でコマンドパレット検索 / Ctrl+r で履歴検索" -ForegroundColor DarkGray
 }
 Set-Alias phelp Show-ProfileHelp
 
-# Git 系コマンドの一覧だけを表示
-function git-help { Show-ProfileHelp -OnlySection 'Git / GitHub' }
+# .gitconfig の [alias] を `g <alias>` 形式で一覧表示する。git が無ければ何も出さない。
+function Show-GitAliasHelp {
+    if (-not (Test-Cmd git)) { return }
+    $rows = @(git config --get-regexp '^alias\.' 2>$null | Sort-Object)
+    if (-not $rows) { return }
+
+    Write-Host ''
+    Write-Host '[git alias]' -ForegroundColor Cyan
+    foreach ($row in $rows) {
+        $name, $body = $row -split ' ', 2
+        $body = 'git ' + $body
+        if ($body.Length -gt 64) { $body = $body.Substring(0, 61) + '...' }
+        Write-Host ('    {0,-22}' -f ('g ' + ($name -replace '^alias\.', ''))) -ForegroundColor Yellow -NoNewline
+        Write-Host $body -ForegroundColor Gray
+    }
+}
+
+# Git 系コマンドと git alias をまとめて表示
+function git-help {
+    Show-ProfileHelp -OnlySection 'Git / GitHub' -NoTip
+    Show-GitAliasHelp
+    Write-Host ''
+    Write-Host 'tip: 素の git を短く打つなら git alias 側 (g s / g co / g cm <msg>) / Ctrl+g でコマンドパレット検索' -ForegroundColor DarkGray
+}

@@ -54,16 +54,21 @@ function Get-CatalogNames {
     }
 }
 
-# Show-ProfileHelp output split into section headers and command rows (Write-Host -> information stream).
+# Show-ProfileHelp output split into section headers, group headings and command rows
+# (Write-Host -> information stream). Group headings sit at indent 2, command rows at indent 4.
 function Get-HelpView {
     param([string]$Filter)
     $records = @(Show-ProfileHelp -Filter $Filter 6>&1 | ForEach-Object { "$_" })
-    $sections = @(); $items = @(); $current = $null
+    $sections = @(); $items = @(); $groups = @(); $current = $null; $currentGroup = $null
     foreach ($r in $records) {
-        if ($r -match '^\[(.+)\]$') { $current = $Matches[1]; $sections += $current }
-        elseif ($r -match '^  \S') { $items += [pscustomobject]@{ Section = $current; Cmd = $r.Trim() } }
+        if ($r -match '^\[(.+)\]$') { $current = $Matches[1]; $sections += $current; $currentGroup = $null }
+        elseif ($r -match '^    \S') { $items += [pscustomobject]@{ Section = $current; Group = $currentGroup; Cmd = $r.Trim() } }
+        elseif ($r -match '^  \S') {
+            $currentGroup = $r.Trim()
+            $groups += [pscustomobject]@{ Section = $current; Group = $currentGroup }
+        }
     }
-    [pscustomobject]@{ Records = $records; Sections = $sections; Items = $items }
+    [pscustomobject]@{ Records = $records; Sections = $sections; Items = $items; Groups = $groups }
 }
 
 try {
@@ -606,13 +611,13 @@ try {
     }
     Test-Case 'Command palette rows are name<TAB>description<TAB>[section]' {
         $rows = Get-PaletteRows
-        $gp = @($rows | Where-Object { $_ -like "gp`t*" })
-        $desc = ($script:ProfileHelp['Git / GitHub'] | Where-Object { $_.Cmd -eq 'gp / gpf' }).Desc
-        $gp.Count -eq 1 -and $gp[0] -ceq "gp`t$desc`t[Git / GitHub]"
+        $gf = @($rows | Where-Object { $_ -like "gf`t*" })
+        $desc = ($script:ProfileHelp['Git / GitHub'] | Where-Object { $_.Cmd -eq 'git-fetch / gf' }).Desc
+        $gf.Count -eq 1 -and $gf[0] -ceq "gf`t$desc`t[Git / GitHub]"
     }
-    Test-Case "Combined entries 'gp / gpf' and 'gsta/gstp/gstl' are split into separate rows" {
+    Test-Case "Combined entries 'git-fetch / gf' and 'prc/prv/prl/prs' are split into separate rows" {
         $names = @(Get-PaletteRows | ForEach-Object { ($_ -split "`t")[0] })
-        $missing = @('gp', 'gpf', 'gsta', 'gstp', 'gstl', '..', '...', '....') | Where-Object { $names -notcontains $_ }
+        $missing = @('git-fetch', 'gf', 'prc', 'prv', 'prl', 'prs', '..', '...', '....') | Where-Object { $names -notcontains $_ }
         $missing.Count -eq 0
     }
     Test-Case 'Argument placeholders like <path> and [-Yes] are stripped from palette names' {

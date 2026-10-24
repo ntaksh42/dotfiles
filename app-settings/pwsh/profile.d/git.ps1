@@ -1,40 +1,13 @@
 # ---------------------------------------------------------------------------
 # §3 Git / GitHub
 # ---------------------------------------------------------------------------
-
-# Show git status in short format
-function gs { git status -sb @args }
+# git をそのまま呼ぶだけの短縮名はここには置かない。app-settings\git\.gitconfig の
+# [alias] 側に寄せてあるので `g s` / `g co` / `g cm <msg>` のように打つ (一覧は git-help)。
+# ここに残すのは cd する・fzf で選ぶ・実行前に確認を取る・複数リポジトリをまとめる、
+# といった git alias では書けないものだけ。
 
 # Show git log with graph
 function gl { git log --oneline --graph --decorate -20 @args }
-
-# Undo last git commit (return to staging)
-function git-undo { git reset --soft HEAD~1 }
-
-function ga { git add @args }
-function gaa { git add -A @args }
-function gb { git branch @args }
-function gd { git diff @args }
-function gds { git diff --staged @args }
-function gp { git push @args }
-function gpf { git push --force-with-lease @args }
-
-# stash shortcuts
-function gsta { git stash push @args }
-function gstp { git stash pop @args }
-function gstl { git stash list @args }
-
-# Commit with a message (message required)
-function gcm {
-    if ($args.Count -eq 0) { Write-Warning 'usage: gcm <message>'; return }
-    git commit -m "$args"
-}
-
-# Checkout; no arg -> fzf branch picker
-function gco {
-    if ($args.Count -gt 0) { git checkout @args; return }
-    git-switch
-}
 
 # These wrappers do not need an eager command lookup. If a tool is missing,
 # PowerShell's normal command-not-found message is sufficient on first use.
@@ -123,4 +96,3 @@ function git-reset-clean {
     git clean -ffdx
     Assert-NativeCommandSucceeded 'git clean -ffdx'
 }
-

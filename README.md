@@ -29,10 +29,12 @@ tools/                     汎用 PowerShell ユーティリティ
 上書き確認・バックアップ後に更新するため、未公開のローカル変更は反映しません。
 
 コマンド一覧は `phelp`（例: `phelp git`）、検索は Ctrl+G で開けます。
-`gl`、`gp`、`gcm`、`cat` は標準エイリアスを置き換え、それぞれ
-Git log、Git push、Git commit、bat 連携として動作します。
-`gco` の引数なし実行は `git-switch` と同じブランチ選択を使います。
-その他の既存の短縮名も維持しています。
+`gl` と `cat` は標準エイリアスを置き換え、それぞれ Git log、bat 連携として動作します。
+
+Git の短縮名は `app-settings/git/.gitconfig` の `[alias]` に寄せてあり、`g s`、`g co`、
+`g cm <msg>` のように打ちます。PowerShell 側（`profile.d/git.ps1`）には cd する・fzf で選ぶ・
+実行前に確認を取る・複数リポジトリをまとめる、といった git alias では書けないものだけを置いています。
+`git-help` は両方をまとめて一覧表示します。
 
 検証は `pwsh -NoProfile -File app-settings/pwsh/tests/Invoke-AllTests.ps1` で全テストファイルを一括実行します（個別実行は各 `Test-*.ps1`）。
 

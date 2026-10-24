@@ -10,7 +10,7 @@ $originalExitCode = $global:LASTEXITCODE
 
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ('dotfiles-core-test-' + [guid]::NewGuid().ToString('N'))
 $script:dirSeq = 0
-$builtinAliases = 'gl', 'gp', 'gcm', 'cat'
+$builtinAliases = 'gl', 'cat'
 $preLoadAliases = @{}
 foreach ($aliasName in $builtinAliases) { $preLoadAliases[$aliasName] = [bool](Get-Alias $aliasName -ErrorAction Ignore) }
 

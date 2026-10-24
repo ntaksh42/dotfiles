@@ -37,7 +37,7 @@ try {
     . (Join-Path $root 'Microsoft.PowerShell_profile.ps1')
 
     Test-Case 'Git/bat shortcuts resolve to functions rather than built-in aliases' {
-        @('gl', 'gp', 'gcm', 'cat' | Where-Object { (Get-Command $_).CommandType -ne 'Function' }).Count -eq 0
+        @('gl', 'cat' | Where-Object { (Get-Command $_).CommandType -ne 'Function' }).Count -eq 0
     }
     Test-Case 'Split profile loads environment commands and help' {
         (Get-Command Install-DevTools).CommandType -eq 'Function' -and
@@ -114,24 +114,16 @@ try {
     $script:_cmdCache['fzf'] = $true
     $script:_cmdCache['bat'] = $true
 
-    Test-Case 'Git log/push/commit shortcuts forward arguments' {
+    Test-Case 'gl forwards arguments after its fixed log options' {
         gl --all
-        $logOk = ($script:gitArgs -join '|') -eq 'log|--oneline|--graph|--decorate|-20|--all'
-        gp origin topic
-        $pushOk = ($script:gitArgs -join '|') -eq 'push|origin|topic'
-        gcm 'message with spaces'
-        $logOk -and $pushOk -and ($script:gitArgs -join '|') -eq 'commit|-m|message with spaces'
+        ($script:gitArgs -join '|') -eq 'log|--oneline|--graph|--decorate|-20|--all'
     }
     Test-Case 'cat invokes bat with the supplied file name' {
         cat 'file with spaces.txt'
         ($script:batArgs -join '|') -eq 'file with spaces.txt'
     }
-    Test-Case 'gco still forwards explicit checkout arguments' {
-        gco -b topic
-        ($script:gitArgs -join '|') -eq 'checkout|-b|topic'
-    }
-    Test-Case 'gco picker excludes remote HEAD and creates a tracking branch' {
-        gco
+    Test-Case 'git-switch picker excludes remote HEAD and creates a tracking branch' {
+        git-switch
         $script:choices -notcontains 'origin/HEAD' -and
         ($script:gitArgs -join '|') -eq 'checkout|-b|topic|--track|origin/topic'
     }

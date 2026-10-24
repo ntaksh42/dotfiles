@@ -41,7 +41,7 @@ function Invoke-FzfHistory {
 
 # Search this profile's command catalog (fzf) and insert the chosen command
 # name into the prompt without executing it, so arguments can follow.
-# Combined entries like 'gp / gpf' or 'gsta/gstp/gstl' are split into
+# Combined entries like 'git-fetch / gf' or 'prc/prv/prl/prs' are split into
 # separate candidates; argument placeholders like '<msg>' are stripped.
 function Invoke-CommandPalette {
     if (-not (Test-Cmd fzf)) { Write-Warning 'Invoke-CommandPalette needs fzf'; return }

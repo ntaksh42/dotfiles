@@ -158,41 +158,17 @@ try {
 
     Reset-Fake
 
-    # --- Simple git wrappers -------------------------------------------------------------
-    $gitWrappers = @(
-        @{ Cmd = 'gs'; Base = @('status', '-sb') }
-        @{ Cmd = 'ga'; Base = @('add') }
-        @{ Cmd = 'gaa'; Base = @('add', '-A') }
-        @{ Cmd = 'gb'; Base = @('branch') }
-        @{ Cmd = 'gd'; Base = @('diff') }
-        @{ Cmd = 'gds'; Base = @('diff', '--staged') }
-        @{ Cmd = 'gpf'; Base = @('push', '--force-with-lease') }
-        @{ Cmd = 'gsta'; Base = @('stash', 'push') }
-        @{ Cmd = 'gstp'; Base = @('stash', 'pop') }
-        @{ Cmd = 'gstl'; Base = @('stash', 'list') }
-    )
-    foreach ($w in $gitWrappers) {
-        Test-Case "$($w.Cmd) runs only its fixed git arguments when called bare" {
-            Reset-Fake
-            $null = & $w.Cmd
-            $script:calls.Count -eq 1 -and ($script:calls[0] -join '|') -ceq ($w.Base -join '|')
-        }
-        Test-Case "$($w.Cmd) appends caller arguments unsplit after its fixed arguments" {
-            Reset-Fake
-            $null = & $w.Cmd 'a b' '--flag'
-            $script:calls.Count -eq 1 -and
-            ($script:calls[0] -join '|') -ceq ((@($w.Base) + 'a b' + '--flag') -join '|')
-        }
-    }
-    Test-Case 'git-undo soft-resets one commit' {
+    # --- gl: the one wrapper that still just forwards to git -----------------------------
+    Test-Case 'gl runs its fixed log options and appends caller arguments unsplit' {
         Reset-Fake
-        git-undo
-        $script:calls.Count -eq 1 -and ($script:calls[0] -join '|') -ceq 'reset|--soft|HEAD~1'
+        $null = gl 'a b' '--flag'
+        $script:calls.Count -eq 1 -and
+        ($script:calls[0] -join '|') -ceq 'log|--oneline|--graph|--decorate|-20|a b|--flag'
     }
     Test-Case 'A failing wrapper leaves the git exit code visible to the caller' {
         Reset-Fake
-        $script:g.Fail = @('push*')
-        gpf origin topic
+        $script:g.Fail = @('log*')
+        $null = gl
         $LASTEXITCODE -eq 1
     }
 
@@ -220,24 +196,6 @@ try {
         Reset-Fake
         lg; prc; prv; prl; prs
         $script:calls.Count -eq 0
-    }
-
-    # --- gcm / gco edge cases (basic forwarding is in Test-Profile.ps1) ------------------
-    Test-Case 'gcm without a message warns with usage and does not commit' {
-        Reset-Fake
-        $out = Get-Output { gcm }
-        (Test-Line $out 'usage: gcm <message>') -and $script:calls.Count -eq 0
-    }
-    Test-Case 'gcm joins several unquoted words into one commit message' {
-        Reset-Fake
-        gcm fix the build
-        $script:calls.Count -eq 1 -and ($script:calls[0] -join '|') -ceq 'commit|-m|fix the build'
-    }
-    Test-Case 'gco without arguments and without fzf warns and runs no git command' {
-        Reset-Fake
-        $script:_cmdCache['fzf'] = $false
-        $out = Get-Output { gco }
-        (Test-Line $out 'git-switch needs fzf') -and $script:calls.Count -eq 0
     }
 
     # --- gf ------------------------------------------------------------------------------

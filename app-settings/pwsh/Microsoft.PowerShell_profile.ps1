@@ -55,8 +55,8 @@ function Get-InitCache {
 # ---------------------------------------------------------------------------
 # §1 Aliases
 # ---------------------------------------------------------------------------
-# Let the profile's Git and bat functions take precedence over built-in aliases.
-Remove-Item Alias:gl, Alias:gp, Alias:gcm, Alias:cat -Force -ErrorAction Ignore
+# Let the profile's gl and bat functions take precedence over built-in aliases.
+Remove-Item Alias:gl, Alias:cat -Force -ErrorAction Ignore
 Set-Alias cop   copilot
 Set-Alias g     git
 Set-Alias cx     codex

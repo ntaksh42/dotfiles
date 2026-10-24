@@ -83,6 +83,12 @@
 	contributors = shortlog --summary --numbered --email
 	aliases = config --get-regexp ^alias\\.
 	amend = commit --amend --no-edit
+	cm = commit -m
+	pf = push --force-with-lease
+	sta = stash push
+	stp = stash pop
+	stl = stash list
+	undo = reset --soft HEAD~1
 
 # Load machine-specific settings last so they can override shared defaults.
 [include]
