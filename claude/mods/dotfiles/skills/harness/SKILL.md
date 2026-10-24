@@ -36,7 +36,7 @@ argument-hint: "[check|fix] [対象: instructions|skills|agents|hooks|mcp|plugin
 
 | 対象 | Claude Code | Codex | 正本 |
 |---|---|---|---|
-| 指示ファイル | `~/.claude/CLAUDE.md` | `~/.codex/AGENTS.md` | `<dotfiles>/claude/CLAUDE.global.md`（Codex 側は無し） |
+| 指示ファイル | `~/.claude/CLAUDE.md` | `~/.codex/AGENTS.md`（`CODEX_HOME` 設定時はその配下） | 共通: `<dotfiles>/claude/CLAUDE.global.md`。`tools/Install-AgentInstructions.ps1` で両方へ配置 |
 | skills | `~/.claude/skills/`、plugin 内 `skills/` | `~/.agents/skills/`、`~/.codex/skills/`、plugin 内 `skills/` | `<dotfiles>/claude/mods/dotfiles/skills/` |
 | subagents | `~/.claude/agents/*.md` | `~/.codex/agents/*.toml` | 無し |
 | hooks | `~/.claude/settings.json` の `hooks`、plugin の `hooks/hooks.json` | `~/.codex/hooks.json`、`config.toml` の `[hooks]` | `<dotfiles>/claude/mods/dotfiles/hooks/hooks.json` |
@@ -75,7 +75,7 @@ doctor が拾わない、参照切れと重複も確かめる。
 
 ## 4. 直す（fix、ユーザーの承認後）
 
-直す場所は正本を優先する。`~/.claude/settings.json` と `~/.claude/CLAUDE.md` は `<dotfiles>/claude/install.ps1` が生成・上書きするので、直接は直さない。git 管理外のファイル（`~/.codex/*` など）を書き換える前は、一時フォルダへ控えを取る。
+直す場所は正本を優先する。`~/.claude/settings.json` は `<dotfiles>/claude/install.ps1` が生成する。両エージェントのグローバル指示は `<dotfiles>/claude/CLAUDE.global.md` を直し、`tools/Install-AgentInstructions.ps1` で再配置する。git 管理外のファイル（`~/.codex/*` など）を書き換える前は、一時フォルダへ控えを取る。
 
 | 直すもの | 使う公式手段 |
 |---|---|

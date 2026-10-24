@@ -6,7 +6,8 @@ Windows 環境の Claude Code dotfiles（hooks・skills・settings）を一元�
 
 ```
 claude/
-  install.ps1              インストーラ（CLAUDE.md・settings.json を ~/.claude に配置）
+  install.ps1              インストーラ（共通ルールを両エージェントへ、settings.json を Claude へ配置）
+  CLAUDE.global.md          Claude Code / Codex の共通ルールの管理元
   settings.template.json   settings.json のテンプレート
   mods/                    Claude Code プラグイン（dotfiles-mods マーケットプレイス）
     dotfiles/              自作の skills・hooks をまとめた plugin
@@ -168,8 +169,19 @@ powershell.exe -ExecutionPolicy Bypass -File claude\install.ps1
 ```
 
 インストーラが行うこと：
-- `claude/CLAUDE.global.md` を `~/.claude/CLAUDE.md` にコピー
+- `claude/CLAUDE.global.md` を `~/.claude/CLAUDE.md` と `~/.codex/AGENTS.md` にコピー
 - `settings.template.json` からパスを解決して `~/.claude/settings.json` を生成
+
+共通ルールだけを配置・更新する場合は次を実行します。内容が異なる既存ファイルは
+`.backup.<ID>` に退避し、同じ内容なら変更しません。Codex の配置先は `CODEX_HOME` が設定されていればそれに従います。
+
+```powershell
+pwsh -NoProfile -File tools/Install-AgentInstructions.ps1
+```
+
+ルールの変更は配置先ではなく `claude/CLAUDE.global.md` に行い、再配置してください。
+`AGENTS.override.md` があると Codex はそちらを優先するため、インストーラは警告を表示します。
+検証は `pwsh -NoProfile -File tools/tests/Test-InstallAgentInstructions.ps1` で実行できます。
 
 ### 3. plugin を導入
 
@@ -179,9 +191,9 @@ Install-DevTools
 
 skills・hooks・Mod を `claude plugin install` で導入します。
 
-### 4. Claude Code を再起動
+### 4. Claude Code / Codex の新しいセッションを開始
 
-設定を反映するために Claude Code を再起動してください。
+共通ルールを読み直すため、Claude Code / Codex の新しいセッションを開始してください。
 
 ---
 

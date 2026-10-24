@@ -1,7 +1,7 @@
 ﻿# Claude Code dotfiles installer for Windows
 # Usage: .\install.ps1
 # skills・hooks は claude/mods/ の plugin として Install-DevTools が導入する。
-# このスクリプトは CLAUDE.md と settings.json の配置だけを行う。
+# 共通ルールを Claude Code と Codex へ、settings.json を Claude Code へ配置する。
 
 param()
 
@@ -11,7 +11,6 @@ $ErrorActionPreference = "Stop"
 $ScriptDir       = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ClaudeDir       = Join-Path $env:USERPROFILE ".claude"
 $TemplateFile    = Join-Path $ScriptDir "settings.template.json"
-$GlobalClaudeMd  = Join-Path $ScriptDir "CLAUDE.global.md"
 
 Write-Host "Claude Code dotfiles installer" -ForegroundColor Cyan
 Write-Host "==============================" -ForegroundColor Cyan
@@ -31,18 +30,8 @@ if (Test-Path $SettingsFile) {
     Copy-Item $SettingsFile $BackupFile
 }
 
-# Copy global CLAUDE.md (CLAUDE.global.md -> ~/.claude/CLAUDE.md)
-if (Test-Path $GlobalClaudeMd) {
-    Write-Host "Copying global CLAUDE.md..." -ForegroundColor Green
-    $ClaudeMdDest = Join-Path $ClaudeDir "CLAUDE.md"
-    if (Test-Path $ClaudeMdDest) {
-        $ClaudeMdBackup = Join-Path $ClaudeDir "CLAUDE.md.backup.$(Get-Date -Format 'yyyyMMdd-HHmmss')"
-        Write-Host "  Backing up existing CLAUDE.md to $ClaudeMdBackup" -ForegroundColor Yellow
-        Copy-Item $ClaudeMdDest $ClaudeMdBackup
-    }
-    Copy-Item $GlobalClaudeMd $ClaudeMdDest -Force
-    Write-Host "  - CLAUDE.md (from CLAUDE.global.md)" -ForegroundColor Gray
-}
+# Install shared global instructions for both agents.
+& (Join-Path $ScriptDir '..\tools\Install-AgentInstructions.ps1') -ClaudeDir $ClaudeDir
 
 # Set ENABLE_TOOL_SEARCH environment variable if not exists
 $envName = "ENABLE_TOOL_SEARCH"

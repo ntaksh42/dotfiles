@@ -10,9 +10,9 @@ Windows環境のClaude Code dotfiles・開発環境構成リポジトリ。Claud
 
 ```
 claude/              Claude Code 設定の管理元
-  install.ps1        インストーラ（CLAUDE.md・settings.json を ~/.claude に配置）
+  install.ps1        インストーラ（共通ルールを Claude Code / Codex へ、settings.json を Claude へ配置）
   settings.template.json  settings.json テンプレート（{{REPO_DIR}} プレースホルダ）
-  CLAUDE.global.md   グローバル CLAUDE.md の管理元（~/.claude/CLAUDE.md へ展開、既存はバックアップ）
+  CLAUDE.global.md   共通ルールの管理元（~/.claude/CLAUDE.md と ~/.codex/AGENTS.md へ配置、既存はバックアップ）
   mods/              Claude Code プラグイン。リポジトリ直下の .claude-plugin/marketplace.json で
                      dotfiles-mods マーケットプレイスとして公開し、settings で有効化する
     dotfiles/        自作の skills・hooks・Mod をまとめた唯一の plugin
@@ -38,8 +38,11 @@ tools/               汎用PowerShellユーティリティ
 ## コマンド
 
 ```bash
-# CLAUDE.md と settings.json を ~/.claude に配置する
+# 共通ルールを Claude Code / Codex へ、settings.json を Claude Code へ配置する
 powershell.exe -ExecutionPolicy Bypass -File claude/install.ps1
+
+# 共通ルールだけを配置する
+pwsh -NoProfile -File tools/Install-AgentInstructions.ps1
 
 # app-settings/ の設定ファイルを実環境へ配置する（pwsh プロファイル経由。GitHub の main から取得）
 # 配置対象は app-settings/pwsh/profile.d/devtools-catalog.ps1 のカタログで定義する。プロファイル自体は Update-Profile
