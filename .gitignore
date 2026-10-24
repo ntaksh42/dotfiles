@@ -1,2 +1,6 @@
 .claude/
 __pycache__/
+
+# claude plugin eval の結果
+**/evals/results/
+claude/mods/dotfiles/evals-ctx*/
