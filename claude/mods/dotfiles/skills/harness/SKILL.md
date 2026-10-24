@@ -12,8 +12,16 @@ argument-hint: "[check|fix] [対象: instructions|skills|agents|hooks|mcp|plugin
 
 ## 0. 準備
 
-- dotfiles リポジトリの場所は `claude plugin marketplace list` の `dotfiles-mods` の Source（Folder）から取る。以下 `<dotfiles>` と書く
+- dotfiles リポジトリの場所は `claude plugin marketplace list` の `dotfiles-mods` の Source（Folder）から取る。以下 `<dotfiles>` と書く。登録が無いとき（会社の PC など）はユーザーにパスを聞き、分からなければ正本との比較を省く
 - `<dotfiles>/claude/harness-intentional.md` があれば読む。ここに載っている差分は意図的なものなので報告しない
+- 組織の管理設定（Team / Enterprise プラン）を確かめる。読めるものだけ読み、無ければ「管理設定なし」として進める
+
+  | | Claude Code | Codex |
+  |---|---|---|
+  | 手元のファイル | `C:\Program Files\ClaudeCode\managed-settings.json`、同じ場所の `managed-settings.d\`、`managed-mcp.json` | `%ProgramData%\OpenAI\Codex\requirements.toml`、`~/.codex/managed_config.toml` |
+  | 配信される設定 | `claude doctor` の `Managed settings (remote)` 行と、拒否された項目の一覧。ユーザーに `/status` の `Setting sources` を見てもらう | クラウドの要件はファイルに出ない。`codex doctor --json` の `config.load` と、起動時の競合通知で分かる範囲を見る |
+
+  管理設定で固定されている項目は、ユーザー側のファイルを直しても効かない。以降の報告と修正はこの前提で行う（「組織ポリシーとの関係」参照）
 
 ## 1. 公式コマンドで集める（読み取りのみ、並列で実行してよい）
 
@@ -59,6 +67,7 @@ doctor が拾わない、参照切れと重複も確かめる。
 - **正本との差**: 実環境が dotfiles の正本と違う。`install.ps1` の再実行で消える変更は「上書きリスク」と明記する
 - **未使用**: `/skill-doctor` や `claude plugin details` で使われていない、または消費が大きいもの
 - **対象外**: ランタイムの状態（スレッド DB、Defender の除外など）や、アプリが自分で書く設定。報告はするが直さない
+- **組織ポリシー**: 管理設定で禁止・固定されていて、ユーザー側では直せないもの。例：ユーザーの hooks が `allowManagedHooksOnly` で動いていない、MCP が許可リスト外。直す場所は「管理者に依頼」と書く
 
 ずれは「意図的な差か」をユーザーに確認する。意図的と答えたものは `<dotfiles>/claude/harness-intentional.md` に「対象 / 理由 / 記録日」の表で追記する（fix の承認と同じタイミングでよい）。
 
@@ -78,6 +87,21 @@ doctor が拾わない、参照切れと重複も確かめる。
 | Codex の feature flag | `codex features enable|disable <name>` |
 | plugin の更新・無効化 | `claude plugin update|disable|uninstall`、`codex plugin remove`、`codex plugin marketplace upgrade` |
 
+### 組織ポリシーとの関係
+
+修正案を出す前に、0 で見た管理設定に次の鍵があるか確かめ、あれば対応する案を出さない（代わりに「組織ポリシー」として報告する）。
+
+| 修正案 | 止める鍵（Claude Code） | 止める鍵（Codex） |
+|---|---|---|
+| plugin / マーケットプレイスで配る | `strictKnownMarketplaces`、`blockedMarketplaces` | `features.plugins = false`、`[marketplaces] restrict_to_allowed_sources` |
+| `~/.claude/skills` などにスキルや subagent を置く | `strictPluginOnlyCustomization`（`.skills`、`.agents`） | — |
+| hooks を追加・修正する | `allowManagedHooksOnly`、`strictPluginOnlyCustomization.hooks` | `allow_managed_hooks_only` |
+| MCP を追加する | `allowManagedMcpServersOnly` と `allowedMcpServers`、`deniedMcpServers`、`strictPluginOnlyCustomization.mcp` | `requirements.toml` の `[mcp_servers]`（許可リスト） |
+| 権限ルールを足す | `allowManagedPermissionRulesOnly` | `[rules]`、`allowed_sandbox_modes` など |
+| feature flag を切り替える | — | `requirements.toml` の `[features]` で固定されたもの |
+
+plugin での配布だけが止められているときは、スキルを手で `~/.claude/skills` や `~/.agents/skills` にコピーする案を出してよい（ユーザーのスキル自体は許可されているため）。`strictPluginOnlyCustomization.skills` も有効なら、この案も出さず、組織のマーケットプレイスへの登録を管理者に依頼するよう伝える。
+
 直したあとの確認：
 
 1. dotfiles の plugin を変えたら `pwsh -File <dotfiles>/tools/Test-ClaudeMods.ps1` を実行し、`plugin.json` の `version` を上げる
@@ -88,6 +112,7 @@ doctor が拾わない、参照切れと重複も確かめる。
 ## 守ること
 
 - check では何も書き換えない
+- 組織の管理設定（`managed-settings.json`、`requirements.toml` など）は読むだけで、書き換えない。禁止されているもの（例：hooks が禁止されているのに hooks を動かす）を別の経路で実現する案も出さない
 - 削除（skills、subagents、MCP、hooks の除去）は対象を列挙してから確認を取る
 - 他のツールやアプリが書き込む設定は、doctor が warn を出しても消さず、テンプレートでも上書きしない。例：Codex の `computer_use.*`（アプリの許可リスト）と `[hooks.state]`、`[projects.*]` の trust、Orca や agent-dashboard が登録した hooks。直すなら持ち主のツールの UI やコマンドを使う
 - 秘密情報（`auth.json`、`.credentials.json`、MCP の env や URL にあるトークン）は読まない・表示しない。`codex doctor --json` は伏せ字済みなのでそれを使う
