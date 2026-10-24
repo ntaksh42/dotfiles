@@ -142,6 +142,42 @@ function Test-DevToolPluginUpToDate {
     catch { return $null }
 }
 
+# winget / msstore 側に新しい版があるか。--upgrade-available は該当なしでも終了コード 0 を
+# 返すため、出力にパッケージ ID が現れるかで判定する。取りこぼしても winget upgrade 側が
+# 「更新なし」を成功として扱うので、更新が一度余分に走るだけで害はない。
+function Test-DevToolWingetUpgradeAvailable {
+    param([Parameter(Mandatory)]$Tool)
+    $source = if ($Tool.Backend -eq 'msstore') { 'msstore' } else { 'winget' }
+    $output = @(winget list --id $Tool.Id --exact --source $source --upgrade-available --accept-source-agreements 2>$null)
+    return [bool]($output -match [regex]::Escape($Tool.Id))
+}
+
+# winget upgrade は更新が不要なときも失敗扱いの終了コードを返すため、それだけは成功とみなす。
+# 呼び出し側の実行で $LASTEXITCODE が変わるので、終了コードは引数で受け取る。
+function Assert-DevToolWingetUpgraded {
+    param([Parameter(Mandatory)]$Tool, [int]$ExitCode)
+    # 0x8A15002B = APPINSTALLER_CLI_ERROR_UPDATE_NOT_APPLICABLE
+    if ($ExitCode -eq -1978335189) {
+        Write-Host '  Already up to date.' -ForegroundColor Gray
+        return
+    }
+    if ($ExitCode -ne 0) { throw "winget upgrade $($Tool.Id) failed with exit code $ExitCode." }
+}
+
+# 更新中に実行ファイルが掴まれていると失敗したり、起動中のアプリを落とされるため、
+# ProcessName を持つものは起動中なら更新を見送る。ProcessPath は同名の別プロセス
+# （Claude デスクトップアプリに対する Claude Code CLI の claude.exe など）を除くための
+# パス パターン。
+function Test-DevToolProcessRunning {
+    param([Parameter(Mandatory)]$Tool)
+    if (-not $Tool.ProcessName) { return $false }
+    $processes = @(Get-Process -Name $Tool.ProcessName -ErrorAction SilentlyContinue)
+    if ($Tool.ProcessPath) {
+        $processes = @($processes | Where-Object { $_.Path -and $_.Path -like $Tool.ProcessPath })
+    }
+    return ($processes.Count -gt 0)
+}
+
 # Detect whether a catalog tool is installed
 function Test-ToolInstalled {
     param([Parameter(Mandatory)]$Tool)
@@ -329,8 +365,13 @@ function Install-DevTools {
             elseif (-not $upToDate) { $tool }
             continue
         }
-        if ($tool.Backend -ne 'script') { continue }
-        if ($tool.Repo) {
+        if ($tool.Backend -eq 'winget' -or $tool.Backend -eq 'msstore') {
+            # winget 管理のものは Upgradable を付けたものだけ更新対象にする。
+            if (-not $tool.Upgradable) { continue }
+            if (-not (Test-DevToolWingetUpgradeAvailable $tool)) { continue }
+        }
+        elseif ($tool.Backend -ne 'script') { continue }
+        elseif ($tool.Repo) {
             $latest = Get-DevToolLatestVersion $tool
             if (-not $latest) {
                 Write-Warning "$($tool.Name): latest version could not be checked; skipping update."
@@ -347,9 +388,8 @@ function Install-DevTools {
             }
             if ($upToDate) { continue }
         }
-        if ($tool.Name -eq 'Windows-Operation-Cli' -and
-            (Get-Process -Name 'windows-operation-cli' -ErrorAction SilentlyContinue)) {
-            Write-Warning 'Windows-Operation-Cli is running; close it before updating.'
+        if (Test-DevToolProcessRunning $tool) {
+            Write-Warning "$($tool.Name) is running; close it before updating."
             continue
         }
         $tool
@@ -382,19 +422,32 @@ function Install-DevTools {
 
     $results = @()
     foreach ($t in $pending) {
-        $action = if ($toUpdate -contains $t) { 'Updating' } else { 'Installing' }
+        $isUpdate = $toUpdate -contains $t
+        $action = if ($isUpdate) { 'Updating' } else { 'Installing' }
         Write-Host "$action $($t.Name)..." -ForegroundColor Green
         $ok = $false
         $rebootRequired = $false
         try {
             switch ($t.Backend) {
                 'winget' {
-                    winget install --id $t.Id --exact --source winget --accept-package-agreements --accept-source-agreements
-                    Assert-NativeCommandSucceeded "winget install $($t.Id)"
+                    if ($isUpdate) {
+                        winget upgrade --id $t.Id --exact --source winget --accept-package-agreements --accept-source-agreements
+                        Assert-DevToolWingetUpgraded $t $LASTEXITCODE
+                    }
+                    else {
+                        winget install --id $t.Id --exact --source winget --accept-package-agreements --accept-source-agreements
+                        Assert-NativeCommandSucceeded "winget install $($t.Id)"
+                    }
                 }
                 'msstore' {
-                    winget install --id $t.Id --source msstore --accept-package-agreements --accept-source-agreements
-                    Assert-NativeCommandSucceeded "winget install $($t.Id)"
+                    if ($isUpdate) {
+                        winget upgrade --id $t.Id --source msstore --accept-package-agreements --accept-source-agreements
+                        Assert-DevToolWingetUpgraded $t $LASTEXITCODE
+                    }
+                    else {
+                        winget install --id $t.Id --source msstore --accept-package-agreements --accept-source-agreements
+                        Assert-NativeCommandSucceeded "winget install $($t.Id)"
+                    }
                 }
                 'pip' {
                     if (-not (Install-PythonIfMissing)) { throw 'Python/pip not found and could not be installed' }

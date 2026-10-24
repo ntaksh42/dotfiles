@@ -59,6 +59,7 @@ Set-WindowsSettings           # 適用（Explorer 系は explorer.exe を再起�
 - hook を追加したら `claude/mods/dotfiles/hooks/hooks.json` に登録する
 - スキルはサブディレクトリ形式（`SKILL.md` + `references/`）を使用する
 - plugin の中身を変えたら `plugin.json` の `version` を上げる
+- devtools カタログの winget / msstore 項目は `Upgradable = $true` を付けたものだけ `Install-DevTools` が更新する（既定は未導入時のインストールのみ）。更新で落とされると困るアプリには `ProcessName`（同名の別プロセスがあるなら `ProcessPath` も）を付け、起動中は更新を見送らせる
 - PowerShellスクリプトは `$ErrorActionPreference = "Stop"` を使用
 - settings.template.json のパスは JSON 文字列としての `\\` エスケープを使用（`\\\\` は過剰）
 

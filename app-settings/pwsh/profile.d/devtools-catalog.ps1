@@ -10,9 +10,15 @@ $script:DevTools = @(
     @{ Name = 'Everything'; Backend = 'winget'; Id = 'voidtools.Everything' }
     @{ Name = 'Orca'; Backend = 'winget'; Id = 'StablyAI.Orca' }
     @{ Name = 'PC Manager'; Backend = 'msstore'; Id = '9PM860492SZD' }
+    # Claude デスクトップアプリは downloads.claude.ai 配布の exe（Store 版ではない）。
+    # 同名の Claude Code CLI と区別するため、起動中かどうかはインストール先のパスで判定する。
+    @{ Name = 'Claude'; Backend = 'winget'; Id = 'Anthropic.Claude'; Upgradable = $true; ProcessName = 'claude'; ProcessPath = '*\WindowsApps\Claude_*' }
+    # ChatGPT は Store 版（Appx 識別子は OpenAI.Codex）が入るため msstore から入れる。
+    # Store 版の更新は Microsoft Store 側でも走るので、winget が差分を見つけたときだけ更新する。
+    @{ Name = 'ChatGPT'; Backend = 'msstore'; Id = '9PLM9XGG6VKS'; Upgradable = $true; ProcessName = 'ChatGPT' }
     # 既存の設定を上書きしないよう、レイアウトが未作成（custom-layouts.json なし）の環境にだけ一度配置する。
     @{ Name = 'Waypoint'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/waypoint/main/installer/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\waypoint\waypoint.exe'); Args = @{ Silent = $true }; RebootRequiredExitCode = 3010; Repo = 'ntaksh42/waypoint'; VersionSource = 'product' }
-    @{ Name = 'Windows-Operation-Cli'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/Windows-Operation-Cli/main/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\windows-operation-cli\windows-operation-cli.exe'); Args = @{ FromRelease = $true }; RequiredCommand = 'claude'; Repo = 'ntaksh42/Windows-Operation-Cli' }
+    @{ Name = 'Windows-Operation-Cli'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/Windows-Operation-Cli/main/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\windows-operation-cli\windows-operation-cli.exe'); Args = @{ FromRelease = $true }; RequiredCommand = 'claude'; Repo = 'ntaksh42/Windows-Operation-Cli'; ProcessName = 'windows-operation-cli' }
     @{ Name = 'Crit'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-Crit.ps1"; Path = (Join-Path $env:USERPROFILE '.local\bin\crit.exe'); Repo = 'tomasz-tomczyk/crit'; VersionSource = 'command' }
     # MSIX のため導入先のファイルではなくパッケージ名で判定する（AppxName）。
     @{ Name = 'Dockyard'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-Dockyard.ps1"; AppxName = 'Dockyard'; Repo = 'ntaksh42/dockyard'; VersionSource = 'appx' }
