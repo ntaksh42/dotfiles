@@ -338,6 +338,12 @@ function Disable-CodexStatusline {
     Write-Host "Codex statusline を無効化しました: $wrapper.disabled" -ForegroundColor Yellow
 }
 
+# スキル同期の失敗でツール導入全体を止めない。
+function Invoke-DevToolSkillSync {
+    try { Sync-DevToolSkills }
+    catch { Write-Warning "Skill sync failed: $($_.Exception.Message)" }
+}
+
 # Install missing catalog tools. Script-backed tools compare installed versions or
 # remote file contents before updating. If the remote check fails, skip the update.
 # remote-config の既存ファイル上書きは、ccstatusline のようにアプリ自身が書き換える
@@ -354,11 +360,19 @@ function Install-DevTools {
 
     # 判定は winget/ネットワークを伴うため1回だけ行い、以降は結果を使い回す。
     $installed = @{}
-    foreach ($tool in $script:DevTools) { $installed[$tool.Name] = [bool](Test-ToolInstalled $tool) }
+    foreach ($tool in $script:DevTools) {
+        # 1つの判定失敗で全体を止めず、そのツールだけ未導入扱いにする。
+        try { $installed[$tool.Name] = [bool](Test-ToolInstalled $tool) }
+        catch {
+            Write-Warning "$($tool.Name): install check failed ($($_.Exception.Message)); treating as not installed."
+            $installed[$tool.Name] = $false
+        }
+    }
     $toInstall = @($script:DevTools | Where-Object { -not $installed[$_.Name] })
     $latestVersions = @{}
     $toUpdate = @(foreach ($tool in $script:DevTools) {
         if (-not $installed[$tool.Name] -or $tool.InstallOnly) { continue }
+        try {
         if ($tool.Backend -eq 'claude-plugin') {
             $upToDate = Test-DevToolPluginUpToDate $tool
             if ($null -eq $upToDate) { Write-Warning "$($tool.Name): plugin version could not be checked; skipping update." }
@@ -393,6 +407,10 @@ function Install-DevTools {
             continue
         }
         $tool
+        }
+        catch {
+            Write-Warning "$($tool.Name): update check failed ($($_.Exception.Message)); skipping update."
+        }
     })
     # 前提コマンドが無いまま走らせても最後に失敗するだけなので、インストーラ自体を起動しない。
     $pending = @($toInstall + $toUpdate | Where-Object {
@@ -403,7 +421,7 @@ function Install-DevTools {
             $true
         })
     if ($pending.Count -eq 0) {
-        Sync-DevToolSkills
+        Invoke-DevToolSkillSync
         Write-Host 'All dev tools already installed.' -ForegroundColor Green
         return
     }
@@ -418,7 +436,7 @@ function Install-DevTools {
         if ($ans -notmatch '^(y|yes)$') { Write-Host 'Aborted.'; return }
     }
 
-    Sync-DevToolSkills
+    Invoke-DevToolSkillSync
 
     $results = @()
     foreach ($t in $pending) {
@@ -589,7 +607,8 @@ function Install-DevTools {
         }
     }
 
-    refreshenv
+    try { refreshenv }
+    catch { Write-Warning "refreshenv failed: $($_.Exception.Message)" }
     Write-Host "`nInstall summary:" -ForegroundColor Cyan
     $results | Format-Table -AutoSize
 }
