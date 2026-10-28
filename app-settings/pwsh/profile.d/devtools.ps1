@@ -229,7 +229,10 @@ function Test-ToolInstalled {
             if ($Tool.Cmd -and (Test-Cmd $Tool.Cmd)) { return $true }
             # 出力の Id 列は端末幅で「…」に切り詰められ文字列照合が外れるため、終了コード
             # （見つからなければ非 0）で判定する。msstore の規約確認で止まらないよう同意も渡す。
-            $null = winget list --id $Tool.Id --exact --accept-source-agreements 2>$null
+            # ソースを絞らないと、無関係なソース（社内ネットワークで塞がれた msstore 等）の
+            # 失敗でも非 0 になり、導入済みを未導入と誤判定する。
+            $source = if ($Tool.Backend -eq 'msstore') { 'msstore' } else { 'winget' }
+            $null = winget list --id $Tool.Id --exact --source $source --accept-source-agreements 2>$null
             return ($LASTEXITCODE -eq 0)
         }
     }
@@ -456,7 +459,9 @@ function Install-DevTools {
                     }
                     else {
                         winget install --id $t.Id --exact --source winget --accept-package-agreements --accept-source-agreements
-                        Assert-NativeCommandSucceeded "winget install $($t.Id)"
+                        # 導入済みと判定できなかったものは install が「更新なし」で返るので成功とみなす。
+                        if ($LASTEXITCODE -eq -1978335189) { Write-Host '  Already installed.' -ForegroundColor Gray }
+                        else { Assert-NativeCommandSucceeded "winget install $($t.Id)" }
                     }
                 }
                 'msstore' {
@@ -466,7 +471,8 @@ function Install-DevTools {
                     }
                     else {
                         winget install --id $t.Id --source msstore --accept-package-agreements --accept-source-agreements
-                        Assert-NativeCommandSucceeded "winget install $($t.Id)"
+                        if ($LASTEXITCODE -eq -1978335189) { Write-Host '  Already installed.' -ForegroundColor Gray }
+                        else { Assert-NativeCommandSucceeded "winget install $($t.Id)" }
                     }
                 }
                 'pip' {

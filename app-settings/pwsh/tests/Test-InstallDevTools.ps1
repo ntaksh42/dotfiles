@@ -436,6 +436,14 @@ if ($h.Throw) { throw $h.Throw }
         (Get-Row 'A').Result -ceq 'OK' -and (Get-Row 'Bad').Result -ceq 'FAILED' -and (Get-Row 'C').Result -ceq 'OK' -and
         $script:log.Contains('WARNING:   Failed: winget install id.Bad failed with exit code 1603.')
     }
+    Test-Case 'winget install that finds the package already installed (0x8A15002B) is OK' {
+        Reset-Fake
+        $script:DevTools = @((New-Tool 'A' 'winget'), (New-Tool 'Store' 'msstore'))
+        $script:failIds['id.A'] = -1978335189
+        $script:failIds['id.Store'] = -1978335189
+        Invoke-Install -Yes
+        (Get-Row 'A').Result -ceq 'OK' -and (Get-Row 'Store').Result -ceq 'OK'
+    }
     Test-Case 'A failing msstore install is FAILED and does not stop a later winget tool' {
         Reset-Fake
         $script:DevTools = @((New-Tool 'Store' 'msstore'), (New-Tool 'A' 'winget'))
