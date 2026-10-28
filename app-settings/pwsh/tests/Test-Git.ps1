@@ -32,6 +32,8 @@ try {
             Top = $null; GitDir = $null; CloneDir = $null
             Branches = @(); LocalBranches = @(); Merged = @(); CleanPreview = @(); LogLines = @()
             Fail = @(); Repos = @{}; GitaNames = @(); GitaPaths = @{}
+            # One-shot failures: the first call matching Pattern prints Output, exits 1 and is consumed.
+            FailOnce = [System.Collections.Generic.List[object]]::new()
         }
         $script:fzfArgs = $null; $script:fzfInput = $null; $script:fzfPick = $null
         $script:prompts = @(); $script:answer = 'y'
@@ -53,6 +55,10 @@ try {
             else { $norm.Add($raw[$i]) }
         }
         $sub = $norm -join ' '
+        for ($k = 0; $k -lt $script:g.FailOnce.Count; $k++) {
+            $f = $script:g.FailOnce[$k]
+            if ($sub -like $f.Pattern) { $script:g.FailOnce.RemoveAt($k); $global:LASTEXITCODE = 1; $f.Output; return }
+        }
         foreach ($pattern in $script:g.Fail) {
             if ($sub -like $pattern) { $global:LASTEXITCODE = 1; return }
         }
@@ -85,6 +91,9 @@ try {
                 if ($script:g.Rebase) { $script:g.Rebase } else { $global:LASTEXITCODE = 1 }
                 return
             }
+            'symbolic-ref --short -q HEAD' { $repo.Branch; return }
+            'config --get branch.*.remote' { 'origin'; return }
+            'config --get branch.*.merge' { "refs/heads/$($repo.Branch)"; return }
             'ls-tree -r --name-only *' { $script:g.RemoteFiles; return }
             'ls-files --others --exclude-standard' { $repo.Untracked; return }
             'ls-files' { $repo.Tracked; return }
@@ -214,6 +223,25 @@ try {
         $script:g.Fail = @('fetch*')
         gf
         (Get-Calls) -join ';' -ceq 'pack-refs --all;fetch --all --prune;pack-refs --all'
+    }
+    # What Git 2.55 prints when the remote has branches that differ only by case (files ref backend on NTFS).
+    $caseCollisionOutput = @(
+        "error: You're on a case-insensitive filesystem, and the remote you are"
+        'trying to fetch from has references that only differ in casing. It'
+        'is impossible to store such references with the ''files'' backend. You'
+        ''
+        '    git refs migrate --ref-format=reftable'
+        ''
+        'repository it may not be an option to migrate to reftables.'
+        ''
+        ' ! [new branch]      x/bar      -> origin/x/bar  (unable to update local ref)'
+    )
+    Test-Case 'gf treats a fetch that failed only on case-colliding remote branches as a warning' {
+        Reset-Fake
+        $script:g.FailOnce.Add(@{ Pattern = 'fetch*'; Output = $caseCollisionOutput })
+        $out = Get-Output { gf }
+        (Get-Calls) -join ';' -ceq 'pack-refs --all;fetch --all --prune;pack-refs --all' -and
+        (Test-Line $out '大文字小文字だけ違うリモートブランチ')
     }
 
     # --- Resolve-GitPullCollision (real files under the scratch dir) ---------------------
@@ -351,7 +379,10 @@ try {
             '-c core.quotepath=false ls-tree -r --name-only origin/main'
             '-c core.quotepath=false ls-files'
             '-c core.quotepath=false ls-files --others --exclude-standard'
-            'pull'
+            'symbolic-ref --short -q HEAD'
+            'config --get branch.main.remote'
+            'config --get branch.main.merge'
+            'pull origin refs/heads/main'
             'pack-refs --all'
         )
         (Get-Calls) -join ';' -ceq ($expected -join ';')
@@ -359,14 +390,28 @@ try {
     Test-Case 'gpl forwards its arguments to git pull' {
         Reset-Fake
         $null = Get-Output { gpl --ff-only }
-        Test-Called 'pull --ff-only'
+        Test-Called 'pull --ff-only origin refs/heads/main'
     }
     Test-Case 'gpl stops after a failed fetch without stashing or pulling' {
         Reset-Fake
         $script:g.Dirty = 'M file.txt'; $script:g.Fail = @('fetch*')
         $out = Get-Output { gpl }
         (Test-Line $out 'fetch 失敗') -and -not (Test-Called 'pull*') -and -not (Test-Called 'stash*') -and
-        -not (Test-Called 'rev-parse*')
+        -not (Test-Called 'rev-parse*') -and @(Get-Calls | Where-Object { $_ -like 'fetch*' }).Count -eq 1
+    }
+    Test-Case 'gpl warns and carries on when fetch fails only on case-colliding remote branches' {
+        Reset-Fake
+        $script:g.FailOnce.Add(@{ Pattern = 'fetch*'; Output = $caseCollisionOutput })
+        $out = Get-Output { gpl }
+        (Test-Line $out 'unable to update local ref') -and (Test-Line $out '大文字小文字だけ違うリモートブランチ') -and
+        -not (Test-Line $out 'case-insensitive filesystem') -and -not (Test-Line $out 'impossible to store') -and
+        -not (Test-Line $out 'fetch 失敗') -and (Test-Called 'pull origin refs/heads/main') -and
+        @(Get-Calls | Where-Object { $_ -like 'fetch*' }).Count -eq 1
+    }
+    Test-Case 'gpl keeps explicit repository and branch arguments as given' {
+        Reset-Fake
+        $null = Get-Output { gpl --rebase upstream dev }
+        (Test-Called 'pull --rebase upstream dev') -and -not (Test-Called 'symbolic-ref*')
     }
     Test-Case 'gpl warns and stops when there is no upstream and no arguments' {
         Reset-Fake
@@ -384,7 +429,7 @@ try {
         Reset-Fake
         $script:g.Fail = @('pack-refs*')
         $out = Get-Output { gpl }
-        @($out | Where-Object { $_.Contains('pack-refs をスキップ') }).Count -eq 2 -and (Test-Called 'pull')
+        @($out | Where-Object { $_.Contains('pack-refs をスキップ') }).Count -eq 2 -and (Test-Called 'pull origin refs/heads/main')
     }
     Test-Case 'gpl on a clean tree never stashes' {
         Reset-Fake
@@ -396,7 +441,7 @@ try {
         $script:g.Dirty = 'M file.txt'
         $null = Get-Output { gpl }
         $push = Get-CallIndex 'stash push --quiet -m gpl: auto stash before pull'
-        $pull = Get-CallIndex 'pull'
+        $pull = Get-CallIndex 'pull origin refs/heads/main'
         $pop = Get-CallIndex 'stash pop --quiet'
         $c = @(Get-Calls)
         $push -ge 0 -and $push -lt $pull -and $pull -lt $pop -and $c[-1] -ceq 'pack-refs --all'
@@ -411,7 +456,7 @@ try {
         Reset-Fake
         $script:g.Dirty = 'M submodule'; $script:g.StashRef = 'old-stash'; $script:g.StashCreates = $false
         $null = Get-Output { gpl }
-        (Test-Called 'stash push*') -and (Test-Called 'pull') -and -not (Test-Called 'stash pop*')
+        (Test-Called 'stash push*') -and (Test-Called 'pull origin refs/heads/main') -and -not (Test-Called 'stash pop*')
     }
     Test-Case 'gpl pops the new stash even when an older stash already exists' {
         Reset-Fake
@@ -425,7 +470,7 @@ try {
         $out = Get-Output { gpl }
         $c = @(Get-Calls)
         (Test-Line $out 'pull 失敗') -and (Test-Line $out 'git stash pop') -and
-        -not (Test-Called 'stash pop*') -and $c[-1] -ceq 'pull'
+        -not (Test-Called 'stash pop*') -and $c[-1] -ceq 'pull origin refs/heads/main'
     }
     Test-Case 'gpl omits the stash hint when a failed pull had nothing stashed' {
         Reset-Fake
@@ -453,7 +498,7 @@ try {
         New-TestFile $top 'new.txt'
         $script:g.RemoteFiles = @('new.txt'); $script:g.Untracked = @('new.txt')
         $null = Get-Output { gpl }
-        (Get-BackedUp $top) -contains 'new.txt' -and (Test-Called 'pull')
+        (Get-BackedUp $top) -contains 'new.txt' -and (Test-Called 'pull origin refs/heads/main')
     }
 
     # pull.rebase / argument detection decides whether tracked files are scanned. The tracked listing is

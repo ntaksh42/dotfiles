@@ -6,9 +6,30 @@
 # case (e.g. branch "d" vs "D") share one loose-ref filename, so a plain fetch
 # can silently clobber one with the other. Packing refs before/after moves
 # them into packed-refs (a single text file, immune to filesystem case-folding).
+#
+# ただしリモートに feature/Foo と feature/foo のような大文字小文字だけ違うブランチが両方あると、files 形式の
+# ref では片方を保存できない。Git 2.5x はこれを検出し、ほかの ref を更新したうえで fetch を失敗 (exit 1) にする。
+# この失敗だけなら警告にとどめて成功扱いにする。git が出す長い移行案内は 1 行の警告に置き換える。
+function Invoke-GitFetch {
+    $out = @(git fetch @args 2>&1 | ForEach-Object { "$_" })
+    $code = $LASTEXITCODE
+    $collision = $code -ne 0 -and ($out -match 'only differ in casing')
+    $inAdvice = $false
+    foreach ($line in $out) {
+        if ($collision -and $line -match "^error: You're on a case-insensitive filesystem") { $inAdvice = $true }
+        if (-not $inAdvice -and $line.Trim()) { Write-Host $line }
+        elseif ($line -match 'migrate to reftables\.$') { $inAdvice = $false }
+    }
+    if ($collision) {
+        Write-Warning 'fetch: 大文字小文字だけ違うリモートブランチがあり、片方は取得できない。ほかは取得済みなので続行する (根本対策: git refs migrate --ref-format=reftable)'
+        $code = 0
+    }
+    $global:LASTEXITCODE = $code
+}
+
 function git-fetch {
     git pack-refs --all
-    git fetch --all --prune @args
+    Invoke-GitFetch --all --prune @args
     git pack-refs --all
 }
 
@@ -104,7 +125,7 @@ function git-pull {
 
     # 衝突判定には fetch 済みの upstream が要る。pull 前に取得しておく。
     Write-Host '[gpl] fetch' -ForegroundColor Cyan
-    git fetch --prune --quiet
+    Invoke-GitFetch --prune --quiet
     if ($LASTEXITCODE -ne 0) {
         Write-Host '[gpl] fetch 失敗: 上のエラーを確認 (ネットワーク・認証・他の git プロセスのロック)' -ForegroundColor Red
         return
@@ -145,8 +166,17 @@ function git-pull {
         }
     }
 
+    # 引数無しの git pull は中でリモートの全ブランチを fetch し直し、上の大文字小文字衝突で失敗する。
+    # リポジトリとブランチの指定が無ければ upstream を明示して、取得をそのブランチだけに絞る。
+    $pullArgs = @($args)
+    if ($hasUpstream -and -not ($args | Where-Object { $_ -notlike '-*' })) {
+        $branch = git symbolic-ref --short -q HEAD
+        $remote = git config --get "branch.$branch.remote"
+        $merge = git config --get "branch.$branch.merge"
+        if ($remote -and $merge) { $pullArgs += @($remote, $merge) }
+    }
     Write-Host '[gpl] pull' -ForegroundColor Cyan
-    git pull @args
+    git pull @pullArgs
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[gpl] pull 失敗: 上のエラーを確認。マージ競合ならファイル修正後 git add / git commit、中止は git merge --abort$stashHint" -ForegroundColor Red
         return
