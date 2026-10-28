@@ -66,7 +66,7 @@ if ($h.Throw) { throw $h.Throw }
     function git {
         $line = 'git ' + ($args -join ' ')
         $script:gitCalls.Add($line); Add-Event $line
-        $global:LASTEXITCODE = 0
+        $global:LASTEXITCODE = Get-FakeExit $args
     }
     function claude {
         $line = 'claude ' + ($args -join ' ')
@@ -80,13 +80,16 @@ if ($h.Throw) { throw $h.Throw }
         }
         if ($args[2] -eq 'add' -and $global:LASTEXITCODE -eq 0) { $script:marketplaces += $script:marketplaceNameFor[$args[3]] }
     }
-    function refreshenv { $script:refreshCount++; Add-Event 'refreshenv' }
+    function refreshenv {
+        $script:refreshCount++; Add-Event 'refreshenv'
+        if ($script:failIds.ContainsKey('refreshenv')) { throw 'refreshenv failed' }
+    }
     function Install-Module {
         [CmdletBinding()]
         param([string]$Name, [string]$Scope, [switch]$Force, [switch]$AcceptLicense)
         $line = "Install-Module $Name Scope=$Scope Force=$Force AcceptLicense=$AcceptLicense"
         $script:moduleInstalls.Add($line); Add-Event $line
-        if ($script:failIds.ContainsKey($Name)) { throw "Install-Module failed for $Name" }
+        if ($script:failIds.ContainsKey($Name)) { Write-Error "Install-Module failed for $Name" }
     }
     function Update-Module {
         [CmdletBinding()]
@@ -121,15 +124,26 @@ if ($h.Throw) { throw $h.Throw }
         $h.Uri = $Uri; $h.CreateFile = $spec.CreateFile; $h.Throw = $spec.Throw; $h.Hook = $spec.Hook
         Set-Content -LiteralPath $OutFile -Value $script:installerBody
     }
-    function Disable-CodexStatusline { $script:codexCount++ }
-    function Sync-DevToolSkills { $script:syncCount++; Add-Event 'sync' }
+    function Disable-CodexStatusline {
+        $script:codexCount++
+        if ($script:failIds.ContainsKey('Disable-CodexStatusline')) { throw 'wrapper is locked' }
+    }
+    function Sync-DevToolSkills {
+        $script:syncCount++; Add-Event 'sync'
+        if ($script:failIds.ContainsKey('Sync-DevToolSkills')) { throw 'skills conflict' }
+    }
     function Test-ToolInstalled {
         param($Tool)
         $script:detectCalls.Add($Tool.Name)
+        if ($script:failIds.ContainsKey("detect:$($Tool.Name)")) { throw 'detection failed' }
         $script:installedNames -contains $Tool.Name
     }
     function Get-DevToolLatestVersion { param($Tool) $script:latestCalls.Add($Tool.Name); $script:latest[$Tool.Name] }
-    function Get-DevToolInstalledVersion { param($Tool) $script:installedVersion[$Tool.Name] }
+    function Get-DevToolInstalledVersion {
+        param($Tool)
+        if ($script:failIds.ContainsKey("version:$($Tool.Name)")) { throw 'version failed' }
+        $script:installedVersion[$Tool.Name]
+    }
     function Test-DevToolRemoteFilesUpToDate { param($Tool) $script:remoteUpToDate[$Tool.Name] }
     function Test-DevToolPluginUpToDate { param($Tool) $script:pluginUpToDate[$Tool.Name] }
     function Get-DotfilesRemoteConfig {
@@ -317,6 +331,83 @@ if ($h.Throw) { throw $h.Throw }
         $script:installedNames = @('Have')
         Invoke-Install -Yes
         $script:wingetCalls.Count -eq 1 -and $script:wingetCalls[0].Contains('id.Need') -and -not (Get-Calls $script:wingetCalls).Contains('id.Have')
+    }
+
+    # ======================================================================================
+    # Failure isolation
+    # ======================================================================================
+    Test-Case 'Detection failure skips that tool and continues checking and installing the others' {
+        Reset-Fake
+        $script:DevTools = @((New-Tool 'Bad' 'winget'), (New-Tool 'After' 'winget'))
+        $script:failIds['detect:Bad'] = 1
+        Invoke-Install -Yes
+        ($script:detectCalls -join ',') -ceq 'Bad,After' -and $script:wingetCalls.Count -eq 1 -and
+        (Get-Row 'Bad').Action -ceq 'Checking' -and (Get-Row 'Bad').Result -ceq 'FAILED' -and
+        (Get-Row 'After').Result -ceq 'OK' -and $script:log.Contains('detection failed')
+    }
+    Test-Case 'When every detection fails the summary is still shown without claiming everything is installed' {
+        Reset-Fake
+        $script:DevTools = @((New-Tool 'Bad' 'winget'))
+        $script:failIds['detect:Bad'] = 1
+        Invoke-Install -Yes
+        (Get-Row 'Bad').Result -ceq 'FAILED' -and $script:wingetCalls.Count -eq 0 -and
+        -not $script:log.Contains('All dev tools already installed.')
+    }
+    Test-Case 'Version detection failure does not stop later updates' {
+        Reset-Fake
+        $script:DevTools = @((New-ScriptTool 'Bad' @{ Repo = 'o/bad'; VersionSource = 'product' }),
+            (New-ScriptTool 'After' @{ RemoteFiles = @('a.ps1') }))
+        $script:installedNames = @('Bad', 'After')
+        $script:latest['Bad'] = 'v2.0.0'; $script:failIds['version:Bad'] = 1
+        $script:remoteUpToDate['After'] = $false
+        Invoke-Install -Yes
+        (Get-Row 'Bad').Action -ceq 'Checking' -and (Get-Row 'Bad').Result -ceq 'FAILED' -and
+        (Get-Row 'After').Action -ceq 'Updating' -and (Get-Row 'After').Result -ceq 'OK' -and
+        $script:downloads.Count -eq 1
+    }
+    Test-Case 'Statusline and skill sync failures warn but do not stop installation' {
+        Reset-Fake
+        $script:DevTools = @((New-Tool 'After' 'winget'))
+        $script:failIds['Disable-CodexStatusline'] = 1; $script:failIds['Sync-DevToolSkills'] = 1
+        Invoke-Install -Yes
+        (Get-Row 'After').Result -ceq 'OK' -and $script:log.Contains('wrapper is locked') -and
+        $script:log.Contains('skills conflict') -and $script:refreshCount -eq 1
+    }
+    Test-Case 'Skill sync failure with nothing pending warns without throwing' {
+        Reset-Fake
+        $script:failIds['Sync-DevToolSkills'] = 1
+        Invoke-Install -Yes
+        $script:log.Contains('skills conflict') -and $script:syncCount -eq 1
+    }
+    Test-Case 'Environment refresh failure does not hide the install summary' {
+        Reset-Fake
+        $script:DevTools = @((New-Tool 'After' 'winget'))
+        $script:failIds['refreshenv'] = 1
+        Invoke-Install -Yes
+        (Get-Row 'After').Result -ceq 'OK' -and $script:log.Contains('refreshenv failed')
+    }
+    Test-Case 'A non-terminating module error is FAILED even when the caller uses Continue' {
+        Reset-Fake
+        $ErrorActionPreference = 'Continue'
+        $script:DevTools = @((New-Tool 'Bad' 'psmodule'), (New-Tool 'After' 'winget'))
+        $script:failIds['id.Bad'] = 1
+        Invoke-Install -Yes
+        (Get-Row 'Bad').Result -ceq 'FAILED' -and (Get-Row 'After').Result -ceq 'OK'
+    }
+    Test-Case 'A delta git configuration failure is FAILED and later tools still install' {
+        Reset-Fake
+        $script:DevTools = @((New-Tool 'delta' 'winget' @{ PostInstall = 'delta' }), (New-Tool 'After' 'winget'))
+        $script:failIds['core.pager'] = 1
+        Invoke-Install -Yes
+        (Get-Row 'delta').Result -ceq 'FAILED' -and (Get-Row 'After').Result -ceq 'OK' -and
+        $script:gitCalls.Count -eq 1 -and $script:log.Contains('exit code 1')
+    }
+    Test-Case 'A version marker failure is FAILED and later tools still install' {
+        Reset-Fake
+        $script:DevTools = @((New-ScriptTool 'Bad' @{ Repo = 'o/bad' }), (New-Tool 'After' 'winget'))
+        $script:latest['Bad'] = 'v1.0.0'
+        Invoke-Install -Yes
+        (Get-Row 'Bad').Result -ceq 'FAILED' -and (Get-Row 'After').Result -ceq 'OK'
     }
 
     # ======================================================================================

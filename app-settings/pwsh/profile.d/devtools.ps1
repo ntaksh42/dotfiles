@@ -338,12 +338,6 @@ function Disable-CodexStatusline {
     Write-Host "Codex statusline を無効化しました: $wrapper.disabled" -ForegroundColor Yellow
 }
 
-# スキル同期の失敗でツール導入全体を止めない。
-function Invoke-DevToolSkillSync {
-    try { Sync-DevToolSkills }
-    catch { Write-Warning "Skill sync failed: $($_.Exception.Message)" }
-}
-
 # Install missing catalog tools. Script-backed tools compare installed versions or
 # remote file contents before updating. If the remote check fails, skip the update.
 # remote-config の既存ファイル上書きは、ccstatusline のようにアプリ自身が書き換える
@@ -354,62 +348,65 @@ function Install-DevTools {
     [CmdletBinding()]
     param([switch]$Force, [switch]$Yes)
 
+    $ErrorActionPreference = 'Stop'
     if ($Yes) { $Force = $true }
 
-    Disable-CodexStatusline
+    try { Disable-CodexStatusline }
+    catch { Write-Warning "Disable-CodexStatusline failed: $($_.Exception.Message)" }
 
     # 判定は winget/ネットワークを伴うため1回だけ行い、以降は結果を使い回す。
+    $results = @()
     $installed = @{}
     foreach ($tool in $script:DevTools) {
-        # 1つの判定失敗で全体を止めず、そのツールだけ未導入扱いにする。
         try { $installed[$tool.Name] = [bool](Test-ToolInstalled $tool) }
         catch {
-            Write-Warning "$($tool.Name): install check failed ($($_.Exception.Message)); treating as not installed."
-            $installed[$tool.Name] = $false
+            Write-Warning "$($tool.Name): installation status could not be checked; skipping. $($_.Exception.Message)"
+            $results += [PSCustomObject]@{ Tool = $tool.Name; Action = 'Checking'; Result = 'FAILED' }
         }
     }
-    $toInstall = @($script:DevTools | Where-Object { -not $installed[$_.Name] })
+    $toInstall = @($script:DevTools | Where-Object { $installed.ContainsKey($_.Name) -and -not $installed[$_.Name] })
     $latestVersions = @{}
     $toUpdate = @(foreach ($tool in $script:DevTools) {
         if (-not $installed[$tool.Name] -or $tool.InstallOnly) { continue }
         try {
-        if ($tool.Backend -eq 'claude-plugin') {
-            $upToDate = Test-DevToolPluginUpToDate $tool
-            if ($null -eq $upToDate) { Write-Warning "$($tool.Name): plugin version could not be checked; skipping update." }
-            elseif (-not $upToDate) { $tool }
-            continue
-        }
-        if ($tool.Backend -eq 'winget' -or $tool.Backend -eq 'msstore') {
-            # winget 管理のものは Upgradable を付けたものだけ更新対象にする。
-            if (-not $tool.Upgradable) { continue }
-            if (-not (Test-DevToolWingetUpgradeAvailable $tool)) { continue }
-        }
-        elseif ($tool.Backend -ne 'script') { continue }
-        elseif ($tool.Repo) {
-            $latest = Get-DevToolLatestVersion $tool
-            if (-not $latest) {
-                Write-Warning "$($tool.Name): latest version could not be checked; skipping update."
+            if ($tool.Backend -eq 'claude-plugin') {
+                $upToDate = Test-DevToolPluginUpToDate $tool
+                if ($null -eq $upToDate) { Write-Warning "$($tool.Name): plugin version could not be checked; skipping update." }
+                elseif (-not $upToDate) { $tool }
                 continue
             }
-            $latestVersions[$tool.Name] = $latest
-            if (Test-DevToolVersionCurrent (Get-DevToolInstalledVersion $tool) $latest) { continue }
-        }
-        elseif ($tool.RemoteFiles) {
-            $upToDate = Test-DevToolRemoteFilesUpToDate $tool
-            if ($null -eq $upToDate) {
-                Write-Warning "$($tool.Name): remote files could not be checked; skipping update."
+            if ($tool.Backend -eq 'winget' -or $tool.Backend -eq 'msstore') {
+                # winget 管理のものは Upgradable を付けたものだけ更新対象にする。
+                if (-not $tool.Upgradable) { continue }
+                if (-not (Test-DevToolWingetUpgradeAvailable $tool)) { continue }
+            }
+            elseif ($tool.Backend -ne 'script') { continue }
+            elseif ($tool.Repo) {
+                $latest = Get-DevToolLatestVersion $tool
+                if (-not $latest) {
+                    Write-Warning "$($tool.Name): latest version could not be checked; skipping update."
+                    continue
+                }
+                $latestVersions[$tool.Name] = $latest
+                if (Test-DevToolVersionCurrent (Get-DevToolInstalledVersion $tool) $latest) { continue }
+            }
+            elseif ($tool.RemoteFiles) {
+                $upToDate = Test-DevToolRemoteFilesUpToDate $tool
+                if ($null -eq $upToDate) {
+                    Write-Warning "$($tool.Name): remote files could not be checked; skipping update."
+                    continue
+                }
+                if ($upToDate) { continue }
+            }
+            if (Test-DevToolProcessRunning $tool) {
+                Write-Warning "$($tool.Name) is running; close it before updating."
                 continue
             }
-            if ($upToDate) { continue }
-        }
-        if (Test-DevToolProcessRunning $tool) {
-            Write-Warning "$($tool.Name) is running; close it before updating."
-            continue
-        }
-        $tool
+            $tool
         }
         catch {
-            Write-Warning "$($tool.Name): update check failed ($($_.Exception.Message)); skipping update."
+            Write-Warning "$($tool.Name): update could not be checked; skipping. $($_.Exception.Message)"
+            $results += [PSCustomObject]@{ Tool = $tool.Name; Action = 'Checking'; Result = 'FAILED' }
         }
     })
     # 前提コマンドが無いまま走らせても最後に失敗するだけなので、インストーラ自体を起動しない。
@@ -421,8 +418,13 @@ function Install-DevTools {
             $true
         })
     if ($pending.Count -eq 0) {
-        Invoke-DevToolSkillSync
-        Write-Host 'All dev tools already installed.' -ForegroundColor Green
+        try { Sync-DevToolSkills }
+        catch { Write-Warning "Sync-DevToolSkills failed: $($_.Exception.Message)" }
+        if ($results.Count -gt 0) {
+            Write-Host "`nInstall summary:" -ForegroundColor Cyan
+            $results | Format-Table -AutoSize
+        }
+        else { Write-Host 'All dev tools already installed.' -ForegroundColor Green }
         return
     }
 
@@ -436,9 +438,9 @@ function Install-DevTools {
         if ($ans -notmatch '^(y|yes)$') { Write-Host 'Aborted.'; return }
     }
 
-    Invoke-DevToolSkillSync
+    try { Sync-DevToolSkills }
+    catch { Write-Warning "Sync-DevToolSkills failed: $($_.Exception.Message)" }
 
-    $results = @()
     foreach ($t in $pending) {
         $isUpdate = $toUpdate -contains $t
         $action = if ($isUpdate) { 'Updating' } else { 'Installing' }
@@ -576,7 +578,6 @@ function Install-DevTools {
                     }
                 }
             }
-            $ok = $true
             # 実行ファイルから版を読めないものだけ、更新前に確認したタグを記録する。
             if ($t.Repo -and -not $t.VersionSource) {
                 $installedVersion = $latestVersions[$t.Name]
@@ -588,23 +589,26 @@ function Install-DevTools {
                     Set-Content -LiteralPath $marker -Value "$installedVersion`n$hash" -NoNewline -Encoding UTF8
                 }
             }
+            # Post-install: delta -> configure git pager (with confirmation)
+            if ($t.PostInstall -eq 'delta') {
+                $cfg = if ($Force) { 'y' } else { Read-Host 'Configure git to use delta as pager? (y/N)' }
+                if ($cfg -match '^(y|yes)$') {
+                    git config --global core.pager delta
+                    Assert-NativeCommandSucceeded 'git config --global core.pager delta'
+                    git config --global interactive.diffFilter 'delta --color-only'
+                    Assert-NativeCommandSucceeded 'git config --global interactive.diffFilter'
+                    git config --global delta.navigate true
+                    Assert-NativeCommandSucceeded 'git config --global delta.navigate true'
+                    Write-Host '  git pager set to delta.' -ForegroundColor Gray
+                }
+            }
+            $ok = $true
         }
         catch {
             Write-Warning "  Failed: $($_.Exception.Message)"
         }
         $result = if (-not $ok) { 'FAILED' } elseif ($rebootRequired) { 'RESTART REQUIRED' } else { 'OK' }
         $results += [PSCustomObject]@{ Tool = $t.Name; Action = $action; Result = $result }
-
-        # Post-install: delta -> configure git pager (with confirmation)
-        if ($ok -and $t.PostInstall -eq 'delta') {
-            $cfg = if ($Force) { 'y' } else { Read-Host 'Configure git to use delta as pager? (y/N)' }
-            if ($cfg -match '^(y|yes)$') {
-                git config --global core.pager delta
-                git config --global interactive.diffFilter 'delta --color-only'
-                git config --global delta.navigate true
-                Write-Host '  git pager set to delta.' -ForegroundColor Gray
-            }
-        }
     }
 
     try { refreshenv }
