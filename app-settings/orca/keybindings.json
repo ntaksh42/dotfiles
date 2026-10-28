@@ -16,6 +16,9 @@
       ],
       "terminal.splitDown": [
         "Alt+Shift+Minus"
+      ],
+      "worktree.palette": [
+        "Mod+K"
       ]
     }
   }
