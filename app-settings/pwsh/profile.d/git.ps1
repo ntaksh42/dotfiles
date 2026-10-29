@@ -70,29 +70,41 @@ function git-clean-branches {
 }
 
 # ローカルを完全にきれいな状態へ戻す: 追跡ファイルの変更を破棄し (reset --hard)、
-# 未追跡・.gitignore 対象のファイル/ディレクトリも削除する (clean -ffdx)。
-# 削除対象をプレビューして確認を取ってから実行 (-Force で確認省略)。
+# 未追跡・.gitignore 対象のファイル/ディレクトリも削除する (clean -ffdx)。確認はしない。
+# git clean はカレントディレクトリ以下しか消さないので、サブディレクトリから実行してもリポジトリのルートで動かす。
+# git clean が消せないもの (Windows の予約名 nul 等、長すぎるパス) は \\?\ パスで消し直す。
 function git-reset-clean {
     [CmdletBinding()]
-    param(
-        [string]$Ref = 'HEAD',
-        [switch]$Force
-    )
-    $dirty = git status --porcelain
-    $toClean = @(git clean -ffdxn)
+    param([string]$Ref = 'HEAD')
+
+    $top = "$(git rev-parse --show-toplevel)".Trim()
+    Assert-NativeCommandSucceeded 'git rev-parse --show-toplevel'
+    $dirty = git -C $top status --porcelain
+    $toClean = @(Get-GitCleanPreview $top)
     if (-not $dirty -and $toClean.Count -eq 0) {
         Write-Host 'Already clean.' -ForegroundColor Green
         return
     }
 
-    Write-Host "This will 'git reset --hard $Ref' and remove:" -ForegroundColor Cyan
+    Write-Host "git reset --hard $Ref, then removing $($toClean.Count) untracked/ignored item(s):" -ForegroundColor Cyan
     $toClean | ForEach-Object { Write-Host "  $_" }
-    if (-not $Force) {
-        if ((Read-Host 'Proceed? (y/N)') -notmatch '^(y|yes)$') { Write-Host 'Aborted.'; return }
-    }
 
-    git reset --hard $Ref
+    git -C $top reset --hard $Ref
     Assert-NativeCommandSucceeded "git reset --hard $Ref"
-    git clean -ffdx
+    git -C $top clean -ffdx
     Assert-NativeCommandSucceeded 'git clean -ffdx'
+
+    foreach ($rel in @(Get-GitCleanPreview $top)) {
+        $full = (Join-Path $top $rel.TrimEnd('/')) -replace '/', '\'
+        Remove-Item -LiteralPath "\\?\$full" -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    $left = @(Get-GitCleanPreview $top)
+    if ($left.Count -gt 0) { Write-Warning "Could not remove (in use by another process?): $($left -join ', ')" }
+}
+
+# git clean -ffdx が消す予定のパス (リポジトリのルートからの相対) を返す。
+# "Would refuse to remove current working directory" (シェルがいる未追跡ディレクトリ) は消せないので含めない。
+function Get-GitCleanPreview([string]$Top) {
+    git -C $Top -c core.quotepath=false clean -ffdxn | Where-Object { "$_".StartsWith('Would remove ') } |
+        ForEach-Object { "$_".Substring('Would remove '.Length) }
 }
