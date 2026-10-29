@@ -32,9 +32,9 @@ $script:ProfileHelp = [ordered]@{
         @{ Group = '移動とクローン'; Cmd = 'git-clone <url>'; Desc = 'クローンして、そのフォルダへ移動' }
         @{ Group = '破壊的操作'; Cmd = 'git-reset-clean'; Desc = '変更破棄 + 未追跡・ignore 対象も削除して完全クリーン (-Ref/-Force)' }
         @{ Group = 'GitHub PR'; Cmd = 'prc/prv/prl/prs'; Desc = 'GitHub PR の作成 / ブラウザ表示 / 一覧 / 状況 (gh があれば)' }
-        @{ Group = '複数リポジトリ (gita)'; Cmd = 'gita-pull-all'; Desc = 'gita 全リポジトリの nul ファイルを掃除して pull (-Fallback で切替先指定)' }
+        @{ Group = '複数リポジトリ (gita)'; Cmd = 'gita-pull-all'; Desc = 'gita 全リポジトリの nul ファイルを掃除して pull し、失敗したリポジトリを最後に一覧 (-Fallback で切替先指定)' }
         @{ Group = '複数リポジトリ (gita)'; Cmd = 'gita-scan [path]'; Desc = '直下の git リポジトリを gita に一括登録' }
-        @{ Group = '複数リポジトリ (gita)'; Cmd = 'gita-doctor'; Desc = 'gita の登録から壊れた行 (フォルダなし / 名前が空 / git でない) を探し、確認して削除' }
+        @{ Group = '複数リポジトリ (gita)'; Cmd = 'gita-doctor [-Deep]'; Desc = 'gita の登録の不備 (確認して削除) と壊れたリポジトリ (status 失敗 / lock 残骸 / merge 途中。-Deep で fsck) を検出' }
         @{ Group = 'ヘルプ'; Cmd = 'git-help'; Desc = 'この一覧と .gitconfig の git alias をまとめて表示' }
     )
     'Visual Studio / build' = @(
