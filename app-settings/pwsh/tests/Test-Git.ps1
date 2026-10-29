@@ -79,13 +79,18 @@ try {
                 return
             }
             'rev-parse --verify --quiet origin/*' { if (-not $repo.HasOrigin) { $global:LASTEXITCODE = 1 }; return }
-            'rev-parse --absolute-git-dir' { $script:g.GitDir; return }
+            'rev-parse --absolute-git-dir' { $repo.GitDir; return }
+            'rev-parse --is-bare-repository' { if ($repo.Bare) { 'true' } else { 'false' }; return }
             'rev-parse --git-dir' { if ($repo.NotRepo) { $global:LASTEXITCODE = 128 }; return }
             'rev-parse --show-toplevel' {
                 if ($script:g.Top) { $script:g.Top } else { $global:LASTEXITCODE = 128 }
                 return
             }
-            'status --porcelain*' { $script:g.Dirty; return }
+            'status --porcelain*' {
+                if ($repo.StatusError) { $repo.StatusError; $global:LASTEXITCODE = 128 } else { $script:g.Dirty }
+                return
+            }
+            'fsck *' { if ($repo.FsckError) { $repo.FsckError; $global:LASTEXITCODE = 1 }; return }
             'stash push --quiet -m *' { if ($script:g.StashCreates) { $script:g.StashRef = 'stash-created' }; return }
             'config --get pull.rebase' {
                 if ($script:g.Rebase) { $script:g.Rebase } else { $global:LASTEXITCODE = 1 }
@@ -157,8 +162,9 @@ try {
     function New-FakeRepo([string]$Name, [hashtable]$Overrides = @{}) {
         $dir = Join-Path (New-ScratchDir) $Name
         New-Item -ItemType Directory -Path $dir | Out-Null
-        $cfg = @{ Branch = 'main'; HasOrigin = $true; Tracked = @(); Untracked = @() }
+        $cfg = @{ Branch = 'main'; HasOrigin = $true; Tracked = @(); Untracked = @(); GitDir = (Join-Path $dir '.git') }
         foreach ($k in $Overrides.Keys) { $cfg[$k] = $Overrides[$k] }
+        if (-not $cfg.NotRepo -and -not $cfg.Bare) { New-Item -ItemType Directory -Path $cfg.GitDir | Out-Null }
         $script:g.Repos[$dir] = $cfg
         $script:g.GitaPaths[$Name] = $dir
         $script:g.GitaNames += $Name
@@ -895,6 +901,43 @@ try {
         (Get-CallIndex "-C $repo ls-files*") -ge 0 -and (Get-CallIndex "-C $repo ls-files*") -lt (Get-CallIndex "-C $repo fetch*")
     }
 
+    Test-Case 'gita-pull-all switches a detached HEAD to the fallback branch without probing origin/HEAD' {
+        Reset-Fake
+        $repo = New-FakeRepo 'alpha' @{ Branch = 'HEAD' }
+        $out = Get-Output { gita-pull-all }
+        (Test-Line $out 'detached HEAD -> switching to main') -and (Test-Called "-C $repo checkout main") -and
+        -not (Test-Called "-C $repo rev-parse --verify --quiet origin/HEAD") -and (Test-Called "-C $repo pull --ff-only")
+    }
+    Test-Case 'gita-pull-all skips the pull when fetch fails and lists the repo at the end' {
+        Reset-Fake
+        $repo = New-FakeRepo 'alpha'
+        $script:g.Fail = @('fetch*')
+        $out = Get-Output { gita-pull-all }
+        (Test-Line $out 'fetch failed') -and -not (Test-Called "-C $repo pull*") -and
+        (Test-Line $out '1 of 1 repo(s) failed: alpha (fetch)')
+    }
+    Test-Case 'gita-pull-all skips a repo whose HEAD cannot be read' {
+        Reset-Fake
+        $repo = New-FakeRepo 'alpha'
+        $script:g.Fail = @('rev-parse --abbrev-ref HEAD')
+        $out = Get-Output { gita-pull-all }
+        (Test-Line $out 'cannot read HEAD') -and -not (Test-Called "-C $repo pull*") -and (Test-Line $out 'alpha (HEAD)')
+    }
+    Test-Case 'gita-pull-all lists every failed repo at the end and stays quiet when all succeed' {
+        Reset-Fake
+        $null = New-FakeRepo 'alpha'
+        $b = New-FakeRepo 'beta'
+        $ok = Get-Output { gita-pull-all }
+        $script:calls.Clear()
+        $script:g.FailOnce.Add(@{ Pattern = 'pull*'; Output = 'fatal: Not possible to fast-forward' })
+        $ghost = Join-Path $scratch 'ghost-repo'
+        $script:g.GitaNames += 'ghost'
+        $script:g.GitaPaths['ghost'] = $ghost
+        $out = Get-Output { gita-pull-all }
+        -not (Test-Line $ok 'failed') -and (Test-Line $out 'pull failed') -and (Test-Called "-C $b pull --ff-only") -and
+        (Test-Line $out '2 of 3 repo(s) failed: alpha (pull), ghost (path not found)')
+    }
+
     # --- gita-doctor --------------------------------------------------------------------
     # Registry with one healthy repo and one entry for each kind of problem.
     function New-GitaRegistry {
@@ -936,6 +979,72 @@ try {
         $script:answer = 'n'
         $out = Get-Output { gita-doctor -Path $r.Csv }
         (Test-Line $out 'Aborted.') -and (Get-Content -LiteralPath $r.Csv -Raw) -ceq $before -and -not (Test-Path -LiteralPath "$($r.Csv).bak")
+    }
+    # Registry file with one line per given repo path / name.
+    function New-GitaCsv([string[]]$Lines) {
+        $csv = Join-Path (New-ScratchDir) 'repos.csv'
+        Set-Content -LiteralPath $csv -Value $Lines
+        $csv
+    }
+    Test-Case 'gita-doctor reports a repo whose git status fails, with the git error, and keeps its entry' {
+        Reset-Fake
+        $repo = New-FakeRepo 'corrupt' @{ StatusError = @('error: object file .git/objects/aa/bb is empty', 'fatal: bad object HEAD') }
+        $csv = New-GitaCsv "$repo,corrupt,,"
+        $before = Get-Content -LiteralPath $csv -Raw
+        $out = Get-Output { gita-doctor -Path $csv }
+        (Test-Line $out 'Broken repos') -and (Test-Line $out 'git status failed: error: object file .git/objects/aa/bb is empty') -and
+        (Test-Line $out 're-clone') -and $script:prompts.Count -eq 0 -and (Get-Content -LiteralPath $csv -Raw) -ceq $before
+    }
+    Test-Case 'gita-doctor suggests safe.directory for a dubious-ownership repo and an index rebuild for a broken index' {
+        Reset-Fake
+        $owned = New-FakeRepo 'owned' @{ StatusError = "fatal: detected dubious ownership in repository at 'x'" }
+        $idx = New-FakeRepo 'idx' @{ StatusError = 'fatal: .git/index: index file smaller than expected' }
+        $csv = New-GitaCsv @("$owned,owned,,", "$idx,idx,,")
+        $out = Get-Output { gita-doctor -Path $csv }
+        (Test-Line $out "safe.directory '$($owned -replace '\\', '/')'") -and (Test-Line $out 'git reset')
+    }
+    Test-Case 'gita-doctor reports stale lock files in the git dir and under refs' {
+        Reset-Fake
+        $repo = New-FakeRepo 'locked'
+        New-TestFile $repo '.git/index.lock'
+        New-TestFile $repo '.git/refs/heads/main.lock'
+        New-TestFile $repo '.git/refs/heads/main'
+        $out = Get-Output { gita-doctor -Path (New-GitaCsv "$repo,locked,,") }
+        (Test-Line $out 'stale lock file: index.lock') -and (Test-Line $out 'main.lock') -and
+        @($out | Where-Object { $_.Contains('stale lock file') }).Count -eq 2
+    }
+    Test-Case 'gita-doctor reports a rebase left in progress' {
+        Reset-Fake
+        $repo = New-FakeRepo 'rebasing'
+        New-Item -ItemType Directory -Path (Join-Path $repo '.git\rebase-merge') | Out-Null
+        $out = Get-Output { gita-doctor -Path (New-GitaCsv "$repo,rebasing,,") }
+        (Test-Line $out 'rebase in progress') -and (Test-Line $out 'git rebase --abort')
+    }
+    Test-Case 'gita-doctor runs git fsck only with -Deep' {
+        Reset-Fake
+        $repo = New-FakeRepo 'deep' @{ FsckError = @('missing blob 1234', 'error: 1234: object corrupt or missing') }
+        $csv = New-GitaCsv "$repo,deep,,"
+        $plain = Get-Output { gita-doctor -Path $csv }
+        $fsckBefore = Test-Called '*fsck*'
+        $deep = Get-Output { gita-doctor -Path $csv -Deep }
+        (Test-Line $plain 'No problems in 1 gita entries.') -and -not $fsckBefore -and
+        (Test-Line $deep 'git fsck failed: error: 1234: object corrupt or missing')
+    }
+    Test-Case 'gita-doctor reads a quoted path containing a comma and accepts a bare repo' {
+        Reset-Fake
+        $comma = New-FakeRepo 'a,b'
+        $bare = New-FakeRepo 'bare' @{ Bare = $true }
+        $out = Get-Output { gita-doctor -Path (New-GitaCsv @("`"$comma`",ab,,", "$bare,bare,,")) }
+        Test-Line $out 'No problems in 2 gita entries.'
+    }
+    Test-Case 'gita-doctor shows broken repos and still offers to remove only the bad entries' {
+        Reset-Fake
+        $r = New-GitaRegistry
+        $broken = New-FakeRepo 'broken' @{ StatusError = 'fatal: bad object HEAD' }
+        Add-Content -LiteralPath $r.Csv -Value "$broken,broken,,"
+        $out = Get-Output { gita-doctor -Path $r.Csv }
+        (Test-Line $out 'git status failed: fatal: bad object HEAD') -and (Test-Line $out 'Removed 3 entries') -and
+        ((Get-Content -LiteralPath $r.Csv) -join ';') -ceq "$($r.Good);$broken,broken,,"
     }
 }
 finally {
