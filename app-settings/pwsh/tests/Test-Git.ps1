@@ -30,7 +30,7 @@ try {
             Dirty = $null; Rebase = $null; StashRef = $null; StashCreates = $true
             RemoteFiles = @('README.md'); Tracked = @(); Untracked = @()
             Top = $null; GitDir = $null; CloneDir = $null
-            Branches = @(); LocalBranches = @(); Merged = @(); CleanPreview = @(); LogLines = @()
+            Branches = @(); LocalBranches = @(); Merged = @(); CleanPreview = @(); CleanLeft = @(); Cleaned = $false; LogLines = @()
             Fail = @(); Repos = @{}; GitaNames = @(); GitaPaths = @{}
             # One-shot failures: the first call matching Pattern prints Output, exits 1 and is consumed.
             FailOnce = [System.Collections.Generic.List[object]]::new()
@@ -104,7 +104,16 @@ try {
             'ls-files' { $repo.Tracked; return }
             'branch --all --format=%(refname:short)' { $script:g.Branches; return }
             'branch --merged' { $script:g.Merged; return }
-            'clean -ffdxn' { $script:g.CleanPreview; return }
+            'clean -ffdxn' {
+                # After "clean -ffdx" only the CleanLeft entries that still exist on disk under Top remain.
+                if (-not $script:g.Cleaned) { $script:g.CleanPreview; return }
+                foreach ($line in $script:g.CleanLeft) {
+                    $p = "\\?\$(Join-Path $script:g.Top (($line -replace '^Would remove ', '').TrimEnd('/') -replace '/', '\'))"
+                    if ([IO.File]::Exists($p) -or [IO.Directory]::Exists($p)) { $line }
+                }
+                return
+            }
+            'clean -ffdx' { $script:g.Cleaned = $true; return }
             'log *' { $script:g.LogLines; return }
             'clone *' {
                 if ($script:g.CloneDir) { New-Item -ItemType Directory -Path $script:g.CloneDir | Out-Null }
@@ -710,61 +719,78 @@ try {
     }
 
     # --- git-reset-clean ------------------------------------------------------------------------
-    Test-Case 'git-reset-clean reports an already clean tree without prompting or resetting' {
+    Test-Case 'git-reset-clean reports an already clean tree without resetting' {
         Reset-Fake
+        $top = New-FakeWorktree
         $out = Get-Output { git-reset-clean }
         (Test-Line $out 'Already clean.') -and $script:prompts.Count -eq 0 -and
-        (Get-Calls) -join ';' -ceq 'status --porcelain;clean -ffdxn'
+        (Get-Calls) -join ';' -ceq "rev-parse --show-toplevel;-C $top status --porcelain;-C $top -c core.quotepath=false clean -ffdxn"
     }
-    Test-Case 'git-reset-clean shows the preview and aborts on a negative answer' {
+    Test-Case 'git-reset-clean resets hard then cleans at the repo root without prompting' {
         Reset-Fake
+        $top = New-FakeWorktree
         $script:g.Dirty = 'M a.txt'; $script:g.CleanPreview = @('Would remove junk/')
-        $script:answer = 'n'
         $out = Get-Output { git-reset-clean }
-        (Test-Line $out "git reset --hard HEAD") -and (Test-Line $out '  Would remove junk/') -and (Test-Line $out 'Aborted.') -and
-        -not (Test-Called 'reset*') -and -not (Test-Called 'clean -ffdx')
-    }
-    Test-Case 'git-reset-clean resets hard then cleans after a positive answer' {
-        Reset-Fake
-        $script:g.Dirty = 'M a.txt'
-        $script:answer = 'y'
-        $null = Get-Output { git-reset-clean }
-        $reset = Get-CallIndex 'reset --hard HEAD'
-        $clean = Get-CallIndex 'clean -ffdx'
-        $script:prompts.Count -eq 1 -and $reset -ge 0 -and $reset -lt $clean
-    }
-    Test-Case 'git-reset-clean -Force skips the prompt' {
-        Reset-Fake
-        $script:g.Dirty = 'M a.txt'
-        $null = Get-Output { git-reset-clean -Force }
-        $script:prompts.Count -eq 0 -and (Test-Called 'reset --hard HEAD') -and (Test-Called 'clean -ffdx')
+        $reset = Get-CallIndex "-C $top reset --hard HEAD"
+        $clean = Get-CallIndex "-C $top clean -ffdx"
+        $script:prompts.Count -eq 0 -and $reset -ge 0 -and $reset -lt $clean -and
+        (Test-Line $out 'removing 1 untracked/ignored item(s)') -and (Test-Line $out '  junk/') -and
+        -not (Test-Line $out 'Could not remove')
     }
     Test-Case 'git-reset-clean -Ref resets to that ref' {
         Reset-Fake
+        $top = New-FakeWorktree
         $script:g.Dirty = 'M a.txt'
-        $out = Get-Output { git-reset-clean -Ref origin/main -Force }
-        (Test-Called 'reset --hard origin/main') -and (Test-Line $out "git reset --hard origin/main") -and
-        -not (Test-Called 'reset --hard HEAD')
+        $out = Get-Output { git-reset-clean -Ref origin/main }
+        (Test-Called "-C $top reset --hard origin/main") -and (Test-Line $out 'git reset --hard origin/main') -and
+        -not (Test-Called '*reset --hard HEAD')
     }
     Test-Case 'git-reset-clean proceeds when only untracked or ignored files exist' {
         Reset-Fake
+        $top = New-FakeWorktree
         $script:g.CleanPreview = @('Would remove build/')
-        $null = Get-Output { git-reset-clean -Force }
-        (Test-Called 'reset --hard HEAD') -and (Test-Called 'clean -ffdx')
+        $null = Get-Output { git-reset-clean }
+        (Test-Called "-C $top reset --hard HEAD") -and (Test-Called "-C $top clean -ffdx")
+    }
+    Test-Case 'git-reset-clean ignores the refusal to remove the current directory' {
+        Reset-Fake
+        $null = New-FakeWorktree
+        $script:g.CleanPreview = @('Would refuse to remove current working directory')
+        $out = Get-Output { git-reset-clean }
+        Test-Line $out 'Already clean.'
+    }
+    Test-Case 'git-reset-clean deletes what git clean left behind (reserved names) through a \\?\ path' {
+        Reset-Fake
+        $top = New-FakeWorktree
+        New-TestFile $top 'nul'
+        New-TestFile $top 'deep/nul'
+        $script:g.CleanPreview = @('Would remove nul', 'Would remove deep/')
+        $script:g.CleanLeft = @('Would remove nul', 'Would remove deep/')
+        $out = Get-Output { git-reset-clean }
+        -not (Test-TestFile $top 'nul') -and -not (Test-Path -LiteralPath (Join-Path $top 'deep')) -and
+        -not (Test-Line $out 'Could not remove')
+    }
+    Test-Case 'git-reset-clean throws outside a repository' {
+        Reset-Fake
+        $msg = $null
+        try { $null = Get-Output { git-reset-clean } } catch { $msg = $_.Exception.Message }
+        $msg -like '*git rev-parse --show-toplevel failed*' -and -not (Test-Called '*reset*')
     }
     Test-Case 'git-reset-clean throws and skips the clean when reset fails' {
         Reset-Fake
+        $null = New-FakeWorktree
         $script:g.Dirty = 'M a.txt'; $script:g.Fail = @('reset*')
         $msg = $null
-        try { $null = Get-Output { git-reset-clean -Force } } catch { $msg = $_.Exception.Message }
-        $msg -like '*git reset --hard HEAD failed with exit code 1*' -and -not (Test-Called 'clean -ffdx')
+        try { $null = Get-Output { git-reset-clean } } catch { $msg = $_.Exception.Message }
+        $msg -like '*git reset --hard HEAD failed with exit code 1*' -and -not (Test-Called '*clean -ffdx')
     }
     Test-Case 'git-reset-clean throws when the clean fails' {
         Reset-Fake
+        $null = New-FakeWorktree
         $script:g.Dirty = 'M a.txt'; $script:g.Fail = @('clean -ffdx')
         $msg = $null
-        try { $null = Get-Output { git-reset-clean -Force } } catch { $msg = $_.Exception.Message }
-        $msg -like '*git clean -ffdx failed with exit code 1*' -and (Test-Called 'reset --hard HEAD')
+        try { $null = Get-Output { git-reset-clean } } catch { $msg = $_.Exception.Message }
+        $msg -like '*git clean -ffdx failed with exit code 1*' -and (Test-Called '*reset --hard HEAD')
     }
 
     # --- gita-scan -----------------------------------------------------------------------

@@ -30,7 +30,7 @@ $script:ProfileHelp = [ordered]@{
         @{ Group = '取得と同期'; Cmd = 'git-pull / gpl'; Desc = '安全な pull: 未コミット変更を退避 → 衝突ファイルを .git/pull-backup へ避難 → pull → 復元 (引数は git pull へ)' }
         @{ Group = '移動とクローン'; Cmd = 'git-root'; Desc = 'リポジトリのルートへ移動' }
         @{ Group = '移動とクローン'; Cmd = 'git-clone <url>'; Desc = 'クローンして、そのフォルダへ移動' }
-        @{ Group = '破壊的操作'; Cmd = 'git-reset-clean'; Desc = '変更破棄 + 未追跡・ignore 対象も削除して完全クリーン (-Ref/-Force)' }
+        @{ Group = '破壊的操作'; Cmd = 'git-reset-clean'; Desc = '変更破棄 + 未追跡・ignore 対象もリポジトリ全体から確認なしで削除 (-Ref)' }
         @{ Group = 'GitHub PR'; Cmd = 'prc/prv/prl/prs'; Desc = 'GitHub PR の作成 / ブラウザ表示 / 一覧 / 状況 (gh があれば)' }
         @{ Group = '複数リポジトリ (gita)'; Cmd = 'gita-pull-all'; Desc = 'gita 全リポジトリの nul ファイルを掃除して pull し、失敗したリポジトリを最後に一覧 (-Fallback で切替先指定)' }
         @{ Group = '複数リポジトリ (gita)'; Cmd = 'gita-scan [path]'; Desc = '直下の git リポジトリを gita に一括登録' }
