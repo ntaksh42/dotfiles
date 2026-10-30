@@ -236,8 +236,8 @@ try {
     Test-Case 'gf still packs refs afterwards when fetch fails' {
         Reset-Fake
         $script:g.Fail = @('fetch*')
-        gf
-        (Get-Calls) -join ';' -ceq 'pack-refs --all;fetch --all --prune;pack-refs --all'
+        $null = Get-Output { gf }
+        (Get-Calls) -join ';' -ceq 'pack-refs --all;fetch --all --prune;fetch --all --no-prune;pack-refs --all'
     }
     # What Git 2.55 prints when the remote has branches that differ only by case (files ref backend on NTFS).
     $caseCollisionOutput = @(
@@ -412,7 +412,15 @@ try {
         $script:g.Dirty = 'M file.txt'; $script:g.Fail = @('fetch*')
         $out = Get-Output { gpl }
         (Test-Line $out 'fetch 失敗') -and -not (Test-Called 'pull*') -and -not (Test-Called 'stash*') -and
-        -not (Test-Called 'rev-parse*') -and @(Get-Calls | Where-Object { $_ -like 'fetch*' }).Count -eq 1
+        -not (Test-Called 'rev-parse*') -and
+        (@(Get-Calls | Where-Object { $_ -like 'fetch*' }) -join ';') -ceq 'fetch --prune --quiet;fetch --no-prune --quiet'
+    }
+    Test-Case 'gpl retries a failed fetch --prune without prune and then pulls' {
+        Reset-Fake
+        $script:g.FailOnce.Add(@{ Pattern = 'fetch --prune*'; Output = "error: cannot lock ref 'refs/remotes/origin/Feature/b'" })
+        $out = Get-Output { gpl }
+        (Test-Line $out 'prune を外して取得し直す') -and (Test-Called 'fetch --no-prune --quiet') -and
+        -not (Test-Line $out 'fetch 失敗') -and (Test-Called 'pull origin refs/heads/main')
     }
     Test-Case 'gpl warns and carries on when fetch fails only on case-colliding remote branches' {
         Reset-Fake

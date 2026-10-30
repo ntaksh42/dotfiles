@@ -24,6 +24,13 @@ function Invoke-GitFetch {
         Write-Warning 'fetch: 大文字小文字だけ違うリモートブランチがあり、片方は取得できない。ほかは取得済みなので続行する (根本対策: git refs migrate --ref-format=reftable)'
         $code = 0
     }
+    # prune は大文字小文字だけ違う ref の削除と作成がぶつかって失敗することがある。prune は掃除なので外して取り直す。
+    if ($code -ne 0 -and $args -ccontains '--prune') {
+        Write-Warning 'fetch --prune に失敗。prune を外して取得し直す'
+        $retryArgs = @($args | ForEach-Object { if ($_ -ceq '--prune') { '--no-prune' } else { $_ } })
+        Invoke-GitFetch @retryArgs
+        return
+    }
     $global:LASTEXITCODE = $code
 }
 
