@@ -55,6 +55,27 @@ function git-switch {
     else { git checkout -b $local --track "origin/$local" }
 }
 
+# fzf で現在のリポジトリの worktree を選んで移動する。
+function git-worktree-switch {
+    if (-not (Test-Cmd fzf)) { Write-Warning 'git-worktree-switch needs fzf'; return }
+    $raw = @(git worktree list --porcelain -z 2>$null)
+    if ($LASTEXITCODE -ne 0) { Write-Warning 'git worktree list failed (run inside a git repository)'; return }
+
+    $rows = @(foreach ($record in (($raw -join "`n") -split "`0`0")) {
+        if (-not $record) { continue }
+        $fields = $record -split "`0"
+        $path = $fields[0] -replace '^worktree ', ''
+        if ($fields -contains 'bare' -or $fields -match '^prunable(?: |$)' -or
+            -not (Test-Path -LiteralPath $path -PathType Container)) { continue }
+        $branch = ($fields | Where-Object { $_.StartsWith('branch ') }) -replace '^branch refs/heads/', ''
+        if ($fields -contains 'detached') { $branch = '(detached)' }
+        "$path`t$branch"
+    })
+    if ($rows.Count -eq 0) { Write-Warning 'No accessible worktrees'; return }
+    $sel = $rows | fzf --delimiter "`t" --with-nth '2,1' --no-sort --prompt 'worktree> '
+    if ($sel) { Set-Location -LiteralPath (($sel -split "`t", 2)[0]) }
+}
+
 # 現在ブランチへマージ済みのローカルブランチを一括削除 (保護ブランチは残す)。
 function git-clean-branches {
     param([string[]]$Protected = @('main', 'master', 'develop'))

@@ -25,6 +25,7 @@ $script:ProfileHelp = [ordered]@{
         @{ Group = '状態と履歴'; Cmd = 'git-log-browse'; Desc = 'fzf でコミットを閲覧 (差分プレビュー。delta があれば色付き)' }
         @{ Group = '状態と履歴'; Cmd = 'lg'; Desc = 'lazygit を起動 (あれば)' }
         @{ Group = 'ブランチ'; Cmd = 'git-switch'; Desc = 'fzf でブランチ切替 (ローカルに無ければ origin から作成して追跡)' }
+        @{ Group = 'ブランチ'; Cmd = 'git-worktree-switch'; Desc = '現在のリポジトリの worktree を fzf で選んで移動 (ブランチ名付き)' }
         @{ Group = 'ブランチ'; Cmd = 'git-clean-branches'; Desc = 'マージ済みのローカルブランチを確認後に一括削除 (main/master/develop は残す)' }
         @{ Group = '取得と同期'; Cmd = 'git-fetch / gf'; Desc = '全リモートを取得して削除済みを掃除 (大文字小文字違いの ref 衝突を回避)' }
         @{ Group = '取得と同期'; Cmd = 'git-pull / gpl'; Desc = '安全な pull: 未コミット変更を退避 → 衝突ファイルを .git/pull-backup へ避難 → pull → 復元 (引数は git pull へ)' }
@@ -34,7 +35,7 @@ $script:ProfileHelp = [ordered]@{
         @{ Group = 'GitHub PR'; Cmd = 'prc/prv/prl/prs'; Desc = 'GitHub PR の作成 / ブラウザ表示 / 一覧 / 状況 (gh があれば)' }
         @{ Group = '複数リポジトリ (gita)'; Cmd = 'gita-pull-all'; Desc = 'gita 全リポジトリの nul ファイルを掃除して pull し、失敗したリポジトリを最後に一覧 (-Fallback で切替先指定)' }
         @{ Group = '複数リポジトリ (gita)'; Cmd = 'gita-scan [path]'; Desc = '直下の git リポジトリを gita に一括登録' }
-        @{ Group = '複数リポジトリ (gita)'; Cmd = 'gita-doctor [-Deep]'; Desc = 'gita の登録の不備 (確認して削除) と壊れたリポジトリ (status 失敗 / lock 残骸 / merge 途中。-Deep で fsck) を検出' }
+        @{ Group = '複数リポジトリ (gita)'; Cmd = 'gita-doctor [-Deep]'; Desc = 'gita の登録の不備 (確認して削除) と壊れたリポジトリ (status 失敗 / HEAD 異常 / lock 残骸 / merge 途中。-Deep で fsck) を検出' }
         @{ Group = 'ヘルプ'; Cmd = 'git-help'; Desc = 'この一覧と .gitconfig の git alias をまとめて表示' }
     )
     'Visual Studio / build' = @(

@@ -29,7 +29,7 @@ try {
             Upstream = 'origin/main'; Branch = 'main'; HasOrigin = $true
             Dirty = $null; Rebase = $null; StashRef = $null; StashCreates = $true
             RemoteFiles = @('README.md'); Tracked = @(); Untracked = @()
-            Top = $null; GitDir = $null; CloneDir = $null
+            Top = $null; GitDir = $null; CloneDir = $null; Worktrees = ''
             Branches = @(); LocalBranches = @(); Merged = @(); CleanPreview = @(); CleanLeft = @(); Cleaned = $false; LogLines = @()
             Fail = @(); Repos = @{}; GitaNames = @(); GitaPaths = @{}
             # One-shot failures: the first call matching Pattern prints Output, exits 1 and is consumed.
@@ -97,6 +97,12 @@ try {
                 return
             }
             'symbolic-ref --short -q HEAD' { $repo.Branch; return }
+            'symbolic-ref --quiet HEAD' {
+                if ($repo.HeadError) { $repo.HeadError; $global:LASTEXITCODE = 128 }
+                elseif ($repo.Detached) { $global:LASTEXITCODE = 1 }
+                else { "refs/heads/$($repo.Branch)" }
+                return
+            }
             'config --get branch.*.remote' { 'origin'; return }
             'config --get branch.*.merge' { "refs/heads/$($repo.Branch)"; return }
             'ls-tree -r --name-only *' { $script:g.RemoteFiles; return }
@@ -104,6 +110,7 @@ try {
             'ls-files' { $repo.Tracked; return }
             'branch --all --format=%(refname:short)' { $script:g.Branches; return }
             'branch --merged' { $script:g.Merged; return }
+            'worktree list --porcelain -z' { $script:g.Worktrees; return }
             'clean -ffdxn' {
                 # After "clean -ffdx" only the CleanLeft entries that still exist on disk under Top remain.
                 if (-not $script:g.Cleaned) { $script:g.CleanPreview; return }
@@ -683,6 +690,57 @@ try {
         (Get-Calls)[-1] -ceq 'checkout -b feature/x --track origin/feature/x'
     }
 
+    # --- git-worktree-switch ------------------------------------------------------------
+    Test-Case 'git-worktree-switch warns without fzf and does not run git' {
+        Reset-Fake
+        $script:_cmdCache['fzf'] = $false
+        $out = Get-Output { git-worktree-switch }
+        (Test-Line $out 'git-worktree-switch needs fzf') -and $script:calls.Count -eq 0
+    }
+    Test-Case 'git-worktree-switch changes to a selected path containing spaces, brackets and Japanese' {
+        Reset-Fake
+        $base = New-ScratchDir
+        $target = Join-Path $base '作業 [topic]'
+        New-Item -ItemType Directory -Path $target | Out-Null
+        $script:g.Worktrees = "worktree $base`0HEAD abc`0branch refs/heads/main`0`0worktree $target`0HEAD def`0branch refs/heads/feature/topic`0`0"
+        $script:fzfPick = "$target`tfeature/topic"
+        Push-Location -LiteralPath $base
+        try { git-worktree-switch; $here = (Get-Location).Path } finally { Pop-Location }
+        $here -eq $target -and $script:fzfInput.Count -eq 2 -and
+        $script:fzfInput -contains "$base`tmain" -and $script:fzfInput -contains "$target`tfeature/topic"
+    }
+    Test-Case 'git-worktree-switch includes detached worktrees but excludes bare, missing and prunable entries' {
+        Reset-Fake
+        $target = New-ScratchDir
+        $bare = New-ScratchDir
+        $stale = New-ScratchDir
+        $missing = Join-Path $scratch 'missing-worktree'
+        $script:g.Worktrees = "worktree $bare`0bare`0`0worktree $target`0HEAD abc`0detached`0`0worktree $missing`0HEAD def`0branch refs/heads/gone`0`0worktree $stale`0HEAD def`0branch refs/heads/stale`0prunable gitdir file points to non-existent location`0`0"
+        $null = Get-Output { git-worktree-switch }
+        $script:fzfInput.Count -eq 1 -and $script:fzfInput[0] -ceq "$target`t(detached)"
+    }
+    Test-Case 'git-worktree-switch stays put when the picker is cancelled' {
+        Reset-Fake
+        $target = New-ScratchDir
+        $script:g.Worktrees = "worktree $target`0HEAD abc`0branch refs/heads/main`0`0"
+        $before = (Get-Location).Path
+        $null = Get-Output { git-worktree-switch }
+        (Get-Location).Path -eq $before -and $null -ne $script:fzfArgs
+    }
+    Test-Case 'git-worktree-switch warns outside a repository without opening the picker' {
+        Reset-Fake
+        $script:g.Fail = @('worktree list*')
+        $before = (Get-Location).Path
+        $out = Get-Output { git-worktree-switch }
+        (Test-Line $out 'git worktree list failed') -and $null -eq $script:fzfArgs -and (Get-Location).Path -eq $before
+    }
+    Test-Case 'git-worktree-switch warns when no accessible worktrees remain' {
+        Reset-Fake
+        $script:g.Worktrees = "worktree $scratch/missing-worktree`0HEAD abc`0branch refs/heads/main`0`0"
+        $out = Get-Output { git-worktree-switch }
+        (Test-Line $out 'No accessible worktrees') -and $null -eq $script:fzfArgs
+    }
+
     # --- git-clean-branches --------------------------------------------------------------
     $mergedList = @('* main', '  feature/a', '  feature/b', '  develop', '  master', '+ wt-branch')
     Test-Case 'git-clean-branches deletes merged branches except current and protected ones, stripping markers' {
@@ -1036,6 +1094,22 @@ try {
         $csv = New-GitaCsv @("$owned,owned,,", "$idx,idx,,")
         $out = Get-Output { gita-doctor -Path $csv }
         (Test-Line $out "safe.directory '$($owned -replace '\\', '/')'") -and (Test-Line $out 'git reset')
+    }
+    Test-Case 'gita-doctor detects an invalid HEAD even when status succeeds and keeps the registration' {
+        Reset-Fake
+        $repo = New-FakeRepo 'invalid-head' @{ HeadError = 'fatal: No such ref: HEAD' }
+        $csv = New-GitaCsv "$repo,invalid-head,,"
+        $before = Get-Content -LiteralPath $csv -Raw
+        $out = Get-Output { gita-doctor -Path $csv }
+        (Test-Line $out 'invalid HEAD: fatal: No such ref: HEAD') -and
+        $script:prompts.Count -eq 0 -and (Get-Content -LiteralPath $csv -Raw) -ceq $before
+    }
+    Test-Case 'gita-doctor accepts an unborn branch and a detached HEAD' {
+        Reset-Fake
+        $unborn = New-FakeRepo 'unborn'
+        $detached = New-FakeRepo 'detached' @{ Detached = $true }
+        $out = Get-Output { gita-doctor -Path (New-GitaCsv @("$unborn,unborn,,", "$detached,detached,,")) }
+        Test-Line $out 'No problems in 2 gita entries.'
     }
     Test-Case 'gita-doctor reports stale lock files in the git dir and under refs' {
         Reset-Fake

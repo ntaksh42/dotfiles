@@ -83,7 +83,7 @@ function gita-scan {
 #  - 登録の問題: フォルダがない / 名前が空 / git リポジトリでない。gita はこれらを黙って無視するか誤動作する。
 #    一覧を出し、確認のうえ削除する (元のファイルは .bak に残す)。名前が空の行は gita rm で消せないため直接編集する。
 #  - リポジトリの破損: git status が失敗する (index 破損、空のオブジェクト、壊れた ref、dubious ownership 等)、
-#    .lock ファイルの残骸、途中で止まった merge / rebase。gita の各コマンドが失敗する原因になる。登録は消さず、直し方を表示する。
+#    不正な HEAD、.lock ファイルの残骸、途中で止まった merge / rebase。登録は消さず、直し方を表示する。
 # -Deep を付けると git fsck で全オブジェクトも検査する (遅い)。
 function gita-doctor {
     param(
@@ -144,6 +144,15 @@ function Get-GitaRepoIssue {
         else { 'repair the repo, or re-clone it and re-register with gita add' }
         [pscustomobject]@{ Issue = "git status failed: $msg"; Fix = $fix }
         return  # the checks below need a working repo
+    }
+
+    # status may succeed even when HEAD points to an invalid ref (e.g. refs/heads/.invalid).
+    # symbolic-ref returns 1 for a valid detached HEAD; an unborn branch also remains valid.
+    $out = @(git -C $Repo symbolic-ref --quiet HEAD 2>&1 | ForEach-Object { "$_" })
+    if ($LASTEXITCODE -gt 1) {
+        $msg = Get-GitErrorLine $out $LASTEXITCODE
+        [pscustomobject]@{ Issue = "invalid HEAD: $msg"; Fix = 'repair HEAD to point to the intended branch, or re-register the correct repo path with gita add' }
+        return
     }
 
     $gitDir = "$(git -C $Repo rev-parse --absolute-git-dir 2>$null)".Trim()
