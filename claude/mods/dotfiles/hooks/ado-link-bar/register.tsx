@@ -15,8 +15,10 @@ const MAX_READ_BYTES = 64 * 1024 * 1024
 
 // Module variables start over on a reload; register sets them again from the settings.
 const cfg = { enabled: true, organization: '', prs: 5, workItems: 5 }
-// Work items whose title was already asked for, so each is fetched once.
-const requested = new Set<string>()
+const REFRESH_MS = 5 * 60_000
+const RETRY_MS = 60_000
+// Infinity marks an in-flight request; failures wait a minute before retrying.
+const nextFetch = new Map<string, number>()
 
 // How az is started, found once.
 let azArgv: string[] | undefined
@@ -51,17 +53,28 @@ async function fetchDetails($: EngineInterface, url: string) {
   const info = ran.exitCode === 0 ? parseWorkItem(ran.stdout) : null
   if (!info) {
     await $.ui.log(`ado-link-bar: no title for ${url}: ${ran.stderr.trim().split('\n')[0] ?? `az exited ${ran.exitCode}`}`, { to: 'debug' })
-    return
+    return false
   }
   await update($, details, prev => ({ ...(prev ?? {}), [url]: info }))
+  return true
 }
 
-// Asks for the titles not asked for yet. They arrive later; the row redraws when they land.
-function requestDetails($: EngineInterface, urls: readonly string[]) {
+// Keep the last good result while refreshing, without overlapping requests.
+async function requestDetails($: EngineInterface, urls: readonly string[]) {
+  const now = await $.clock.now()
   for (const url of urls) {
-    if (requested.has(url)) continue
-    requested.add(url)
-    fetchDetails($, url).catch(error => $.ui.log(`ado-link-bar: ${String(error)}`, { to: 'debug' }))
+    if (now < (nextFetch.get(url) ?? 0)) continue
+    nextFetch.set(url, Infinity)
+    void (async () => {
+      let ok = false
+      try {
+        ok = await fetchDetails($, url) === true
+      } catch (error) {
+        await $.ui.log(`ado-link-bar: ${String(error)}`, { to: 'debug' })
+      } finally {
+        nextFetch.set(url, (await $.clock.now()) + (ok ? REFRESH_MS : RETRY_MS))
+      }
+    })()
   }
 }
 
@@ -69,22 +82,28 @@ function requestDetails($: EngineInterface, urls: readonly string[]) {
 async function note($: EngineInterface, text: string) {
   const found = findMentions(text, cfg.organization)
   if (found.length === 0) return
-  await update($, links, prev => {
+  const visible = await update($, links, prev => {
     const cur = prev ?? EMPTY
     return {
       prs: remember(cur.prs, found.filter(f => f.kind === 'pr'), cfg.prs),
       workItems: remember(cur.workItems, found.filter(f => f.kind === 'workItem'), cfg.workItems),
     }
   })
-  requestDetails($, found.filter(f => f.kind === 'workItem').map(f => f.url))
+  await requestDetails($, visible.workItems.map(m => m.url))
 }
 
 export async function sessionStart($: EngineInterface, e: Args<'session.start'>, next: Next<'session.start'>) {
   if (!cfg.enabled) return next(e)
   const started = await next(e)
   const l = (await read($, links)) ?? EMPTY
-  const known = (await read($, details)) ?? {}
-  requestDetails($, l.workItems.map(m => m.url).filter(url => !(url in known)))
+  await requestDetails($, l.workItems.map(m => m.url))
+  $.clock.every(RETRY_MS, async () => {
+    try {
+      await requestDetails($, ((await read($, links)) ?? EMPTY).workItems.map(m => m.url))
+    } catch (error) {
+      await $.ui.log(`ado-link-bar: ${String(error)}`, { to: 'debug' })
+    }
+  })
   return started
 }
 

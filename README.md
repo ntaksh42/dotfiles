@@ -119,6 +119,10 @@ pwsh -NoProfile -File tools/Sync-DevToolSkills.ps1
 登録済みの場合は、そのマーケットプレイスをそのまま使います。GitHub から登録する場合は、
 Mod が `main` に取り込まれている必要があります。`claude` が PATH に無いとスキップされます。
 
+- `toast-notify`: 入力待ち中は停滞警告を抑え、長時間コマンドは「コマンド実行中」として通知します。
+- `ado-link-bar`: 表示中の Work Item のタイトル・状態を5分ごとに再取得します。取得失敗時は前回の表示を保ち、1分後に再試行します。
+- `/cmdHistory`: 検索結果を「前へ」「次へ」で移動し、項目の全文を確認してから「入力欄に挿入」で `!` コマンドとして入力できます。
+
 組織の管理設定（`allowManagedModsOnly` など）で Mod が拒否される環境では、同じ plugin の代替が働きます。
 トースト通知とセッション名は settings hook（`scripts/lite-hook.mjs`）、PR 表示は ccstatusline の
 `statusline/pr-line.mjs`、`/cmdHistory` は `/dotfiles:cmd-history` スキルです。代替では停滞検知、

@@ -17,12 +17,16 @@ const WI = (n: number) => `https://dev.azure.com/contoso/_workitems/edit/${n}`
 
 // What the engine answers beneath the plugins: a marker standing for the empty band.
 const engine = (on: On) => {
+  const clock = mock.clock(on)
+  on('env.set', () => ({ value: {} }) as never)
+  on('command.register', () => ({ value: undefined }) as never)
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
   on('classic.SessionStart', () => ({}))
   on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
     const { Text } = $.ui.resolve(e)
     return <Text>engine band</Text>
   })
+  return clock
 }
 
 // A test cannot stand in for the store beneath session.append, so the bottom
@@ -146,6 +150,97 @@ describe('work item titles', () => {
     expect(await ui.find({ type: 'Link', text: /#11$/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: ' Active' })).toBeUndefined()
     expect(calls).toEqual(['11'])
+    await ui.unmount()
+  })
+
+  test('visible work items refresh after five minutes, including state', async ($, on) => {
+    const clock = engine(on)
+    const calls: string[] = []
+    mock.env(on, {})
+    let state = 'Active'
+    on('process.run', (_$, e) => {
+      calls.push(e.argv[e.argv.indexOf('--id') + 1] ?? '')
+      return { value: { exitCode: 0, stdout: JSON.stringify({ fields: { 'System.Title': state === 'Active' ? 'Before' : 'After', 'System.State': state } }), stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+    })
+    await $.session.start(START)
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    await append($, say('user', WI(10)))
+    await clock.settle()
+    expect(await waitForText(ui, ' Before')).toBeDefined()
+    state = 'Closed'
+    await clock.advance(4 * 60_000)
+    expect(calls).toEqual(['10'])
+    await clock.advance(60_000)
+    expect(await waitForText(ui, ' After')).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: ' Closed' })).toBeDefined()
+    expect(calls).toEqual(['10', '10'])
+    await $.classic.SessionStart({ source: 'clear' })
+    await clock.advance(10 * 60_000)
+    expect(calls).toEqual(['10', '10'])
+    await ui.unmount()
+  })
+
+  test('a failed lookup retries after a minute without another mention', async ($, on) => {
+    const clock = engine(on)
+    const calls: string[] = []
+    const titles: Record<string, string> = {}
+    mock.env(on, {})
+    on('ui.log', () => ({ value: undefined }))
+    boards(on, titles, calls)
+    await $.session.start(START)
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    await append($, say('user', WI(11)))
+    await clock.settle()
+    await append($, say('assistant', WI(11)))
+    expect(calls).toEqual(['11'])
+    titles['11'] = 'Recovered'
+    await clock.advance(60_000)
+    expect(await waitForText(ui, ' Recovered')).toBeDefined()
+    expect(calls).toEqual(['11', '11'])
+    await ui.unmount()
+  })
+
+  test('refresh failures keep the last good title until a retry succeeds', async ($, on) => {
+    const clock = engine(on)
+    const calls: string[] = []
+    const titles: Record<string, string> = { '10': 'Original' }
+    mock.env(on, {})
+    on('ui.log', () => ({ value: undefined }))
+    boards(on, titles, calls)
+    await $.session.start(START)
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    await append($, say('user', WI(10)))
+    await clock.settle()
+    expect(await waitForText(ui, ' Original')).toBeDefined()
+    delete titles['10']
+    await clock.advance(5 * 60_000)
+    expect(await ui.find({ type: 'Text', text: ' Original' })).toBeDefined()
+    titles['10'] = 'Updated'
+    await clock.advance(60_000)
+    expect(await waitForText(ui, ' Updated')).toBeDefined()
+    expect(calls).toEqual(['10', '10', '10'])
+    await ui.unmount()
+  })
+
+  test('mentions and timer ticks do not overlap a pending lookup', async ($, on) => {
+    const clock = engine(on)
+    mock.env(on, {})
+    let calls = 0
+    let finish!: () => void
+    on('process.run', async () => {
+      calls++
+      await new Promise<void>(resolve => { finish = resolve })
+      return { value: { exitCode: 0, stdout: JSON.stringify({ fields: { 'System.Title': 'Fetched', 'System.State': 'Active' } }), stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+    })
+    await $.session.start(START)
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    await append($, say('user', WI(10)))
+    await append($, say('assistant', WI(10)))
+    await clock.advance(6 * 60_000)
+    expect(calls).toBe(1)
+    finish()
+    await clock.settle()
+    expect(await waitForText(ui, ' Fetched')).toBeDefined()
     await ui.unmount()
   })
 

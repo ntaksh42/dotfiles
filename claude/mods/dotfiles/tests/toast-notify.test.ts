@@ -127,7 +127,7 @@ describe('tool.call', () => {
 
 describe('停滞検知', () => {
   // mock.clock で時計を進める。process.run で出したトーストを記録する
-  const stallEngine = (on: On, toasts: Toast[]) => {
+  const stallEngine = (on: On, toasts: Toast[], runTool?: () => Promise<void>) => {
     const clock = mock.clock(on)
     on('session.cwd', () => ({ value: 'E:/work/shop' }) as never)
     on('command.register', () => ({ value: undefined }) as never)
@@ -141,7 +141,11 @@ describe('停滞検知', () => {
     on('session.start', (_$, e) => ({ cwd: e.cwd }))
     on('turn.start', (_$, e) => ({ turnId: e.turnId }))
     on('turn.complete', () => ({ text: '' }))
-    on('tool.call', () => ({ result: {}, text: '' }) as never)
+    on('classic.Notification', () => ({}))
+    on('tool.call', async () => {
+      await runTool?.()
+      return { result: {}, text: '' } as never
+    })
     return clock
   }
 
@@ -184,6 +188,55 @@ describe('停滞検知', () => {
     await $.turn.complete(turn(1_000))
     await clock.advance(10 * 60_000)
     expect(toasts).toEqual([])
+  })
+
+  test('長時間のコマンドは停滞警告ではなく実行中として一度通知する', async ($, on) => {
+    const toasts: Toast[] = []
+    let finish!: () => void
+    const clock = stallEngine(on, toasts, () => new Promise<void>(resolve => { finish = resolve }))
+    await $.session.start({ cwd: 'E:/work/shop', surface: 'terminal', isInteractive: true })
+    await $.turn.start({ text: 'fix', turnId: 't1' })
+    const pending = $.tool.call({ tool: 'Bash', command: 'npm test' } as never)
+    await settle()
+    expect(typeof finish).toBe('function')
+    await clock.settle()
+    await clock.advance(6 * 60_000)
+    expect(toasts).toEqual([{ title: 'Claude: コマンド実行中 - shop', body: 'npm test', level: 'info' }])
+    await clock.advance(6 * 60_000)
+    expect(toasts).toHaveLength(1)
+    finish()
+    await pending
+    await clock.settle()
+    toasts.length = 0
+    await clock.advance(6 * 60_000)
+    expect(toasts).toEqual([STALL])
+  })
+
+  test('入力待ちの間は停滞警告を出さず、ツール完了後は検知を再開する', async ($, on) => {
+    const toasts: Toast[] = []
+    const clock = stallEngine(on, toasts)
+    await $.session.start({ cwd: 'E:/work/shop', surface: 'terminal', isInteractive: true })
+    await $.turn.start({ text: 'fix', turnId: 't1' })
+    await $.classic.Notification({ message: 'Permission needed', notification_type: 'permission_prompt' })
+    await clock.settle()
+    expect(toasts[0]?.title).toBe('Claude: 入力待ち - shop')
+    await clock.advance(10 * 60_000)
+    expect(toasts).toHaveLength(1)
+    await $.tool.call({ tool: 'Read', file_path: 'a.ts' } as never)
+    await clock.advance(6 * 60_000)
+    expect(toasts[1]).toEqual(STALL)
+  })
+
+  test('サブエージェントの開始でメインの停滞タイマーをリセットしない', async ($, on) => {
+    const toasts: Toast[] = []
+    const clock = stallEngine(on, toasts)
+    await $.session.start({ cwd: 'E:/work/shop', surface: 'terminal', isInteractive: true })
+    await $.turn.start({ text: 'fix', turnId: 't1' })
+    await clock.settle()
+    await clock.advance(4 * 60_000)
+    await $.turn.start({ text: 'subtask', turnId: 'sub', agentId: 'a1' } as never)
+    await clock.advance(90_000)
+    expect(toasts).toEqual([STALL])
   })
 
   test('0 秒にすると無効になる', { options: { toastStallSeconds: 0 } }, async ($, on) => {

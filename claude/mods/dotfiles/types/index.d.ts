@@ -22,6 +22,8 @@ declare module 'claude-code' {
       current: TitleCurrent
       entries: CmdHistoryEntries
       filter: string
+      historyPage: number
+      historySelected: string
     }
   }
 }

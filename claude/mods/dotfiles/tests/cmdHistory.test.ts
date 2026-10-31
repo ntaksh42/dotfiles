@@ -18,11 +18,11 @@ test('空白区切りの語をすべて含む項目に絞る', () => {
 // エンジン側の応答。履歴ファイルを返し、入力欄に入れたテキストを記録する
 const HISTORY = 'C:/Users/me/AppData/Roaming/Microsoft/Windows/PowerShell/PSReadLine/ConsoleHost_history.txt'
 
-const engine = (on: On, filled: string[]) => {
+const engine = (on: On, filled: string[], history = 'git pull\r\nls\r\ngit push origin main\r\n') => {
   mock.env(on, { APPDATA: 'C:/Users/me/AppData/Roaming' })
   // エンジンは区切りを \ に正規化して渡す
   on('fs.exists', (_$, e) => ({ value: e.path.replaceAll('\\', '/') === HISTORY }) as never)
-  on('fs.read', () => ({ value: 'git pull\r\nls\r\ngit push origin main\r\n' }) as never)
+  on('fs.read', () => ({ value: history }) as never)
   on('command.register', () => ({ value: undefined }) as never)
   on('ui.open', () => ({ value: { isPlaced: true } }) as never)
   on('ui.close', () => ({ value: undefined }) as never)
@@ -50,5 +50,44 @@ test('引数で絞り込み、選んだ項目を ! 付きで入力欄に入れ�
   expect(await ui.find({ key: 'row:2' })).toBeUndefined()
   await ui.input({ key: 'filter', text: 'pull', kind: 'change' })
   await ui.press({ key: 'row:0' })
+  expect(filled).toEqual([])
+  expect(await ui.find({ type: 'Text', text: 'git pull' })).toBeDefined()
+  await ui.press({ key: 'insert' })
   expect(filled).toEqual(['!git pull'])
+  await ui.unmount()
+})
+
+test('ページ移動で隠れた項目を選び、検索を変えると先頭ページに戻る', async ($, on) => {
+  engine(on, [], Array.from({ length: 30 }, (_, i) => `command-${i}`).join('\n'))
+  await $.command.run(run(''))
+  const ui = await $.ui.mount({ plugin: 'dotfiles', surface: 'terminal', ...PANE })
+  expect((await ui.find({ key: 'row:0' }))?.text).toBe('command-29')
+  await ui.press({ key: 'next' })
+  expect((await ui.find({ key: 'row:0' }))?.text).toBe('command-17')
+  await ui.press({ key: 'next' })
+  expect((await ui.find({ key: 'row:0' }))?.text).toBe('command-5')
+  expect(await ui.find({ key: 'next' })).toBeUndefined()
+  await ui.press({ key: 'previous' })
+  expect((await ui.find({ key: 'row:0' }))?.text).toBe('command-17')
+  await ui.input({ key: 'filter', text: 'command-29', kind: 'change' })
+  expect((await ui.find({ key: 'row:0' }))?.text).toBe('command-29')
+  expect(await ui.find({ key: 'previous' })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('複数行の全文を確認してからそのまま挿入し、一覧にも戻れる', async ($, on) => {
+  const filled: string[] = []
+  const command = `Write-Output '${'x'.repeat(100)}'\n| Out-String`
+  engine(on, filled, command.replace('\n', '`\r\n') + '\r\n')
+  await $.command.run(run(''))
+  const ui = await $.ui.mount({ plugin: 'dotfiles', surface: 'terminal', ...PANE })
+  await ui.press({ key: 'row:0' })
+  expect(await ui.find({ type: 'Text', text: command })).toBeDefined()
+  await ui.press({ key: 'back' })
+  expect(await ui.find({ key: 'filter' })).toBeDefined()
+  expect(filled).toEqual([])
+  await ui.press({ key: 'row:0' })
+  await ui.press({ key: 'insert' })
+  expect(filled).toEqual([`!${command}`])
+  await ui.unmount()
 })

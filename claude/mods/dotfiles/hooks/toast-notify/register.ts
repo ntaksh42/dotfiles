@@ -11,6 +11,8 @@ const STALL_TICK_MS = 15_000
 const cfg = { enabled: true, minTurnMs: 30_000, minCommandMs: 60_000, stallMs: 300_000 }
 // メインのターン中に、最後に進捗（モデル出力・ツール呼び出し）があった時刻
 const stall = { active: false, last: 0, dirty: false, notified: false }
+let waitingForInput = false
+const commands = new Map<symbol, string>()
 const touch = () => { stall.dirty = true }
 // セッション名。/rename や auto-session-title の命名はプロンプト送信・セッション開始の入出力で拾う
 // 組織管理下では classic.* が個人インストールの mod に回ってこないため、/rename の実行からも拾う
@@ -56,9 +58,13 @@ export async function sessionStart($: EngineInterface, e: Args<'session.start'>,
     $.clock.now().then(now => {
       if (!stall.active) return
       if (stall.dirty) Object.assign(stall, { last: now, dirty: false, notified: false })
-      else if (!stall.notified && now - stall.last >= cfg.stallMs) {
+      else if (!waitingForInput && !stall.notified && now - stall.last >= cfg.stallMs) {
         stall.notified = true
-        notify($, 'Claude: 停止の可能性', `${formatDuration(cfg.stallMs)}間進捗がありません`, 'warn')
+        if (commands.size > 0) {
+          notify($, 'Claude: コマンド実行中', firstLine([...commands.values()][0] ?? ''), 'info')
+        } else {
+          notify($, 'Claude: 停止の可能性', `${formatDuration(cfg.stallMs)}間進捗がありません`, 'warn')
+        }
       }
     }, error => $.ui.log(`toast-notify: ${String(error)}`, { to: 'debug' }))
   })
@@ -103,7 +109,10 @@ export const register: Register = (on, options) => {
   if (cfg.stallMs > 0) {
 
     on('turn.start', async ($, e, next) => {
-      Object.assign(stall, { active: true, last: await $.clock.now(), dirty: false, notified: false })
+      if (e.agentId === undefined) {
+        waitingForInput = false
+        Object.assign(stall, { active: true, last: await $.clock.now(), dirty: false, notified: false })
+      }
       return next(e)
     })
 
@@ -111,6 +120,7 @@ export const register: Register = (on, options) => {
     on('turn.step', async function* ($, e, next) {
       const stream = next(e)
       for await (const chunk of stream) {
+        if (e.agentId === undefined) waitingForInput = false
         touch()
         yield chunk
       }
@@ -120,6 +130,8 @@ export const register: Register = (on, options) => {
 
 
   on('classic.UserPromptSubmit', async ($, e, next) => {
+    waitingForInput = false
+    touch()
     const ran = await next(e)
     sessionTitle = ran.sessionTitle ?? e.session_title ?? sessionTitle
     return ran
@@ -129,17 +141,19 @@ export const register: Register = (on, options) => {
   on('classic.Notification', async ($, e, next) => {
     const done = await next(e)
     if (e.agent_id === undefined && e.notification_type !== 'idle_prompt' && e.notification_type !== 'auth_success') {
+      waitingForInput = true
       notify($, 'Claude: 入力待ち', e.message, 'warn')
     }
     return done
   })
 
-  // ツールの開始・終了も進捗とみなす（実行中のまま 5 分黙ったコマンドは停滞として通知する）
+  // ツールの開始・終了も進捗とみなし、実行中のコマンドと出力の途絶を区別する
   on('tool.call', async ($, e, next) => {
     touch()
     try {
       return await next(e)
     } finally {
+      waitingForInput = false
       touch()
     }
   })
@@ -147,7 +161,17 @@ export const register: Register = (on, options) => {
   for (const tool of ['Bash', 'PowerShell'] as const) {
     on('tool.call', { tool }, async ($, e, next) => {
       const started = await $.clock.now()
-      const ran = await next(e)
+      const id = Symbol()
+      commands.set(id, e.command)
+      touch()
+      let ran
+      try {
+        ran = await next(e)
+      } finally {
+        commands.delete(id)
+        waitingForInput = false
+        touch()
+      }
       const elapsed = (await $.clock.now()) - started
       if (ran.deny === undefined && elapsed >= cfg.minCommandMs) {
         const failed = ran.isError === true
