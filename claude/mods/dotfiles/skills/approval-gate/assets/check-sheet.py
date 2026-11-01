@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """レビュー 標準モード — シートと [判断] コメント JSON の機械検査。
 
-  python3 check-sheet.py ./review/<topic>-01.html --comments <judgments.json>
+  python3 check-sheet.py ./review/<topic>.html --comments <judgments.json>
 
 人に見せる前に「無言で壊れる不備」だけを捕まえる。画面を見ても気づけない類の欠陥:
   - TODO の残り
@@ -9,15 +9,36 @@
   - 相対 URL の外部参照 (self-contained 違反)
   - [判断] の selector がシートに無い (ピンが刺さらない)
   - 論点 (#p1 …) と [判断] の数のズレ、5 件以上
-  - [判断] に 推奨 / 根拠 / 未返信時の既定 の書き忘れ
+  - [判断] に 推奨 / 根拠 の書き忘れ、未返信時の既定の書き忘れ (全体コメントで 1 回)
+  - 文字の多すぎ (本文の文章 600 字超、結論 120 字超)
 
 終了コード 0 = 出してよい / 1 = 直してから出す。標準ライブラリのみ (python3.8+)。
 """
 import argparse
+import html as htmllib
 import json
 import re
 import sys
 from pathlib import Path
+
+
+PROSE_LIMIT = 600
+CONCL_LIMIT = 120
+
+
+def visible_len(fragment: str) -> int:
+    text = htmllib.unescape(re.sub(r'<[^>]+>', '', fragment))
+    return len(re.sub(r'\s+', '', text))
+
+
+def prose_length(live: str):
+    """本文の文章 (見出し・結論・段落・キャプション・表) の文字数。SVG と畳みの中は数えない。"""
+    body = re.sub(r'<(svg|details|style)\b.*?</\1>', '', live, flags=re.DOTALL)
+    parts = re.findall(r'<(h1|h2|p|figcaption|td|th|li)\b[^>]*>(.*?)</\1>', body, flags=re.DOTALL)
+    concl = re.search(r'<div class=["\']concl["\'][^>]*>(.*?)</div>', body, flags=re.DOTALL)
+    concl_len = visible_len(concl.group(1)) if concl else 0
+    gl = sum(visible_len(t) for t in re.findall(r'<div class=["\']gl["\'][^>]*>(.*?)</div>', body, flags=re.DOTALL))
+    return sum(visible_len(t) for _, t in parts) + concl_len + gl, concl_len
 
 
 def check_sheet(html: str):
@@ -30,8 +51,13 @@ def check_sheet(html: str):
         errors.append('問いカード / radio がある — 問いはシートに書かず [判断] コメントで出す')
     for m in re.finditer(r'<(?:script|link|img)[^>]*(?:src|href)=["\'](?!https:|data:|file:|#|mailto:|//)([^"\']+)["\']', live):
         warns.append(f'相対 URL の外部参照: {m.group(1)} (data URI か https 絶対 URL にする)')
-    if 'review-sheet-format: v4' not in html:
-        warns.append('<!-- review-sheet-format: v4 --> が無い (どの規約で書いたシートかの目印)')
+    if 'review-sheet-format: v5' not in html:
+        warns.append('<!-- review-sheet-format: v5 --> が無い (どの規約で書いたシートかの目印)')
+    total, concl = prose_length(live)
+    if total > PROSE_LIMIT:
+        warns.append(f'本文の文章が {total} 字 (目安 {PROSE_LIMIT} 字以内)。絵で分かる説明から削り、判断外の決定は <details> へ')
+    if concl > CONCL_LIMIT:
+        warns.append(f'結論が {concl} 字 (目安 {CONCL_LIMIT} 字以内・2 文まで)')
     ids = set(re.findall(r'\bid=["\']([^"\']+)["\']', live))
     points = sorted(i for i in ids if re.fullmatch(r'p\d+', i))
     return errors, warns, ids, points
@@ -55,11 +81,11 @@ def check_comments(data, ids, points):
     for i, c in enumerate(judgments, 1):
         body = c['body']
         head = body.splitlines()[0][:40]
-        for key, why in (('推奨', '推奨'), ('未返信', '未返信時の既定'), ('根拠', '根拠 (file:line か実行結果)')):
+        for key, why in (('推奨', '推奨'), ('根拠', '根拠 (file:line か実行結果)')):
             if key not in body:
                 errors.append(f'[判断] #{i} 「{head}」に {why} が無い')
-        if '利点' not in body:
-            warns.append(f'[判断] #{i} 「{head}」に利点が無い (非推奨の選択肢にも利点を書く)')
+    if judgments and not any('未返信' in c.get('body', '') for c in data):
+        errors.append('「未返信は推奨で確定」がどこにも無い (scope: review の全体コメントに 1 回書く)')
     pinned = {c['selector'][1:] for c in judgments if str(c.get('selector', '')).startswith('#')}
     unpinned = [p for p in points if p not in pinned]
     if unpinned:
@@ -69,7 +95,7 @@ def check_comments(data, ids, points):
 
 def main() -> None:
     ap = argparse.ArgumentParser(description='標準モードのシートと [判断] コメント JSON を、人に見せる前に検査する。')
-    ap.add_argument('sheet', help='シート HTML (例: ./review/topic-01.html)')
+    ap.add_argument('sheet', help='シート HTML (例: ./review/topic.html)')
     ap.add_argument('--comments', help='crit comment --json に渡す JSON ファイル')
     a = ap.parse_args()
 
