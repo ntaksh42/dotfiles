@@ -31,7 +31,24 @@ try {
         $running | Stop-Process -Force
         $running | Wait-Process -Timeout 10
     }
-    Move-Item -LiteralPath $downloadPath -Destination $critPath -Force
+    # 終了させ損ねた crit.exe (別セッション・管理者権限で動くもの等) が残っていると、上書きは
+    # 「既に存在するファイルを作成することはできません」で失敗する。起動中の exe でも改名はできるので、
+    # 旧版を退避してから置く。退避した旧版は消せなければ次回の更新で消す。
+    Get-ChildItem -LiteralPath $installDir -Filter 'crit.exe.old-*' -ErrorAction SilentlyContinue |
+        Remove-Item -Force -ErrorAction SilentlyContinue
+    $oldPath = $null
+    if (Test-Path -LiteralPath $critPath) {
+        $oldPath = "$critPath.old-$([guid]::NewGuid().ToString('N'))"
+        Move-Item -LiteralPath $critPath -Destination $oldPath
+    }
+    try {
+        Move-Item -LiteralPath $downloadPath -Destination $critPath
+    }
+    catch {
+        if ($oldPath) { Move-Item -LiteralPath $oldPath -Destination $critPath }
+        throw
+    }
+    if ($oldPath) { Remove-Item -LiteralPath $oldPath -Force -ErrorAction SilentlyContinue }
 }
 finally {
     Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue
