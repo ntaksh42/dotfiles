@@ -9,7 +9,8 @@
   - 相対 URL の外部参照 (self-contained 違反)
   - [判断] の selector がシートに無い (ピンが刺さらない)
   - 論点 (#p1 …) と [判断] の数のズレ、5 件以上
-  - [判断] に 推奨 / 根拠 の書き忘れ、未返信時の既定の書き忘れ (全体コメントで 1 回)
+  - [判断] に 推奨 / 根拠 の書き忘れ
+  - 全体コメント (scope: review) の混入 (Crit のプレビューは受け付けない)
   - 文字の多すぎ (本文の文章 600 字超、結論 120 字超)
 
 終了コード 0 = 出してよい / 1 = 直してから出す。標準ライブラリのみ (python3.8+)。
@@ -84,8 +85,8 @@ def check_comments(data, ids, points):
         for key, why in (('推奨', '推奨'), ('根拠', '根拠 (file:line か実行結果)')):
             if key not in body:
                 errors.append(f'[判断] #{i} 「{head}」に {why} が無い')
-    if judgments and not any('未返信' in c.get('body', '') for c in data):
-        errors.append('「未返信は推奨で確定」がどこにも無い (scope: review の全体コメントに 1 回書く)')
+    if any(c.get('scope') == 'review' for c in data):
+        errors.append('全体コメント (scope: review) がある — Crit のプレビューは受け付けない。人への案内に書く')
     pinned = {c['selector'][1:] for c in judgments if str(c.get('selector', '')).startswith('#')}
     unpinned = [p for p in points if p not in pinned]
     if unpinned:
