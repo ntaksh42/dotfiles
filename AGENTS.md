@@ -48,6 +48,9 @@ pwsh -NoProfile -File tools/Install-AgentInstructions.ps1
 # 配置対象は app-settings/pwsh/profile.d/devtools-catalog.ps1 のカタログで定義する。プロファイル自体は Update-Profile
 Install-DevTools
 
+# 配置済みのプロファイル・共通ルール・plugin が GitHub の main と一致するか確かめる（pwsh プロファイル経由）
+Test-DotfilesDeployment
+
 # claude/mods/ の全 mod に claude plugin validate / test をかける（失敗があれば終了コード 1）
 pwsh -File tools/Test-ClaudeMods.ps1
 

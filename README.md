@@ -1,19 +1,10 @@
-# env - Claude Code 環境設定
+# dotfiles - Claude Code 環境設定
 
 Windows 環境の Claude Code dotfiles（hooks・skills・settings）を一元管理するリポジトリ。
 
 ## リポジトリ構成
 
-```
-claude/
-  install.ps1              インストーラ（共通ルールを両エージェントへ、settings.json を Claude へ配置）
-  CLAUDE.global.md          Claude Code / Codex の共通ルールの管理元
-  settings.template.json   settings.json のテンプレート
-  mods/                    Claude Code プラグイン（dotfiles-mods マーケットプレイス）
-    dotfiles/              自作の skills・hooks をまとめた plugin
-app-settings/              アプリ設定ファイルのバックアップ
-tools/                     汎用 PowerShell ユーティリティ
-```
+ディレクトリ構成と各部の仕組みは [AGENTS.md](AGENTS.md) の「アーキテクチャ」にまとめています。
 
 ## PowerShell コマンド
 
@@ -38,6 +29,7 @@ Git の短縮名は `app-settings/git/.gitconfig` の `[alias]` に寄せてあ�
 `git-help` は両方をまとめて一覧表示します。
 
 検証は `pwsh -NoProfile -File app-settings/pwsh/tests/Invoke-AllTests.ps1` で全テストファイルを一括実行します（個別実行は各 `Test-*.ps1`）。
+main への push と PR では、GitHub Actions（`.github/workflows/test.yml`）が同じテストと jp-deslop のテストを実行します。
 
 ## 一部の端末だけに入れるアプリ
 
@@ -145,8 +137,8 @@ Mod が `main` に取り込まれている必要があります。`claude` が P
 ### 1. リポジトリをクローン
 
 ```powershell
-git clone https://github.com/ntaksh42/env.git
-cd env
+git clone https://github.com/ntaksh42/dotfiles.git
+cd dotfiles
 ```
 
 ### 2. インストーラを実行
@@ -181,6 +173,14 @@ skills・hooks・Mod を `claude plugin install` で導入します。
 ### 4. Claude Code / Codex の新しいセッションを開始
 
 共通ルールを読み直すため、Claude Code / Codex の新しいセッションを開始してください。
+
+### 5. 配置を確かめる
+
+```powershell
+Test-DotfilesDeployment
+```
+
+プロファイル・共通ルール・plugin が GitHub の main と一致するかを一覧します。「古い」と出た行は、Fix 列のコマンドで更新します。
 
 ---
 
