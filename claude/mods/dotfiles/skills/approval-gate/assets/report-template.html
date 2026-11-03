@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- report-sheet -->
+<!--
+  報告シートの雛形。会話で書くと長くなる報告・相談を、表と短い行で 1 枚にまとめる。
+  - 骨格は固定: 結論 → 要点の表 → (注意点) → 畳み付録
+  - 1 行 1 項目。段落は 2 文まで。根拠は file:line か実行結果を .mono で添える
+  - 問い・選択肢・推奨はシートに書かない。[判断] は会話で聞く
+  - 色は Orca のテーマ変数を優先し、無い環境 (ブラウザ) では固定色に戻る。赤は注意点と論点だけに使う
+  - 相対 URL 禁止。100vh 禁止
+-->
+<title><!-- TODO: タイトル --></title>
+<style>
+:root{
+  --ag-ink:var(--foreground,#212529);--ag-muted:var(--muted-foreground,#64707C);
+  --ag-line:var(--border,#DEE2E6);--ag-paper:var(--background,#FFFFFF);
+  --ag-dim:var(--muted,#F6F8FA);--ag-link:var(--primary,#2563EB);--ag-red:#DC2626}
+*{box-sizing:border-box}
+body{background:var(--ag-paper);color:var(--ag-ink);font-family:'IBM Plex Sans JP','Hiragino Kaku Gothic ProN','Yu Gothic UI','Meiryo',sans-serif;font-size:15px;line-height:1.75;margin:0;padding:12px 20px 24px}
+main{max-width:1000px;margin:0 auto}
+h1{font-size:22px;line-height:1.45;margin:4px 0 10px}
+h2{font-size:17px;line-height:1.45;margin:22px 0 6px;padding-bottom:3px;border-bottom:1px solid var(--ag-line)}
+p{margin:6px 0}
+a{color:var(--ag-link)}
+.concl{border:1px solid var(--ag-line);border-left:3px solid var(--ag-red);border-radius:8px;padding:10px 16px}
+.mono{font-family:'IBM Plex Mono',Consolas,Menlo,monospace;font-size:13px;color:var(--ag-muted)}
+table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.6;margin:6px 0}
+th,td{border-bottom:1px solid var(--ag-line);padding:6px 8px;text-align:left;vertical-align:top}
+th{font-size:12px;color:var(--ag-muted);font-weight:500;white-space:nowrap}
+td.no{width:2.5em;color:var(--ag-muted);font-family:'IBM Plex Mono',Consolas,monospace}
+.warn{border-left:3px solid var(--ag-red);padding:4px 12px;margin:6px 0}
+ul{margin:6px 0;padding-left:1.4em}
+details{border:1px solid var(--ag-line);border-radius:8px;padding:8px 14px;margin:18px 0 6px}
+summary{cursor:pointer;color:var(--ag-link);font-size:13.5px}
+</style></head>
+<body><main>
+
+<h1><!-- TODO: 主張の言い切り。1 行 --></h1>
+<div class="concl"><b>結論:</b> <!-- TODO: 2 文以内 --></div>
+
+<!-- 要点: 1 行 1 項目。列は内容に合わせて変えてよい (例: 項目 / 内容 / 根拠、案 / 利点 / 代償) -->
+<h2><!-- TODO: 見出し --></h2>
+<table>
+<tr><th>#</th><th><!-- TODO --></th><th><!-- TODO --></th><th>根拠</th></tr>
+<tr><td class="no">1</td><td><!-- TODO --></td><td><!-- TODO --></td><td class="mono"><!-- TODO: file:line --></td></tr>
+</table>
+
+<!-- 注意点: 失敗したテスト・飛ばした作業・未確認のこと。無ければ節ごと削る -->
+<h2>注意点</h2>
+<div class="warn"><!-- TODO --></div>
+
+<!-- 畳み付録: 読みたい人だけ読む経緯・実行ログ。summary は中身を予告する。無ければ削る -->
+<details><summary><!-- TODO: 例「調べたファイル 6 つと実行ログ」 --></summary>
+<p class="mono"><!-- TODO --></p>
+</details>
+
+</main></body></html>
