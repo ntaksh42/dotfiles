@@ -1,0 +1,33 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PowerShell tests
+        shell: pwsh
+        run: pwsh -NoProfile -File app-settings/pwsh/tests/Invoke-AllTests.ps1
+
+      - name: Install-AgentInstructions test
+        shell: pwsh
+        run: pwsh -NoProfile -File tools/tests/Test-InstallAgentInstructions.ps1
+
+      - name: Codex statusline tests
+        shell: pwsh
+        run: pwsh -NoProfile -File app-settings/codex-statusline/tests/Test-Statusline.ps1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: jp-deslop tests
+        run: |
+          pip install pytest
+          python -m pytest -q claude/mods/dotfiles/skills/jp-deslop/tests
