@@ -609,7 +609,7 @@ if ($h.Throw) { throw $h.Throw }
         Set-Present 'claude'
         $script:DevTools = @((& $plugin 'p1'))
         Invoke-Install -Yes
-        ($script:claudeCalls -join '|') -ceq 'claude plugin marketplace list --json|claude plugin marketplace add owner/repo|claude plugin install p1@mods' -and
+        ($script:claudeCalls -join '|') -ceq 'claude plugin list --json|claude plugin marketplace list --json|claude plugin marketplace add owner/repo|claude plugin install p1@mods' -and
         (Get-Row 'p1').Result -ceq 'OK'
     }
     Test-Case 'claude-plugin: a marketplace that is already registered is not added again' {
@@ -618,7 +618,7 @@ if ($h.Throw) { throw $h.Throw }
         $script:marketplaces = @('mods')
         $script:DevTools = @((& $plugin 'p1'))
         Invoke-Install -Yes
-        ($script:claudeCalls -join '|') -ceq 'claude plugin marketplace list --json|claude plugin install p1@mods'
+        ($script:claudeCalls -join '|') -ceq 'claude plugin list --json|claude plugin marketplace list --json|claude plugin install p1@mods'
     }
     Test-Case 'claude-plugin: Replaces are uninstalled, and an installed but disabled plugin is updated then enabled' {
         Reset-Fake
@@ -936,7 +936,7 @@ if ($h.Throw) { throw $h.Throw }
         $script:running = @('windows-operation-cli')
         $script:installedNames = @('Windows-Operation-Cli'); $script:installedVersion['Windows-Operation-Cli'] = '1.0.0'
         $script:latest['Windows-Operation-Cli'] = 'v2.0.0'
-        $script:DevTools = @((New-ScriptTool 'Windows-Operation-Cli' @{ Args = @{ FromRelease = $true }; RequiredCommand = 'claude'; Repo = 'o/woc' }))
+        $script:DevTools = @((New-ScriptTool 'Windows-Operation-Cli' @{ Args = @{ FromRelease = $true }; RequiredCommand = 'claude'; Repo = 'o/woc'; ProcessName = 'windows-operation-cli' }))
         Invoke-Install -Yes
         $script:downloads.Count -eq 0 -and $script:log.Contains('WARNING: Windows-Operation-Cli is running; close it before updating.')
     }

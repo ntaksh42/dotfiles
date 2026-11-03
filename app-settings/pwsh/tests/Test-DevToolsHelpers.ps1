@@ -48,11 +48,11 @@ try {
     # =====================================================================================
     $knownBackends = 'winget', 'msstore', 'pip', 'psmodule', 'script', 'remote-config', 'claude-plugin'
     $allowedKeys = @{
-        'winget'        = 'Id', 'Cmd', 'PostInstall'
-        'msstore'       = 'Id'
+        'winget'        = 'Id', 'Cmd', 'PostInstall', 'Upgradable', 'ProcessName', 'ProcessPath'
+        'msstore'       = 'Id', 'Upgradable', 'ProcessName', 'ProcessPath'
         'pip'           = 'Id', 'Cmd'
         'psmodule'      = 'Id'
-        'script'        = 'Id', 'Path', 'Args', 'RebootRequiredExitCode', 'RequiredCommand', 'Repo', 'VersionSource', 'InstallOnly', 'RemoteFiles', 'AppxName'
+        'script'        = 'Id', 'Path', 'Args', 'RebootRequiredExitCode', 'RequiredCommand', 'Repo', 'VersionSource', 'InstallOnly', 'RemoteFiles', 'AppxName', 'ProcessName'
         'remote-config' = 'RepoPath', 'Dest', 'StripCommentLines'
         'claude-plugin' = 'Id', 'Marketplace', 'MarketplaceSource', 'RequiredCommand', 'Replaces'
     }
@@ -753,7 +753,7 @@ try {
     }
     Test-Case 'claude-plugin: installed when the plugin id is in `claude plugin list --json`' {
         Reset-Fakes; $script:claudeCalls = @(); Set-CmdAvailable -Present claude
-        $script:claudeOut = '[{"id":"other@m"},{"id":"ado-link-bar@dotfiles-mods","version":"1"}]'
+        $script:claudeOut = '[{"id":"other@m"},{"id":"ado-link-bar@dotfiles-mods","version":"1","enabled":true}]'
         (Test-ToolInstalled $pluginTool) -eq $true -and ($script:claudeCalls[0] -join ' ') -ceq 'plugin list --json'
     }
     Test-Case 'claude-plugin: not installed while a plugin named in Replaces is still installed' {
@@ -770,7 +770,7 @@ try {
     }
     Test-Case 'claude-plugin: installed when the list contains exactly one plugin (single-element JSON array)' {
         Reset-Fakes; Set-CmdAvailable -Present claude
-        $script:claudeOut = '[{"id":"ado-link-bar@dotfiles-mods"}]'
+        $script:claudeOut = '[{"id":"ado-link-bar@dotfiles-mods","enabled":true}]'
         (Test-ToolInstalled $pluginTool) -eq $true
     }
     Test-Case 'claude-plugin: not installed when the id is absent from the list' {
@@ -904,7 +904,7 @@ try {
     Test-Case 'winget: falls back to `winget list` when the Cmd is not on PATH and trusts exit code 0' {
         Reset-Fakes; Set-CmdAvailable -Absent starship
         (Test-ToolInstalled @{ Backend = 'winget'; Id = 'Starship.Starship'; Cmd = 'starship' }) -eq $true -and
-        $script:wingetCalls.Count -eq 1 -and ($script:wingetCalls[0] -join ' ') -ceq 'list --id Starship.Starship --exact --accept-source-agreements'
+        $script:wingetCalls.Count -eq 1 -and ($script:wingetCalls[0] -join ' ') -ceq 'list --id Starship.Starship --exact --source winget --accept-source-agreements'
     }
     Test-Case 'winget: not installed when `winget list` exits non-zero' {
         Reset-Fakes; Set-CmdAvailable -Absent starship; $script:wingetExit = 1
