@@ -82,6 +82,7 @@ $script:ProfileHelp = [ordered]@{
     )
     'Dev environment'       = @(
         @{ Cmd = 'Show-DevEnv'; Desc = '開発ツールの導入状況を一覧' }
+        @{ Cmd = 'Test-DotfilesDeployment'; Desc = 'プロファイル・共通ルール・plugin が GitHub の main と一致するか確認' }
         @{ Cmd = 'Install-DevTools [-Yes]'; Desc = '未導入ツールを一括インストール (-Yes で全確認に y)' }
         @{ Cmd = 'Update-DevTools'; Desc = 'winget/PS モジュールを更新' }
         @{ Cmd = 'Install-ExtraTools [-Name DevDeck,RdpManager] [-Yes]'; Desc = '一部の端末だけに入れる自作アプリを導入・更新（Install-DevTools には含まれない）' }

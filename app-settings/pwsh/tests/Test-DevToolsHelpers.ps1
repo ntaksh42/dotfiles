@@ -1169,6 +1169,40 @@ try {
         $o = Invoke-Captured { Disable-CodexStatusline }
         $o.Host.Count -eq 0 -and (Test-Path -LiteralPath $w -PathType Container) -and -not (Test-Path -LiteralPath "$w.disabled")
     }
+
+    # Test-DotfilesDeployment (the profile check, the rules download and the plugin check are faked)
+    function Get-DotfilesProfileUpdates { if ($script:fakeProfileThrow) { throw 'offline' }; $script:fakeProfileUpdates }
+    function Get-DotfilesRemoteConfig { param($Tool) if ($null -eq $script:fakeRules) { throw 'offline' }; $script:fakeRules }
+    function Test-DevToolPluginUpToDate { param($Tool) $script:fakePlugin }
+    Set-CmdAvailable -Present claude
+    $deploy = {
+        param($claudeText, $codexText)
+        $d = New-Scratch
+        $c = Join-Path $d 'claude'; $x = Join-Path $d 'codex'
+        New-Item -ItemType Directory -Path $c, $x | Out-Null
+        if ($null -ne $claudeText) { Set-Content -LiteralPath (Join-Path $c 'CLAUDE.md') -Value $claudeText -NoNewline }
+        if ($null -ne $codexText) { Set-Content -LiteralPath (Join-Path $x 'AGENTS.md') -Value $codexText -NoNewline }
+        $rows = @(Test-DotfilesDeployment -ClaudeDir $c -CodexDir $x)
+        @{ Profile = $rows[0].Status; Claude = $rows[1].Status; Codex = $rows[2].Status; Plugin = $rows[3].Status; Rows = $rows }
+    }
+
+    Test-Case 'Test-DotfilesDeployment: everything current reports OK on every row' {
+        $script:fakeProfileThrow = $false; $script:fakeProfileUpdates = @(); $script:fakeRules = "rules`n"; $script:fakePlugin = $true
+        $r = & $deploy "rules`r`n" "rules"
+        $r.Rows.Count -eq 4 -and @($r.Rows | Where-Object Status -ne 'OK').Count -eq 0
+    }
+    Test-Case 'Test-DotfilesDeployment: stale rules, missing AGENTS.md, profile and plugin updates report 古い' {
+        $script:fakeProfileThrow = $false; $script:fakeProfileUpdates = @(@{ Tool = @{} }); $script:fakeRules = 'new'; $script:fakePlugin = $false
+        $r = & $deploy 'old' $null
+        $r.Profile -eq '古い' -and $r.Claude -eq '古い' -and $r.Codex -eq '古い' -and $r.Plugin -eq '古い' -and
+        $r.Rows[1].Fix -eq 'tools/Install-AgentInstructions.ps1'
+    }
+    Test-Case 'Test-DotfilesDeployment: failed downloads and a missing claude command report 不明' {
+        $script:fakeProfileThrow = $true; $script:fakeRules = $null; $script:fakePlugin = $true
+        Set-CmdAvailable -Absent claude
+        $r = & $deploy 'x' 'x'
+        $r.Profile -eq '不明' -and $r.Claude -eq '不明' -and $r.Codex -eq '不明' -and $r.Plugin -eq '不明'
+    }
 }
 finally {
     $env:PATH = $originalPath

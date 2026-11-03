@@ -250,6 +250,33 @@ function Show-DevEnv {
     } | Format-Table -AutoSize
 }
 
+# 配置済みのプロファイル・共通ルール・dotfiles plugin が GitHub の main と一致するかを一覧する。
+# 古い項目には直すコマンドを添える。取得に失敗した項目は「不明」。
+function Test-DotfilesDeployment {
+    param(
+        [string]$ClaudeDir = (Join-Path $env:USERPROFILE '.claude'),
+        [string]$CodexDir = $(if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE '.codex' })
+    )
+    $row = { param($target, $state, $fix) [pscustomobject]@{ Target = $target; Status = $state; Fix = $fix } }
+    $status = { param($ok) if ($null -eq $ok) { '不明' } elseif ($ok) { 'OK' } else { '古い' } }
+
+    $profileOk = try { @(Get-DotfilesProfileUpdates).Count -eq 0 } catch { $null }
+    & $row 'PowerShell プロファイル' (& $status $profileOk) 'Update-Profile'
+
+    $rules = try { Get-DotfilesRemoteConfig @{ RepoPath = 'claude/CLAUDE.global.md' } } catch { $null }
+    foreach ($dest in @((Join-Path $ClaudeDir 'CLAUDE.md'), (Join-Path $CodexDir 'AGENTS.md'))) {
+        $ok = if ($null -eq $rules) { $null }
+        elseif (-not (Test-Path -LiteralPath $dest -PathType Leaf)) { $false }
+        else { Test-DevToolTextEqual (Read-DevToolLocalText $dest) $rules }
+        & $row $dest (& $status $ok) 'tools/Install-AgentInstructions.ps1'
+    }
+
+    foreach ($tool in @($script:DevTools | Where-Object { $_.Backend -eq 'claude-plugin' })) {
+        $ok = if (Test-Cmd claude) { Test-DevToolPluginUpToDate $tool } else { $null }
+        & $row $tool.Id (& $status $ok) 'Install-DevTools'
+    }
+}
+
 function Sync-DevToolSkills {
     param(
         [string]$AgentsSkillsDir = (Join-Path $env:USERPROFILE '.agents\skills'),

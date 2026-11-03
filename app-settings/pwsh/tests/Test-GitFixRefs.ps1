@@ -6,7 +6,7 @@ $originalPath = $env:PATH
 $originalGlobal = $env:GIT_CONFIG_GLOBAL
 $originalNoSystem = $env:GIT_CONFIG_NOSYSTEM
 $startLocation = Get-Location
-$gitExe = (Get-Command git -CommandType Application -ErrorAction Stop).Source
+$gitExe = (Get-Command git -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ('dotfiles-fixrefs-test-' + [guid]::NewGuid().ToString('N'))
 . (Join-Path $PSScriptRoot 'TestHarness.ps1')
 
