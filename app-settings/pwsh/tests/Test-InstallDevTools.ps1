@@ -128,6 +128,19 @@ if ($h.Throw) { throw $h.Throw }
         $script:codexCount++
         if ($script:failIds.ContainsKey('Disable-CodexStatusline')) { throw 'wrapper is locked' }
     }
+    function Remove-RetiredDevTools {
+        $script:retiredCount++
+        if ($script:failIds.ContainsKey('Remove-RetiredDevTools')) { throw 'mcp remove failed' }
+    }
+    function Sync-AgentDesktopSkill {
+        $script:agentSkillCount++; Add-Event 'agent-skill'
+        if ($script:failIds.ContainsKey('Sync-AgentDesktopSkill')) { throw 'skill write failed' }
+    }
+    function npm {
+        $line = 'npm ' + ($args -join ' ')
+        $script:npmCalls.Add($line); Add-Event $line
+        $global:LASTEXITCODE = Get-FakeExit $args
+    }
     function Sync-DevToolSkills {
         $script:syncCount++; Add-Event 'sync'
         if ($script:failIds.ContainsKey('Sync-DevToolSkills')) { throw 'skills conflict' }
@@ -167,7 +180,7 @@ if ($h.Throw) { throw $h.Throw }
         $script:cmdPresent = @{ claude = $false; python = $false; pip = $false; git = $false }
         $script:pythonAppearsAfterInstall = $false
         foreach ($n in 'events', 'wingetCalls', 'pipCalls', 'pythonCalls', 'gitCalls', 'claudeCalls', 'moduleInstalls',
-            'moduleUpdates', 'prompts', 'detectCalls', 'latestCalls', 'installerCalls') {
+            'moduleUpdates', 'npmCalls', 'prompts', 'detectCalls', 'latestCalls', 'installerCalls') {
             Set-Variable -Scope Script -Name $n -Value ([System.Collections.Generic.List[string]]::new())
         }
         $script:diffs = [System.Collections.Generic.List[object]]::new()
@@ -190,6 +203,8 @@ if ($h.Throw) { throw $h.Throw }
         $script:refreshCount = 0
         $script:syncCount = 0
         $script:codexCount = 0
+        $script:retiredCount = 0
+        $script:agentSkillCount = 0
         $script:summary = @()
         $script:log = ''
         $global:LASTEXITCODE = 0
@@ -308,7 +323,7 @@ if ($h.Throw) { throw $h.Throw }
         $script:DevTools = @((New-Tool 'A' 'winget'), (New-Tool 'B' 'winget'))
         Invoke-Install -Yes
         $e = @($script:events)
-        $e[0] -ceq 'sync' -and $e[-1] -ceq 'refreshenv' -and $script:refreshCount -eq 1 -and $script:syncCount -eq 1
+        $e[0] -ceq 'sync' -and $e[-2] -ceq 'refreshenv' -and $e[-1] -ceq 'agent-skill' -and $script:refreshCount -eq 1 -and $script:syncCount -eq 1
     }
     Test-Case 'Tools are installed in catalog order and each is announced' {
         Reset-Fake
@@ -379,6 +394,44 @@ if ($h.Throw) { throw $h.Throw }
         $script:failIds['Sync-DevToolSkills'] = 1
         Invoke-Install -Yes
         $script:log.Contains('skills conflict') -and $script:syncCount -eq 1
+    }
+    Test-Case 'Retired tools are cleaned up on every run; a failure only warns' {
+        Reset-Fake
+        Invoke-Install -Yes
+        $first = $script:retiredCount -eq 1
+        Reset-Fake
+        $script:failIds['Remove-RetiredDevTools'] = 1
+        Invoke-Install -Yes
+        $first -and $script:retiredCount -eq 1 -and $script:log.Contains('Remove-RetiredDevTools failed: mcp remove failed')
+    }
+    Test-Case 'npm: installs globally, then writes the agent skill after the install' {
+        Reset-Fake
+        Set-Present 'npm'
+        $script:DevTools = @((New-Tool 'AD' 'npm' @{ Cmd = 'ad'; RequiredCommand = 'npm' }))
+        Invoke-Install -Yes
+        (Get-Row 'AD').Result -ceq 'OK' -and (Get-Calls $script:npmCalls) -ceq 'npm install -g id.AD' -and
+        $script:events.IndexOf('npm install -g id.AD') -lt $script:events.IndexOf('agent-skill') -and $script:agentSkillCount -eq 1
+    }
+    Test-Case 'npm: a missing npm skips the install without running anything' {
+        Reset-Fake
+        $script:cmdPresent['npm'] = $false
+        $script:DevTools = @((New-Tool 'AD' 'npm' @{ Cmd = 'ad'; RequiredCommand = 'npm' }))
+        Invoke-Install -Yes
+        $script:npmCalls.Count -eq 0 -and $script:log.Contains("AD: 'npm' not found; skipping.")
+    }
+    Test-Case 'npm: a failing install is FAILED' {
+        Reset-Fake
+        Set-Present 'npm'
+        $script:failIds['id.AD'] = 1
+        $script:DevTools = @((New-Tool 'AD' 'npm' @{ Cmd = 'ad'; RequiredCommand = 'npm' }))
+        Invoke-Install -Yes
+        (Get-Row 'AD').Result -ceq 'FAILED'
+    }
+    Test-Case 'Agent skill is synced when everything is installed, and its failure only warns' {
+        Reset-Fake
+        $script:failIds['Sync-AgentDesktopSkill'] = 1
+        Invoke-Install -Yes
+        $script:agentSkillCount -eq 1 -and $script:log.Contains('Sync-AgentDesktopSkill failed: skill write failed')
     }
     Test-Case 'Environment refresh failure does not hide the install summary' {
         Reset-Fake

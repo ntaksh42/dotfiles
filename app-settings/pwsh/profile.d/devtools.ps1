@@ -196,6 +196,7 @@ function Test-ToolInstalled {
             if ($Tool.AppxName) { return [bool](Get-AppxPackage -Name $Tool.AppxName) }
             return (Test-Path -LiteralPath $Tool.Path -PathType Leaf)
         }
+        'npm' { return [bool](Test-Cmd $Tool.Cmd) }
         'claude-plugin' {
             if (-not (Test-Cmd claude)) { return $false }
             try { $plugins = claude plugin list --json | ConvertFrom-Json } catch { return $false }
@@ -368,6 +369,58 @@ function Disable-CodexStatusline {
     Write-Host "Codex statusline を無効化しました: $wrapper.disabled" -ForegroundColor Yellow
 }
 
+# 廃止した Windows-Operation-Cli（agent-desktop に置き換え）の MCP 登録・本体・版マーカー・
+# スキルを外す。無ければ何もしない。起動中は本体を消せないので本体だけ見送る。
+function Remove-RetiredDevTools {
+    param(
+        [string]$InstallDir = (Join-Path $env:LOCALAPPDATA 'Programs\windows-operation-cli'),
+        [string]$MarkerPath = (Join-Path $env:LOCALAPPDATA 'dotfiles\devtools\Windows-Operation-Cli.version'),
+        [string]$SkillDir = (Join-Path $env:USERPROFILE '.claude\skills\windows-operation-cli')
+    )
+
+    $ErrorActionPreference = 'Stop'
+    if (Test-Cmd claude) {
+        $null = claude mcp get windows-operation-cli 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            claude mcp remove --scope user windows-operation-cli
+            Assert-NativeCommandSucceeded 'claude mcp remove windows-operation-cli'
+            Write-Host 'Windows-Operation-Cli の MCP 登録を削除しました。' -ForegroundColor Yellow
+        }
+    }
+    if (Test-Path -LiteralPath $InstallDir) {
+        if (Get-Process -Name 'windows-operation-cli' -ErrorAction SilentlyContinue) {
+            Write-Warning 'windows-operation-cli is running; close it to remove it.'
+        }
+        else {
+            Remove-Item -LiteralPath $InstallDir -Recurse -Force
+            Write-Host "Windows-Operation-Cli を削除しました: $InstallDir" -ForegroundColor Yellow
+        }
+    }
+    if (Test-Path -LiteralPath $MarkerPath) { Remove-Item -LiteralPath $MarkerPath -Force }
+    if (Test-Path -LiteralPath $SkillDir) {
+        Remove-Item -LiteralPath $SkillDir -Recurse -Force
+        Write-Host "Windows-Operation-Cli のスキルを削除しました: $SkillDir" -ForegroundColor Yellow
+    }
+}
+
+# agent-desktop のスキルは CLI に内蔵されている（版と常に一致する）ので、それを
+# スキル ディレクトリへ書き出す。CLI が無ければ何もしない。
+function Sync-AgentDesktopSkill {
+    param([string]$SkillsDir = (Join-Path $env:USERPROFILE '.claude\skills'))
+
+    $ErrorActionPreference = 'Stop'
+    if (-not (Test-Cmd agent-desktop)) { return }
+    $json = agent-desktop skills get desktop
+    Assert-NativeCommandSucceeded 'agent-desktop skills get desktop'
+    $content = ($json | ConvertFrom-Json).data.content
+    if (-not $content) { throw 'agent-desktop returned an empty skill.' }
+    $path = Join-Path $SkillsDir 'agent-desktop\SKILL.md'
+    if ((Test-Path -LiteralPath $path) -and (Test-DevToolTextEqual (Read-DevToolLocalText $path) $content)) { return }
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null
+    Set-Content -LiteralPath $path -Value $content -NoNewline -Encoding UTF8
+    Write-Host "agent-desktop のスキルを配置しました: $path" -ForegroundColor Gray
+}
+
 # Install missing catalog tools. Script-backed tools compare installed versions or
 # remote file contents before updating. If the remote check fails, skip the update.
 # remote-config の既存ファイル上書きは、ccstatusline のようにアプリ自身が書き換える
@@ -383,6 +436,8 @@ function Install-DevTools {
 
     try { Disable-CodexStatusline }
     catch { Write-Warning "Disable-CodexStatusline failed: $($_.Exception.Message)" }
+    try { Remove-RetiredDevTools }
+    catch { Write-Warning "Remove-RetiredDevTools failed: $($_.Exception.Message)" }
 
     # 判定は winget/ネットワークを伴うため1回だけ行い、以降は結果を使い回す。
     $results = @()
@@ -450,6 +505,8 @@ function Install-DevTools {
     if ($pending.Count -eq 0) {
         try { Sync-DevToolSkills }
         catch { Write-Warning "Sync-DevToolSkills failed: $($_.Exception.Message)" }
+        try { Sync-AgentDesktopSkill }
+        catch { Write-Warning "Sync-AgentDesktopSkill failed: $($_.Exception.Message)" }
         if ($results.Count -gt 0) {
             Write-Host "`nInstall summary:" -ForegroundColor Cyan
             $results | Format-Table -AutoSize
@@ -514,6 +571,11 @@ function Install-DevTools {
                     }
                 }
                 'psmodule' { Install-Module $t.Id -Scope CurrentUser -Force -AcceptLicense }
+                'npm' {
+                    npm install -g $t.Id
+                    Assert-NativeCommandSucceeded "npm install -g $($t.Id)"
+                    $script:_cmdCache.Remove($t.Cmd)
+                }
                 'claude-plugin' {
                     $plugins = claude plugin list --json | ConvertFrom-Json
                     foreach ($old in $t.Replaces) {
@@ -650,6 +712,8 @@ function Install-DevTools {
 
     try { refreshenv }
     catch { Write-Warning "refreshenv failed: $($_.Exception.Message)" }
+    try { Sync-AgentDesktopSkill }
+    catch { Write-Warning "Sync-AgentDesktopSkill failed: $($_.Exception.Message)" }
     Write-Host "`nInstall summary:" -ForegroundColor Cyan
     $results | Format-Table -AutoSize
 }

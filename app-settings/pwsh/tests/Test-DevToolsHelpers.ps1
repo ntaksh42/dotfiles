@@ -46,11 +46,12 @@ try {
     # =====================================================================================
     # Catalog integrity
     # =====================================================================================
-    $knownBackends = 'winget', 'msstore', 'pip', 'psmodule', 'script', 'remote-config', 'claude-plugin'
+    $knownBackends = 'winget', 'msstore', 'pip', 'npm', 'psmodule', 'script', 'remote-config', 'claude-plugin'
     $allowedKeys = @{
         'winget'        = 'Id', 'Cmd', 'PostInstall', 'Upgradable', 'ProcessName', 'ProcessPath'
         'msstore'       = 'Id', 'Upgradable', 'ProcessName', 'ProcessPath'
         'pip'           = 'Id', 'Cmd'
+        'npm'           = 'Id', 'Cmd', 'RequiredCommand'
         'psmodule'      = 'Id'
         'script'        = 'Id', 'Path', 'Args', 'RebootRequiredExitCode', 'RequiredCommand', 'Repo', 'VersionSource', 'InstallOnly', 'RemoteFiles', 'AppxName', 'ProcessName'
         'remote-config' = 'RepoPath', 'Dest', 'StripCommentLines'
@@ -147,11 +148,6 @@ try {
     }
     Test-Case 'script RebootRequiredExitCode is an integer' {
         @(Get-ToolsByBackend 'script' | Where-Object { $_.ContainsKey('RebootRequiredExitCode') -and $_.RebootRequiredExitCode -isnot [int] }).Count -eq 0
-    }
-    Test-Case 'Windows-Operation-Cli keeps the shape Install-DevTools special-cases' {
-        $w = $tools | Where-Object Name -ceq 'Windows-Operation-Cli'
-        $w.Backend -eq 'script' -and [bool]$w.Repo -and $w.Args -is [hashtable] -and $w.Args.ContainsKey('FromRelease') -and
-        -not $w.VersionSource -and [IO.Path]::GetFileNameWithoutExtension($w.Path) -eq 'windows-operation-cli'
     }
     Test-Case 'remote-config entries have RepoPath and an absolute Dest' {
         $rc = @(Get-ToolsByBackend 'remote-config')
@@ -1203,6 +1199,108 @@ try {
         $r = & $deploy 'x' 'x'
         $r.Profile -eq '不明' -and $r.Claude -eq '不明' -and $r.Codex -eq '不明' -and $r.Plugin -eq '不明'
     }
+
+    # =====================================================================================
+    # Remove-RetiredDevTools / Sync-AgentDesktopSkill / npm detection
+    # =====================================================================================
+    Test-Case 'npm: installed exactly when the command is on PATH' {
+        Set-CmdAvailable -Present agent-desktop
+        $a = Test-ToolInstalled @{ Backend = 'npm'; Id = 'agent-desktop'; Cmd = 'agent-desktop' }
+        Set-CmdAvailable -Absent agent-desktop
+        $b = Test-ToolInstalled @{ Backend = 'npm'; Id = 'agent-desktop'; Cmd = 'agent-desktop' }
+        $a -eq $true -and $b -eq $false
+    }
+    function New-RetiredFixture {
+        $base = New-Scratch
+        $f = @{
+            Install = Join-Path $base 'Programs\windows-operation-cli'
+            Marker  = Join-Path $base 'dotfiles\devtools\Windows-Operation-Cli.version'
+            Skill   = Join-Path $base 'skills\windows-operation-cli'
+        }
+        New-Item -ItemType Directory -Force -Path $f.Install, (Split-Path $f.Marker), $f.Skill | Out-Null
+        Set-Content -LiteralPath (Join-Path $f.Install 'windows-operation-cli.exe') -Value 'exe'
+        Set-Content -LiteralPath $f.Marker -Value 'v1'
+        Set-Content -LiteralPath (Join-Path $f.Skill 'SKILL.md') -Value 'skill'
+        $f
+    }
+    $script:mcpCalls = @(); $script:mcpRegistered = $true; $script:woRunning = $false
+    function claude {
+        $script:mcpCalls += ($args -join ' ')
+        if ($args[1] -eq 'get') { $global:LASTEXITCODE = if ($script:mcpRegistered) { 0 } else { 1 }; return }
+        $global:LASTEXITCODE = 0
+    }
+    function Get-Process { [CmdletBinding()] param($Name) if ($script:woRunning) { [pscustomobject]@{ Name = $Name } } }
+    Test-Case 'Remove-RetiredDevTools removes the MCP registration, install dir, marker and skill' {
+        $f = New-RetiredFixture; $script:mcpCalls = @(); $script:mcpRegistered = $true; $script:woRunning = $false
+        Set-CmdAvailable -Present claude
+        Remove-RetiredDevTools -InstallDir $f.Install -MarkerPath $f.Marker -SkillDir $f.Skill 6>$null
+        ($script:mcpCalls -join '|') -ceq 'mcp get windows-operation-cli|mcp remove --scope user windows-operation-cli' -and
+        -not (Test-Path $f.Install) -and -not (Test-Path $f.Marker) -and -not (Test-Path $f.Skill)
+    }
+    Test-Case 'Remove-RetiredDevTools does not call mcp remove when nothing is registered' {
+        $f = New-RetiredFixture; $script:mcpCalls = @(); $script:mcpRegistered = $false; $script:woRunning = $false
+        Set-CmdAvailable -Present claude
+        Remove-RetiredDevTools -InstallDir $f.Install -MarkerPath $f.Marker -SkillDir $f.Skill 6>$null
+        ($script:mcpCalls -join '|') -ceq 'mcp get windows-operation-cli'
+    }
+    Test-Case 'Remove-RetiredDevTools skips the MCP step without claude and still removes the files' {
+        $f = New-RetiredFixture; $script:mcpCalls = @(); $script:woRunning = $false
+        Set-CmdAvailable -Absent claude
+        Remove-RetiredDevTools -InstallDir $f.Install -MarkerPath $f.Marker -SkillDir $f.Skill 6>$null
+        $script:mcpCalls.Count -eq 0 -and -not (Test-Path $f.Install) -and -not (Test-Path $f.Skill)
+    }
+    Test-Case 'Remove-RetiredDevTools keeps the install dir with a warning while the process runs' {
+        $f = New-RetiredFixture; $script:mcpRegistered = $false; $script:woRunning = $true
+        Set-CmdAvailable -Absent claude
+        $o = Invoke-Captured { Remove-RetiredDevTools -InstallDir $f.Install -MarkerPath $f.Marker -SkillDir $f.Skill }
+        $script:woRunning = $false
+        (Test-Path $f.Install) -and -not (Test-Path $f.Skill) -and $o.Warnings.Count -eq 1
+    }
+    Test-Case 'Remove-RetiredDevTools is silent and harmless when everything is already gone' {
+        $base = New-Scratch; $script:mcpRegistered = $false; $script:woRunning = $false
+        Set-CmdAvailable -Present claude
+        $o = Invoke-Captured { Remove-RetiredDevTools -InstallDir (Join-Path $base 'a') -MarkerPath (Join-Path $base 'b') -SkillDir (Join-Path $base 'c') }
+        $o.Host.Count -eq 0 -and $o.Warnings.Count -eq 0
+    }
+    Remove-Item function:claude, function:Get-Process
+
+    $script:adJson = '{"ok":true,"data":{"content":"---\r\nname: agent-desktop\r\n---\r\nbody"}}'
+    $script:adExit = 0
+    function agent-desktop { $global:LASTEXITCODE = $script:adExit; $script:adJson }
+    Test-Case 'Sync-AgentDesktopSkill writes the CLI skill to agent-desktop/SKILL.md' {
+        $dir = New-Scratch; Set-CmdAvailable -Present agent-desktop
+        Sync-AgentDesktopSkill -SkillsDir $dir 6>$null
+        Test-DevToolTextEqual (Read-DevToolLocalText (Join-Path $dir 'agent-desktop\SKILL.md')) "---`nname: agent-desktop`n---`nbody"
+    }
+    Test-Case 'Sync-AgentDesktopSkill leaves an identical file alone and is silent' {
+        $dir = New-Scratch; Set-CmdAvailable -Present agent-desktop
+        Sync-AgentDesktopSkill -SkillsDir $dir 6>$null
+        $path = Join-Path $dir 'agent-desktop\SKILL.md'; $before = (Get-Item $path).LastWriteTimeUtc
+        Start-Sleep -Milliseconds 50
+        $o = Invoke-Captured { Sync-AgentDesktopSkill -SkillsDir $dir }
+        $o.Host.Count -eq 0 -and (Get-Item $path).LastWriteTimeUtc -eq $before
+    }
+    Test-Case 'Sync-AgentDesktopSkill rewrites a stale skill' {
+        $dir = New-Scratch; Set-CmdAvailable -Present agent-desktop
+        $path = Join-Path $dir 'agent-desktop\SKILL.md'
+        New-Item -ItemType Directory -Force -Path (Split-Path $path) | Out-Null
+        Set-Content -LiteralPath $path -Value 'old'
+        Sync-AgentDesktopSkill -SkillsDir $dir 6>$null
+        (Read-DevToolLocalText $path).Contains('body')
+    }
+    Test-Case 'Sync-AgentDesktopSkill does nothing without the CLI' {
+        $dir = New-Scratch; Set-CmdAvailable -Absent agent-desktop
+        Sync-AgentDesktopSkill -SkillsDir $dir
+        -not (Test-Path (Join-Path $dir 'agent-desktop'))
+    }
+    Test-Case 'Sync-AgentDesktopSkill throws and writes nothing when the CLI fails' {
+        $dir = New-Scratch; Set-CmdAvailable -Present agent-desktop; $script:adExit = 1
+        $threw = $false
+        try { Sync-AgentDesktopSkill -SkillsDir $dir } catch { $threw = $true }
+        $script:adExit = 0
+        $threw -and -not (Test-Path (Join-Path $dir 'agent-desktop'))
+    }
+    Remove-Item function:agent-desktop
 }
 finally {
     $env:PATH = $originalPath

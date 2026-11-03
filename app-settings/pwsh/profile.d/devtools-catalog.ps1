@@ -4,7 +4,7 @@ $ErrorActionPreference = "Stop"
 # §7 Environment setup helpers
 # ---------------------------------------------------------------------------
 
-# Tool catalog (data-driven). Backend: winget | msstore | pip | psmodule | script | remote-config
+# Tool catalog (data-driven). Backend: winget | msstore | pip | npm | psmodule | script | remote-config | claude-plugin
 $script:DevTools = @(
     @{ Name = 'Files'; Backend = 'winget'; Id = 'FilesCommunity.Files' }
     @{ Name = 'Everything'; Backend = 'winget'; Id = 'voidtools.Everything' }
@@ -18,7 +18,6 @@ $script:DevTools = @(
     @{ Name = 'ChatGPT'; Backend = 'msstore'; Id = '9PLM9XGG6VKS'; Upgradable = $true; ProcessName = 'ChatGPT' }
     # 既存の設定を上書きしないよう、レイアウトが未作成（custom-layouts.json なし）の環境にだけ一度配置する。
     @{ Name = 'Waypoint'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/waypoint/main/installer/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\waypoint\waypoint.exe'); Args = @{ Silent = $true }; RebootRequiredExitCode = 3010; Repo = 'ntaksh42/waypoint'; VersionSource = 'product' }
-    @{ Name = 'Windows-Operation-Cli'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/Windows-Operation-Cli/main/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\windows-operation-cli\windows-operation-cli.exe'); Args = @{ FromRelease = $true }; RequiredCommand = 'claude'; Repo = 'ntaksh42/Windows-Operation-Cli'; ProcessName = 'windows-operation-cli' }
     # MSIX のため導入先のファイルではなくパッケージ名で判定する（AppxName）。
     @{ Name = 'Dockyard'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-Dockyard.ps1"; AppxName = 'Dockyard'; Repo = 'ntaksh42/dockyard'; VersionSource = 'appx' }
     @{ Name = 'starship'; Backend = 'winget'; Id = 'Starship.Starship'; Cmd = 'starship' }
@@ -37,6 +36,8 @@ $script:DevTools = @(
     @{ Name = 'PSFzf'; Backend = 'psmodule'; Id = 'PSFzf' }
     @{ Name = 'Terminal-Icons'; Backend = 'psmodule'; Id = 'Terminal-Icons' }
     @{ Name = 'gita'; Backend = 'pip'; Id = 'gita'; Cmd = 'gita' }
+    # Windows-Operation-Cli の後継。スキルは Sync-AgentDesktopSkill が CLI から書き出す。
+    @{ Name = 'agent-desktop'; Backend = 'npm'; Id = 'agent-desktop'; Cmd = 'agent-desktop'; RequiredCommand = 'npm' }
     @{ Name = 'git'; Backend = 'winget'; Id = 'Git.Git'; Cmd = 'git' }
     @{ Name = 'gh'; Backend = 'winget'; Id = 'GitHub.cli'; Cmd = 'gh' }
     @{ Name = 'Azure CLI'; Backend = 'winget'; Id = 'Microsoft.AzureCLI'; Cmd = 'az' }
