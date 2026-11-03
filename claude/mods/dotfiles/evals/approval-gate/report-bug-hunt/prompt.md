@@ -1,6 +1,6 @@
 ---
-description: approval-gate の発動テスト（neg）
-tags: [approval-gate, trigger, neg]
+description: approval-gate の発動テスト（pos）
+tags: [approval-gate, trigger, pos]
 plugins: ["../../.."]
 runs: 2
 max_turns: 6
