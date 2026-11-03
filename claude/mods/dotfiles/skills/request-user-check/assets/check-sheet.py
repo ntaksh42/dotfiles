@@ -11,6 +11,8 @@
   - 論点 (#p1 …) と [判断] の数のズレ、5 件以上
   - [判断] に 推奨 / 根拠 の書き忘れ
   - 文字の多すぎ (本文の文章 600 字超、結論 120 字超)
+  - 報告シート: 図の欠落、要点の印 (class="key") の欠落、
+    文字の多すぎ (本文 300 字超、結論 80 字超、表のセル 40 字超)
 
 終了コード 0 = 出してよい / 1 = 直してから出す。標準ライブラリのみ (python3.8+)。
 """
@@ -24,6 +26,9 @@ from pathlib import Path
 
 PROSE_LIMIT = 600
 CONCL_LIMIT = 120
+REPORT_PROSE_LIMIT = 300
+REPORT_CONCL_LIMIT = 80
+REPORT_CELL_LIMIT = 40
 
 
 def visible_len(fragment: str) -> int:
@@ -55,6 +60,19 @@ def check_sheet(html: str):
     if not is_report and 'review-sheet-format: v5' not in html:
         warns.append('<!-- review-sheet-format: v5 --> が無い (どの規約で書いたシートかの目印)')
     total, concl = prose_length(live)
+    if is_report:
+        if '<svg' not in live:
+            errors.append('図 (インライン SVG) が無い — 報告シートは図で全体を見せる。図が要らない報告は会話で書く')
+        elif not re.search(r'class=["\'][^"\']*\bkey\b', live):
+            warns.append('要点の印 (class="key") が無い — 図の中で要点の要素だけを赤くする')
+        if total > REPORT_PROSE_LIMIT:
+            warns.append(f'本文の文章が {total} 字 (目安 {REPORT_PROSE_LIMIT} 字以内)。説明は図のラベルへ移し、経緯は <details> へ')
+        if concl > REPORT_CONCL_LIMIT:
+            warns.append(f'結論が {concl} 字 (目安 {REPORT_CONCL_LIMIT} 字以内・1 文)')
+        body = re.sub(r'<(svg|details)\b.*?</\1>', '', live, flags=re.DOTALL)
+        long_cells = [n for n in (visible_len(t) for t in re.findall(r'<td\b[^>]*>(.*?)</td>', body, flags=re.DOTALL)) if n > REPORT_CELL_LIMIT]
+        if long_cells:
+            warns.append(f'表のセル {len(long_cells)} 個が {REPORT_CELL_LIMIT} 字超 (最長 {max(long_cells)} 字)。文でなく句で書く')
     if not is_report and total > PROSE_LIMIT:
         warns.append(f'本文の文章が {total} 字 (目安 {PROSE_LIMIT} 字以内)。絵で分かる説明から削り、判断外の決定は <details> へ')
     if not is_report and concl > CONCL_LIMIT:

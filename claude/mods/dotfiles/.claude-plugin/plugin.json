@@ -1,6 +1,6 @@
 {
   "name": "dotfiles",
-  "version": "0.12.3",
+  "version": "0.12.4",
   "description": "Skills (drawio-diagram, jp-deslop, request-user-check, cmd-history, harness), the mods (auto-session-title, ado-link-bar, toast-notify, cmdHistory), and settings-hook fallbacks (scripts/lite-hook.mjs, statusline/pr-line.mjs) for environments where mods are refused.",
   "types": "./types/index.d.ts",
   "userConfig": {

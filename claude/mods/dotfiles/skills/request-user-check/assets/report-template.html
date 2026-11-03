@@ -3,13 +3,13 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- report-sheet -->
 <!--
-  報告シートの雛形。会話で書くと長くなる報告・相談を、表と短い行で 1 枚にまとめる。
-  - 骨格は固定: 結論 → 図 → 詳細 (表と文) → (注意点) → 畳み付録
-  - 図を先に置く。図で全体像が分かり、詳細は図の番号 (①②…) で引く。文字は詳細の節にあってよい
-  - 図が要らない短い報告はこの雛形を使わず会話で書く。図は構造・流れ・比較・内訳のどれかを描く
-  - 1 行 1 項目。段落は 2 文まで。根拠は file:line か実行結果を .mono で添える
+  報告シートの雛形。会話で書くと長くなる報告・相談を、図 1 枚と短い句で見せる。
+  - 骨格は固定: 要点のタイトル → 結論 1 文 → 図 → (根拠の表) → (注意点) → 畳み付録
+  - 先に要点を 1 つ決める。タイトルに 1 行で書き、図では要点の要素だけを class="key" で赤くする。他は灰色
+  - 図は SKILL.md「図の選び方」から選ぶ (流れ・構成・前後・状態の格子・横棒)。説明は文章でなく図のラベルに書く
+  - 文字の上限: 本文 300 字、結論 80 字、表のセル 40 字 (SVG と <details> の中は数えない)
   - 問い・選択肢・推奨はシートに書かない。[判断] は会話で聞く
-  - 色は Orca のテーマ変数を優先し、無い環境 (ブラウザ) では固定色に戻る。赤は注意点と論点だけに使う
+  - 色は Orca のテーマ変数を優先し、無い環境 (ブラウザ) では固定色に戻る。赤は要点と注意点だけに使う
   - 相対 URL 禁止。100vh 禁止
 -->
 <title><!-- TODO: タイトル --></title>
@@ -35,23 +35,28 @@ td.no{width:2.5em;color:var(--ag-muted);font-family:'IBM Plex Mono',Consolas,mon
 ul{margin:6px 0;padding-left:1.4em}
 details{border:1px solid var(--ag-line);border-radius:8px;padding:8px 14px;margin:18px 0 6px}
 summary{cursor:pointer;color:var(--ag-link);font-size:13.5px}
+/* 図: 要点 (.key) だけ赤、他は灰色 */
+svg text{fill:var(--ag-ink);font-size:14px}
+svg .sub{fill:var(--ag-muted);font-size:12px}
+svg rect,svg line,svg path{stroke:var(--ag-muted);fill:none;stroke-width:1.5}
+svg .key rect,svg .key line,svg .key path{stroke:var(--ag-red);stroke-width:3}
+svg .key text{fill:var(--ag-red);font-weight:700}
 </style></head>
 <body><main>
 
-<h1><!-- TODO: 主張の言い切り。1 行 --></h1>
-<div class="concl"><b>結論:</b> <!-- TODO: 2 文以内 --></div>
+<h1><!-- TODO: 要点を 1 行で言い切る (読み手が 1 つだけ持ち帰ること) --></h1>
+<div class="concl"><b>結論:</b> <!-- TODO: 1 文・80 字以内 --></div>
 
-<!-- 図: インライン SVG を 1〜3 枚。構造・流れ・比較・内訳のうち、結論を支えるものを描く。項目に赤の ①②③ を打つ -->
-<h2>図 1: <!-- TODO: 何の図か --></h2>
-<svg viewBox="0 0 960 240" width="100%" role="img" aria-label="<!-- TODO -->">
-<!-- TODO: 図を描く。文字色は fill="currentColor" ではなく var(--ag-ink) 相当の #212529 でよい -->
+<!-- 図: インライン SVG 1 枚 (多くても 2 枚)。見出しは付けない。要点の要素だけ <g class="key"> で包む -->
+<svg viewBox="0 0 960 240" width="100%" role="img" aria-label="<!-- TODO: 図の内容 -->">
+<!-- TODO: 図を描く。例: <g><rect x="20" y="80" width="200" height="60" rx="8"/><text x="120" y="115" text-anchor="middle">現状</text></g>
+     <g class="key"><rect x="380" y="80" width="200" height="60" rx="8"/><text x="480" y="115" text-anchor="middle">ここが壊れていた</text></g> -->
 </svg>
 
-<!-- 詳細: 図の番号で引く。1 行 1 項目。列は内容に合わせて変えてよい (例: 項目 / 内容 / 根拠、案 / 利点 / 代償) -->
-<h2>詳細</h2>
+<!-- 根拠の表: 図だけでは足りない根拠を引くときだけ置く。無ければ削る。セルは句で書く -->
 <table>
-<tr><th>#</th><th><!-- TODO --></th><th><!-- TODO --></th><th>根拠</th></tr>
-<tr><td class="no">①</td><td><!-- TODO --></td><td><!-- TODO --></td><td class="mono"><!-- TODO: file:line --></td></tr>
+<tr><th>#</th><th><!-- TODO --></th><th>根拠</th></tr>
+<tr><td class="no">①</td><td><!-- TODO --></td><td class="mono"><!-- TODO: file:line --></td></tr>
 </table>
 
 <!-- 注意点: 失敗したテスト・飛ばした作業・未確認のこと。無ければ節ごと削る -->
