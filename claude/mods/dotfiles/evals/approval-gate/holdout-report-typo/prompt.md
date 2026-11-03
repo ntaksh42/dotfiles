@@ -1,6 +1,6 @@
 ---
-description: approval-gate の発動テスト（neg、言い回し違い）
-tags: [approval-gate, trigger, neg, holdout]
+description: approval-gate の発動テスト（pos、言い回し違い）
+tags: [approval-gate, trigger, pos, holdout]
 plugins: ["../../.."]
 runs: 3
 max_turns: 6

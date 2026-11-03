@@ -140,23 +140,6 @@ Mod が `main` に取り込まれている必要があります。`claude` が P
 セッション/週次の使用量を表示していました。`tools/Install-CodexStatusline.ps1` と
 `app-settings/codex-statusline/` は再開用に残してあります。
 
-## Crit
-
-`Install-DevTools` は Crit 本体と Codex 連携もインストールします。取得した実行ファイルは
-リリースの `checksums.txt` と SHA256 を照合し、一致しなければ入れません。インストール時に
-`~/.crit.config.json` の既存項目を維持しつつ、社内利用向けの安全設定として
-ローカルホスト限定、更新確認の無効化、Share の無効化、`agent_cmd` の無効化を設定します。
-
-```json
-{
-  "host": "127.0.0.1",
-  "no_update_check": true,
-  "share_url": "",
-  "share_targets": [],
-  "agent_cmd": ""
-}
-```
-
 ## セットアップ手順
 
 ### 1. リポジトリをクローン
