@@ -1,4 +1,4 @@
-# request-user-check 0.9.0 — 報告と相談の型 for Claude Code / Codex
+# request-user-check 0.9.1 — 報告と相談の型 for Claude Code / Codex
 
 エージェントがユーザーに報告・相談するときの型を揃える skill です。報告は結論から書き、決めてほしい点は推奨付きの [判断] として聞きます。UI の配置のように見た目で比べる論点があるときは、比較用の HTML 1 枚 (比較シート) を書いてブラウザで開き、そのうえで [判断] を会話で聞きます。
 
