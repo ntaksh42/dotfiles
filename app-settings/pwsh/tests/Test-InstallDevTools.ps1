@@ -76,7 +76,7 @@ if ($h.Throw) { throw $h.Throw }
             return (ConvertTo-Json -InputObject @($script:marketplaces | ForEach-Object { @{ name = $_ } }) -Compress)
         }
         if ($args[0] -eq 'plugin' -and $args[1] -eq 'list') {
-            return (ConvertTo-Json -InputObject @($script:pluginList | ForEach-Object { @{ id = $_; enabled = $true } }) -Compress)
+            return (ConvertTo-Json -InputObject @($script:pluginList | ForEach-Object { @{ id = $_; enabled = ($script:disabledPlugins -notcontains $_) } }) -Compress)
         }
         if ($args[2] -eq 'add' -and $global:LASTEXITCODE -eq 0) { $script:marketplaces += $script:marketplaceNameFor[$args[3]] }
     }
@@ -176,6 +176,7 @@ if ($h.Throw) { throw $h.Throw }
         $script:failIds = @{}
         $script:marketplaces = @()
         $script:pluginList = @()
+        $script:disabledPlugins = @()
         $script:marketplaceNameFor = @{ 'owner/repo' = 'mods' }   # the name "marketplace add <source>" registers
         $script:modules = @()
         $script:running = @()
@@ -619,10 +620,11 @@ if ($h.Throw) { throw $h.Throw }
         Invoke-Install -Yes
         ($script:claudeCalls -join '|') -ceq 'claude plugin marketplace list --json|claude plugin install p1@mods'
     }
-    Test-Case 'claude-plugin: Replaces are uninstalled, and an installed plugin is updated then enabled' {
+    Test-Case 'claude-plugin: Replaces are uninstalled, and an installed but disabled plugin is updated then enabled' {
         Reset-Fake
         Set-Present 'claude'
         $script:pluginList = @('p1@mods', 'old1@mods', 'old2@mods')
+        $script:disabledPlugins = @('p1@mods')
         $script:DevTools = @((New-Tool 'p1' 'claude-plugin' @{ Id = 'p1@mods'; Marketplace = 'mods'; MarketplaceSource = 'owner/repo'; RequiredCommand = 'claude'; Replaces = @('old1@mods', 'old2@mods', 'absent@mods') }))
         Invoke-Install -Yes
         ($script:claudeCalls -join '|') -ceq 'claude plugin list --json|claude plugin uninstall old1@mods|claude plugin uninstall old2@mods|claude plugin marketplace update mods|claude plugin update p1@mods|claude plugin enable p1@mods' -and
@@ -678,7 +680,7 @@ if ($h.Throw) { throw $h.Throw }
         Invoke-Install -Yes
         $script:claudeCalls.Count -eq 0
     }
-    Test-Case 'claude-plugin: an installed plugin older than the marketplace is updated' {
+    Test-Case 'claude-plugin: an installed, enabled plugin older than the marketplace is updated without enable' {
         Reset-Fake
         Set-Present 'claude'
         $script:pluginList = @('p1@mods')
@@ -686,7 +688,7 @@ if ($h.Throw) { throw $h.Throw }
         $script:installedNames = @('p1')
         $script:pluginUpToDate['p1'] = $false
         Invoke-Install -Yes
-        ($script:claudeCalls -join '|') -ceq 'claude plugin list --json|claude plugin marketplace update mods|claude plugin update p1@mods|claude plugin enable p1@mods' -and
+        ($script:claudeCalls -join '|') -ceq 'claude plugin list --json|claude plugin marketplace update mods|claude plugin update p1@mods' -and
         (Get-Row 'p1').Action -ceq 'Updating' -and (Get-Row 'p1').Result -ceq 'OK'
     }
     Test-Case 'claude-plugin: an installed plugin whose version cannot be checked warns and is left alone' {

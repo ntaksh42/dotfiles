@@ -495,14 +495,18 @@ function Install-DevTools {
                             Assert-NativeCommandSucceeded "claude plugin uninstall $old"
                         }
                     }
-                    if ($plugins | Where-Object { $_.id -eq $t.Id }) {
+                    $current = $plugins | Where-Object { $_.id -eq $t.Id }
+                    if ($current) {
                         # 統合などで中身が変わっていることがあるので、有効化の前に更新する。
                         claude plugin marketplace update $t.Marketplace
                         Assert-NativeCommandSucceeded "claude plugin marketplace update $($t.Marketplace)"
                         claude plugin update $t.Id
                         Assert-NativeCommandSucceeded "claude plugin update $($t.Id)"
-                        claude plugin enable $t.Id
-                        Assert-NativeCommandSucceeded "claude plugin enable $($t.Id)"
+                        # 有効な plugin に enable を呼ぶと claude は失敗を返すため、無効なときだけ呼ぶ。
+                        if (-not $current.enabled) {
+                            claude plugin enable $t.Id
+                            Assert-NativeCommandSucceeded "claude plugin enable $($t.Id)"
+                        }
                         break
                     }
                     # claude/install.ps1 が同名マーケットプレイスをクローン先のパスで登録済みなら、それを使う。
