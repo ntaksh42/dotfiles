@@ -51,12 +51,13 @@ def check_sheet(html: str):
         errors.append('問いカード / radio がある — 問いはシートに書かず会話の [判断] で出す')
     for m in re.finditer(r'<(?:script|link|img)[^>]*(?:src|href)=["\'](?!https:|data:|file:|#|mailto:|//)([^"\']+)["\']', live):
         warns.append(f'相対 URL の外部参照: {m.group(1)} (data URI か https 絶対 URL にする)')
-    if 'review-sheet-format: v5' not in html:
+    is_report = '<!-- report-sheet -->' in html
+    if not is_report and 'review-sheet-format: v5' not in html:
         warns.append('<!-- review-sheet-format: v5 --> が無い (どの規約で書いたシートかの目印)')
     total, concl = prose_length(live)
-    if total > PROSE_LIMIT:
+    if not is_report and total > PROSE_LIMIT:
         warns.append(f'本文の文章が {total} 字 (目安 {PROSE_LIMIT} 字以内)。絵で分かる説明から削り、判断外の決定は <details> へ')
-    if concl > CONCL_LIMIT:
+    if not is_report and concl > CONCL_LIMIT:
         warns.append(f'結論が {concl} 字 (目安 {CONCL_LIMIT} 字以内・2 文まで)')
     ids = set(re.findall(r'\bid=["\']([^"\']+)["\']', live))
     points = sorted(i for i in ids if re.fullmatch(r'p\d+', i))
@@ -114,7 +115,7 @@ def main() -> None:
 
     out = [f'  NG  {e}' for e in errors] + [f'  ??  {w}' for w in warns]
     if not out:
-        out.append('  OK  不備なし。試問 (references/preflight.md) に進む')
+        out.append('  OK  不備なし。比較シートなら試問 (references/preflight.md) に進む')
     msg = f'check-sheet: {path}\n' + '\n'.join(out)
     try:
         print(msg)
