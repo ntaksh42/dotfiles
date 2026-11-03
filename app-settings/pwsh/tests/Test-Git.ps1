@@ -29,7 +29,7 @@ try {
             Upstream = 'origin/main'; Branch = 'main'; HasOrigin = $true
             Dirty = $null; Rebase = $null; StashRef = $null; StashCreates = $true
             RemoteFiles = @('README.md'); Tracked = @(); Untracked = @()
-            Top = $null; GitDir = $null; CloneDir = $null; Worktrees = ''
+            Top = $null; GitDir = $null; CloneDir = $null; Worktrees = ''; RefFormat = 'files'
             Branches = @(); LocalBranches = @(); Merged = @(); CleanPreview = @(); CleanLeft = @(); Cleaned = $false; LogLines = @()
             Fail = @(); Repos = @{}; GitaNames = @(); GitaPaths = @{}
             # One-shot failures: the first call matching Pattern prints Output, exits 1 and is consumed.
@@ -80,6 +80,8 @@ try {
             }
             'rev-parse --verify --quiet origin/*' { if (-not $repo.HasOrigin) { $global:LASTEXITCODE = 1 }; return }
             'rev-parse --absolute-git-dir' { $repo.GitDir; return }
+            'rev-parse --show-ref-format' { $script:g.RefFormat; return }
+            'rev-parse --path-format=absolute --git-common-dir' { $repo.GitDir; return }
             'rev-parse --is-bare-repository' { if ($repo.Bare) { 'true' } else { 'false' }; return }
             'rev-parse --git-dir' { if ($repo.NotRepo) { $global:LASTEXITCODE = 128 }; return }
             'rev-parse --show-toplevel' {
@@ -111,6 +113,7 @@ try {
             'branch --all --format=%(refname:short)' { $script:g.Branches; return }
             'branch --merged' { $script:g.Merged; return }
             'worktree list --porcelain -z' { $script:g.Worktrees; return }
+            'worktree list --porcelain' { $script:g.Worktrees; return }
             'clean -ffdxn' {
                 # After "clean -ffdx" only the CleanLeft entries that still exist on disk under Top remain.
                 if (-not $script:g.Cleaned) { $script:g.CleanPreview; return }
@@ -264,6 +267,75 @@ try {
         $out = Get-Output { gf }
         (Get-Calls) -join ';' -ceq 'pack-refs --all;fetch --all --prune;pack-refs --all' -and
         (Test-Line $out '大文字小文字だけ違うリモートブランチ')
+    }
+
+    # --- git-fixrefs ---------------------------------------------------------------------
+    Test-Case 'git-fixrefs backs up refs, config and reflogs before migrating and fetching' {
+        Reset-Fake
+        $null = New-FakeWorktree
+        New-TestFile $script:g.GitDir 'HEAD' 'ref: refs/heads/main'
+        New-TestFile $script:g.GitDir 'config' '[core]'
+        New-TestFile $script:g.GitDir 'packed-refs' 'packed refs'
+        New-TestFile $script:g.GitDir 'refs/heads/main' 'local oid'
+        New-TestFile $script:g.GitDir 'logs/HEAD' 'reflog'
+        $null = Get-Output { git-fixrefs }
+        $backups = @(Get-ChildItem -LiteralPath (Join-Path $script:g.GitDir 'fixrefs-backup') -Directory)
+        $backups.Count -eq 1 -and
+        (Get-Content -LiteralPath (Join-Path $backups[0].FullName 'refs/heads/main') -Raw) -ceq 'local oid' -and
+        (Get-Content -LiteralPath (Join-Path $backups[0].FullName 'logs/HEAD') -Raw) -ceq 'reflog' -and
+        (Test-Path -LiteralPath (Join-Path $backups[0].FullName 'packed-refs')) -and
+        (Test-Path -LiteralPath (Join-Path $backups[0].FullName 'config')) -and
+        (Test-Path -LiteralPath (Join-Path $backups[0].FullName 'HEAD')) -and
+        (Get-CallIndex 'refs migrate --ref-format=reftable') -lt (Get-CallIndex 'fetch --all --prune')
+    }
+    Test-Case 'git-fixrefs WhatIf changes nothing and does not fetch' {
+        Reset-Fake
+        $null = New-FakeWorktree
+        $null = Get-Output { git-fixrefs -WhatIf }
+        -not (Test-Called 'refs migrate*') -and -not (Test-Called 'fetch*') -and
+        -not (Test-Path -LiteralPath (Join-Path $script:g.GitDir 'fixrefs-backup'))
+    }
+    Test-Case 'git-fixrefs refuses linked worktrees without changing anything' {
+        Reset-Fake
+        $script:g.Worktrees = @('worktree E:/main', '', 'worktree E:/other', '')
+        $message = $null
+        try { git-fixrefs } catch { $message = $_.Exception.Message }
+        $message -like '*追加の worktree*' -and -not (Test-Called 'refs migrate*') -and -not (Test-Called 'fetch*')
+    }
+    Test-Case 'git-fixrefs fetches directly when already using reftable' {
+        Reset-Fake
+        $script:g.RefFormat = 'reftable'
+        $null = Get-Output { git-fixrefs }
+        (Get-Calls) -join ';' -ceq 'rev-parse --show-ref-format;fetch --all --prune'
+    }
+    Test-Case 'git-fixrefs stops before fetching if migration fails and keeps the backup' {
+        Reset-Fake
+        $null = New-FakeWorktree
+        $script:g.Fail = @('refs migrate*')
+        $message = $null
+        try { $null = Get-Output { git-fixrefs } } catch { $message = $_.Exception.Message }
+        $message -like '*git refs migrate*failed with exit code 1*' -and -not (Test-Called 'fetch*') -and
+        (Test-Path -LiteralPath (Join-Path $script:g.GitDir 'fixrefs-backup'))
+    }
+    Test-Case 'git-fixrefs reports fetch failures instead of claiming success' {
+        Reset-Fake
+        $script:g.RefFormat = 'reftable'
+        $script:g.Fail = @('fetch*')
+        $message = $null
+        try { $null = Get-Output { git-fixrefs } } catch { $message = $_.Exception.Message }
+        $message -like '*git fetch --all --prune failed with exit code 1*' -and $LASTEXITCODE -eq 1
+    }
+    Test-Case 'git-fixrefs stops outside a repository or on an unsupported Git version' {
+        Reset-Fake
+        $script:g.Fail = @('rev-parse*')
+        $message = $null
+        try { git-fixrefs } catch { $message = $_.Exception.Message }
+        $notRepo = $message -like '*git rev-parse*failed*' -and -not (Test-Called 'refs migrate*')
+        Reset-Fake
+        $script:g.RefFormat = '--show-ref-format'
+        $message = $null
+        try { git-fixrefs } catch { $message = $_.Exception.Message }
+        $notRepo -and $message -like '*新しい Git*' -and -not (Test-Called 'fetch*')
     }
 
     # --- Resolve-GitPullCollision (real files under the scratch dir) ---------------------

@@ -21,7 +21,7 @@ function Invoke-GitFetch {
         elseif ($line -match 'migrate to reftables\.$') { $inAdvice = $false }
     }
     if ($collision) {
-        Write-Warning 'fetch: 大文字小文字だけ違うリモートブランチがあり、片方は取得できない。ほかは取得済みなので続行する (根本対策: git refs migrate --ref-format=reftable)'
+        Write-Warning 'fetch: 大文字小文字だけ違うリモートブランチがあり、片方は取得できない。ほかは取得済みなので続行する (修復: git-fixrefs)'
         $code = 0
     }
     # prune は大文字小文字だけ違う ref の削除と作成がぶつかって失敗することがある。prune は掃除なので外して取り直す。
@@ -41,6 +41,48 @@ function git-fetch {
 }
 
 Set-Alias gf git-fetch
+
+# refs を reftable に移行し、大文字小文字だけ違う参照を両方取得できるようにする。
+# 古い Git / 一部の Git 連携ツールは reftable 非対応。IDE 等の自動 fetch を止めてから実行する。
+function git-fixrefs {
+    [CmdletBinding(SupportsShouldProcess)]
+    param()
+    $ErrorActionPreference = 'Stop'
+
+    $format = "$(git rev-parse --show-ref-format)".Trim()
+    Assert-NativeCommandSucceeded 'git rev-parse --show-ref-format'
+    if ($format -notin 'files', 'reftable') { throw 'git-fixrefs: reftable に対応した新しい Git が必要です。' }
+
+    if ($format -eq 'files') {
+        $worktrees = @(git worktree list --porcelain)
+        Assert-NativeCommandSucceeded 'git worktree list'
+        if (@($worktrees -cmatch '^worktree ').Count -gt 1) {
+            throw 'git-fixrefs: 追加の worktree があるため移行できません。worktree の変更を保存し、不要な worktree を整理してから再実行してください。'
+        }
+    }
+    if (-not $PSCmdlet.ShouldProcess((Get-Location).Path, 'refs を reftable に移行して fetch --all --prune')) { return }
+
+    if ($format -eq 'files') {
+        $gitDir = "$(git rev-parse --path-format=absolute --git-common-dir)".Trim()
+        Assert-NativeCommandSucceeded 'git rev-parse --git-common-dir'
+        $backup = Join-Path $gitDir ('fixrefs-backup/{0}-{1}' -f (Get-Date -Format 'yyyyMMdd-HHmmss'), [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $backup | Out-Null
+        foreach ($name in 'HEAD', 'config', 'refs', 'packed-refs', 'logs') {
+            $path = Join-Path $gitDir $name
+            if (Test-Path -LiteralPath $path) { Copy-Item -LiteralPath $path -Destination $backup -Recurse }
+        }
+        Write-Host "[git-fixrefs] バックアップ: $backup" -ForegroundColor Cyan
+        Write-Host '[git-fixrefs] reftable に移行 (Git を使う他の処理・自動 fetch は停止してください)' -ForegroundColor Cyan
+        git refs migrate --ref-format=reftable
+        Assert-NativeCommandSucceeded 'git refs migrate --ref-format=reftable'
+    }
+
+    # Invoke-GitFetch は衝突を成功扱いにするため使わず、修復後の fetch 成功を確認する。
+    git fetch --all --prune
+    Assert-NativeCommandSucceeded 'git fetch --all --prune'
+    Write-Host '[git-fixrefs] 完了: reftable で参照を取得しました。' -ForegroundColor Green
+}
+
 # pull を止める「作業ツリー上の衝突」を、pull 前に .git/pull-backup/ へ退避して解消する。
 #  1) core.ignorecase=true な NTFS では、リモートの Foo.cs とローカルの foo.cs が
 #     同一パスに解決されるため "would be overwritten by merge" で止まる (大文字小文字違い)。

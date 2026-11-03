@@ -28,6 +28,7 @@ $script:ProfileHelp = [ordered]@{
         @{ Group = 'ブランチ'; Cmd = 'git-worktree-switch'; Desc = '現在のリポジトリの worktree を fzf で選んで移動 (ブランチ名付き)' }
         @{ Group = 'ブランチ'; Cmd = 'git-clean-branches'; Desc = 'マージ済みのローカルブランチを確認後に一括削除 (main/master/develop は残す)' }
         @{ Group = '取得と同期'; Cmd = 'git-fetch / gf'; Desc = '全リモートを取得して削除済みを掃除 (大文字小文字違いの ref 衝突を回避)' }
+        @{ Group = '取得と同期'; Cmd = 'git-fixrefs [-WhatIf]'; Desc = '参照をバックアップして reftable へ移行し再取得 (大文字小文字違いを解消。追加 worktree がある場合は停止。古い Git / 一部ツールは非対応)' }
         @{ Group = '取得と同期'; Cmd = 'git-pull / gpl'; Desc = '安全な pull: 未コミット変更を退避 → 衝突ファイルを .git/pull-backup へ避難 → pull → 復元 (引数は git pull へ)' }
         @{ Group = '移動とクローン'; Cmd = 'git-root'; Desc = 'リポジトリのルートへ移動' }
         @{ Group = '移動とクローン'; Cmd = 'git-clone <url>'; Desc = 'クローンして、そのフォルダへ移動' }
