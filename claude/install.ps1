@@ -48,9 +48,11 @@ if (-not $currentValue) {
 # Generate settings.json from template
 Write-Host "Generating settings.json..." -ForegroundColor Green
 $template = Get-Content $TemplateFile -Raw -Encoding UTF8
+# マーケットプレイスは Install-DevTools が GitHub の main の ZIP を展開するフォルダ
+# （devtools.ps1 の Get-DevToolMarketplaceDir と同じ場所）。
 # JSON テキストへの埋め込みなのでバックスラッシュを1段だけエスケープする
-$repoDirEscaped = (Split-Path -Parent $ScriptDir) -replace '\\', '\\'
-$settings = $template -replace '\{\{REPO_DIR\}\}', $repoDirEscaped
+$marketplaceDirEscaped = (Join-Path $env:LOCALAPPDATA 'dotfiles\marketplaces\dotfiles-mods') -replace '\\', '\\'
+$settings = $template -replace '\{\{MARKETPLACE_DIR\}\}', $marketplaceDirEscaped
 $null = $settings | ConvertFrom-Json
 
 # PS 5.1 の -Encoding UTF8 は BOM を付けるため、BOM なし UTF-8 を明示して書き出す

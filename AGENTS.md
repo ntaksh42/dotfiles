@@ -11,7 +11,7 @@ Windows環境のClaude Code dotfiles・開発環境構成リポジトリ。Claud
 ```
 claude/              Claude Code 設定の管理元
   install.ps1        インストーラ（共通ルールを Claude Code / Codex へ、settings.json を Claude へ配置）
-  settings.template.json  settings.json テンプレート（{{REPO_DIR}} プレースホルダ）
+  settings.template.json  settings.json テンプレート（{{MARKETPLACE_DIR}} プレースホルダ）
   CLAUDE.global.md   共通ルールの管理元（~/.claude/CLAUDE.md と ~/.codex/AGENTS.md へ配置、既存はバックアップ）
   mods/              Claude Code プラグイン。リポジトリ直下の .claude-plugin/marketplace.json で
                      dotfiles-mods マーケットプレイスとして公開し、settings で有効化する
@@ -22,7 +22,7 @@ tools/               汎用PowerShellユーティリティ
 
 ### skills・hooks の仕組み
 
-- skills と hooks は `claude/mods/dotfiles` plugin に置く。導入は `Install-DevTools` が `claude plugin install` で行う
+- skills と hooks は `claude/mods/dotfiles` plugin に置く。導入は `Install-DevTools` が行う。GitHub の main の ZIP を展開したフォルダをマーケットプレイスとして登録し、`claude plugin install` する。手元のクローンは使わないので、変更は push してから導入する
 - スキルは `claude/mods/dotfiles/skills/<name>/SKILL.md`。plugin 内なのでスキル名は `dotfiles:<name>` になる
 - Mod（TypeScript の hooks module）は `hooks/<mod>/register.ts(x)` に置き、`hooks/register.ts` から呼ぶ。エンジンは同じイベントの matcher 無しフックを plugin につき 1 つしか許さないので、イベントが重なる Mod は `hooks/register.ts` でネストして束ねる
 - 組織の管理設定（`allowManagedModsOnly` 等）で mod が拒否される環境向けに、mod を使わない代替を同じ plugin に置く: toast-notify と auto-session-title は `scripts/lite-hook.mjs`（`hooks.json` の settings hook）、ado-pr-status は ccstatusline が呼ぶ `statusline/pr-line.mjs` の自己更新、cmdHistory は `skills/cmd-history`。mod が動くセッションでは mod が環境変数 `DOTFILES_MOD_TOAST` / `DOTFILES_MOD_TITLE` を設定し、`lite-hook.mjs` はそれを見て何もしない（二重通知を避ける）。通知の送信は `scripts/toast-send.ps1` を mod と共有する
@@ -32,7 +32,7 @@ tools/               汎用PowerShellユーティリティ
 
 ### settings.template.json
 
-- プレースホルダ: `{{REPO_DIR}}` → リポジトリのクローン先（dotfiles-mods マーケットプレイスの登録先）
+- プレースホルダ: `{{MARKETPLACE_DIR}}` → `%LOCALAPPDATA%\dotfiles\marketplaces\dotfiles-mods`（dotfiles-mods マーケットプレイスの登録先。`Install-DevTools` が GitHub の main の ZIP をここへ展開する）
 - インストーラがプレースホルダを実際のパスに置換して `~/.claude/settings.json` を生成
 
 ## コマンド

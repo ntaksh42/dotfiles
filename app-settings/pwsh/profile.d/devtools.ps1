@@ -121,25 +121,65 @@ function Test-DevToolRemoteFilesUpToDate {
     return $upToDate
 }
 
-# 導入済み plugin の版がマーケットプレイスの plugin.json と同じか確認する。読めなければ $null。
-# マーケットプレイスの手元の写しを先に更新してから比べる（GitHub 由来の写しは古いことがある）。
+# 導入済み plugin の版が GitHub の main にある plugin.json と同じか確認する。読めなければ $null。
+# 手元の写し（ZIP の展開先やクローン）は古いことがあるので、比べる相手にしない。
 function Test-DevToolPluginUpToDate {
     param([Parameter(Mandatory)]$Tool)
     try {
-        claude plugin marketplace update $Tool.Marketplace | Out-Null
-        if ($LASTEXITCODE -ne 0) { return $null }
         $installed = (claude plugin list --json | ConvertFrom-Json | Where-Object { $_.id -eq $Tool.Id }).version
-        $location = (claude plugin marketplace list --json | ConvertFrom-Json | Where-Object { $_.name -eq $Tool.Marketplace }).installLocation
-        if (-not $installed -or -not $location) { return $null }
+        if (-not $installed) { return $null }
         $name = ($Tool.Id -split '@')[0]
-        $manifest = Read-DevToolLocalText (Join-Path $location '.claude-plugin\marketplace.json') | ConvertFrom-Json
+        $manifest = Get-DotfilesRemoteConfig @{ RepoPath = '.claude-plugin/marketplace.json' } | ConvertFrom-Json
         $source = ($manifest.plugins | Where-Object { $_.name -eq $name }).source
         if ($source -isnot [string]) { return $null }
-        $latest = (Read-DevToolLocalText (Join-Path (Join-Path $location $source) '.claude-plugin\plugin.json') | ConvertFrom-Json).version
+        $pluginJson = Get-DotfilesRemoteConfig @{ RepoPath = "$($source -replace '^\./', '')/.claude-plugin/plugin.json" }
+        $latest = ($pluginJson | ConvertFrom-Json).version
         if (-not $latest) { return $null }
         return (Test-DevToolVersionCurrent $installed $latest)
     }
     catch { return $null }
+}
+
+# plugin のマーケットプレイスを置くフォルダ。GitHub の main の ZIP をここへ展開する。
+function Get-DevToolMarketplaceDir {
+    param([Parameter(Mandatory)]$Tool)
+    return (Join-Path $env:LOCALAPPDATA "dotfiles\marketplaces\$($Tool.Marketplace)")
+}
+
+# MarketplaceSource (owner/repo) の main を ZIP で取得し、マーケットプレイスのフォルダを置き換える。
+# git もクローンも使わない。展開は隣のフォルダで行い、成功してから入れ替える。
+function Save-DevToolMarketplace {
+    param([Parameter(Mandatory)]$Tool)
+    $dest = Get-DevToolMarketplaceDir $Tool
+    $staging = "$dest.download"
+    try {
+        if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
+        New-Item -ItemType Directory -Path $staging -Force | Out-Null
+        $zip = Join-Path $staging 'main.zip'
+        Invoke-WebRequest -Uri "https://github.com/$($Tool.MarketplaceSource)/archive/refs/heads/main.zip" -OutFile $zip -UseBasicParsing
+        Expand-Archive -LiteralPath $zip -DestinationPath (Join-Path $staging 'x')
+        $root = @(Get-ChildItem -LiteralPath (Join-Path $staging 'x') -Directory)
+        if ($root.Count -ne 1) { throw "Unexpected layout in the archive of $($Tool.MarketplaceSource)." }
+        if (Test-Path -LiteralPath $dest) { Remove-Item -LiteralPath $dest -Recurse -Force }
+        Move-Item -LiteralPath $root[0].FullName -Destination $dest
+    }
+    finally { Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+# 保存済みの plugin の設定値を、claude plugin install に渡す --config 引数にする。
+# マーケットプレイスを登録し直すと設定値が消えるため、消す前に控えて入れ直すのに使う。
+function Get-DevToolPluginConfigArgs {
+    param([Parameter(Mandatory)][string]$Id)
+    $configDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $env:USERPROFILE '.claude' }
+    $path = Join-Path $configDir 'settings.json'
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return }
+    $configs = (Read-DevToolLocalText $path | ConvertFrom-Json).pluginConfigs
+    if (-not $configs -or -not $configs.$Id -or -not $configs.$Id.options) { return }
+    foreach ($option in $configs.$Id.options.psobject.Properties) {
+        $value = if ($option.Value -is [bool]) { "$($option.Value)".ToLowerInvariant() } else { "$($option.Value)" }
+        '--config'
+        "$($option.Name)=$value"
+    }
 }
 
 # winget / msstore 側に新しい版があるか。--upgrade-available は該当なしでも終了コード 0 を
@@ -203,7 +243,11 @@ function Test-ToolInstalled {
             # インストール済みでも無効なら未導入扱いにし、Install-DevTools で有効化する。
             # Replaces に挙げた旧 plugin が残っている間も未導入扱いにし、Install-DevTools で外す。
             if ($Tool.Replaces -and ($plugins | Where-Object { $Tool.Replaces -contains $_.id })) { return $false }
-            return [bool]($plugins | Where-Object { $_.id -eq $Tool.Id -and $_.enabled })
+            if (-not ($plugins | Where-Object { $_.id -eq $Tool.Id -and $_.enabled })) { return $false }
+            # 旧版はマーケットプレイスをクローン先のパスで登録していた。ZIP の展開先以外を指す登録は
+            # 未導入扱いにし、Install-DevTools で登録し直す。
+            $registered = claude plugin marketplace list --json | ConvertFrom-Json | Where-Object { $_.name -eq $Tool.Marketplace }
+            return (-not ($registered -and $registered.path -ne (Get-DevToolMarketplaceDir $Tool)))
         }
         'remote-config' {
             if (-not (Test-Path -LiteralPath $Tool.Dest -PathType Leaf)) { return $false }
@@ -584,6 +628,20 @@ function Install-DevTools {
                             Assert-NativeCommandSucceeded "claude plugin uninstall $old"
                         }
                     }
+                    # マーケットプレイスは GitHub の main の ZIP を展開したフォルダで登録する。
+                    # 旧版がクローン先のパスで登録していたら消して登録し直す。消すと plugin と設定値も
+                    # 消えるため、設定値を控えて install に渡す。
+                    $dir = Get-DevToolMarketplaceDir $t
+                    $registered = claude plugin marketplace list --json | ConvertFrom-Json | Where-Object { $_.name -eq $t.Marketplace }
+                    $config = @()
+                    if ($registered -and $registered.path -ne $dir) {
+                        $config = @(Get-DevToolPluginConfigArgs $t.Id)
+                        claude plugin marketplace remove $t.Marketplace
+                        Assert-NativeCommandSucceeded "claude plugin marketplace remove $($t.Marketplace)"
+                        $registered = $null
+                        $plugins = @()
+                    }
+                    Save-DevToolMarketplace $t
                     $current = $plugins | Where-Object { $_.id -eq $t.Id }
                     if ($current) {
                         # 統合などで中身が変わっていることがあるので、有効化の前に更新する。
@@ -598,13 +656,11 @@ function Install-DevTools {
                         }
                         break
                     }
-                    # claude/install.ps1 が同名マーケットプレイスをクローン先のパスで登録済みなら、それを使う。
-                    $marketplaces = claude plugin marketplace list --json | ConvertFrom-Json
-                    if (-not ($marketplaces | Where-Object { $_.name -eq $t.Marketplace })) {
-                        claude plugin marketplace add $t.MarketplaceSource
-                        Assert-NativeCommandSucceeded "claude plugin marketplace add $($t.MarketplaceSource)"
+                    if (-not $registered) {
+                        claude plugin marketplace add $dir
+                        Assert-NativeCommandSucceeded "claude plugin marketplace add $dir"
                     }
-                    claude plugin install $t.Id
+                    claude plugin install $t.Id @config
                     Assert-NativeCommandSucceeded "claude plugin install $($t.Id)"
                 }
                 'script' {

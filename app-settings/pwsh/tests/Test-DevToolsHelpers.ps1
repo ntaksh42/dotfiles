@@ -213,12 +213,13 @@ try {
     function winget { $script:wingetCalls += , @($args); $global:LASTEXITCODE = $script:wingetExit }
     $script:refreshCalls = 0; $script:refreshAction = $null
     function refreshenv { $script:refreshCalls++; if ($script:refreshAction) { & $script:refreshAction } }
-    $script:web = @{}; $script:webCalls = @(); $script:webFail = $false
+    $script:web = @{}; $script:webFiles = @{}; $script:webCalls = @(); $script:webFail = $false
     function Invoke-WebRequest {
         [CmdletBinding()]
         param($Uri, [switch]$UseBasicParsing, $TimeoutSec, $OutFile)
         $script:webCalls += $Uri
         if ($script:webFail) { throw 'offline' }
+        if ($OutFile -and $script:webFiles.ContainsKey($Uri)) { Copy-Item -LiteralPath $script:webFiles[$Uri] -Destination $OutFile; return }
         if (-not $script:web.ContainsKey($Uri)) { throw "404 $Uri" }
         [pscustomobject]@{ Content = $script:web[$Uri] }
     }
@@ -619,50 +620,112 @@ try {
     }
 
     # =====================================================================================
-    # Test-DevToolPluginUpToDate
+    # Test-DevToolPluginUpToDate / Save-DevToolMarketplace / Get-DevToolPluginConfigArgs
     # =====================================================================================
-    # claude is faked: "plugin list" reports $script:pluginVersion, "marketplace list" points
-    # at a scratch marketplace whose plugin.json holds $Latest.
+    # claude is faked: "plugin list" reports $script:pluginVersion. The latest version comes
+    # from marketplace.json and plugin.json on GitHub main, served by the Invoke-WebRequest fake.
     function claude {
         $script:claudeCalls += ($args -join ' ')
-        $global:LASTEXITCODE = if ($args[2] -eq 'update') { $script:mpUpdateExit } else { 0 }
+        $global:LASTEXITCODE = 0
         if ($args[1] -eq 'list') { return (ConvertTo-Json -Compress -InputObject @(@{ id = 'p@mp'; version = $script:pluginVersion; enabled = $true })) }
-        if ($args[2] -eq 'list') { return (ConvertTo-Json -Compress -InputObject @(@{ name = 'mp'; installLocation = $script:mpDir })) }
     }
     function New-PluginFixture {
         param([string]$Installed, [AllowNull()][string]$Latest)
-        $script:claudeCalls = @(); $script:mpUpdateExit = 0; $script:pluginVersion = $Installed
-        $script:mpDir = New-Scratch
-        New-Item -ItemType Directory -Path (Join-Path $script:mpDir '.claude-plugin'), (Join-Path $script:mpDir 'plugins\p\.claude-plugin') | Out-Null
-        Set-Content -LiteralPath (Join-Path $script:mpDir '.claude-plugin\marketplace.json') -Value '{"name":"mp","plugins":[{"name":"p","source":"./plugins/p"}]}'
+        Reset-Fakes
+        $script:claudeCalls = @(); $script:pluginVersion = $Installed
+        $script:web["$script:DotfilesRawBase/.claude-plugin/marketplace.json"] = '{"name":"mp","plugins":[{"name":"p","source":"./plugins/p"}]}'
         if ($null -ne $Latest) {
-            Set-Content -LiteralPath (Join-Path $script:mpDir 'plugins\p\.claude-plugin\plugin.json') -Value (@{ name = 'p'; version = $Latest } | ConvertTo-Json)
+            $script:web["$script:DotfilesRawBase/plugins/p/.claude-plugin/plugin.json"] = (@{ name = 'p'; version = $Latest } | ConvertTo-Json)
         }
         @{ Name = 'p'; Id = 'p@mp'; Marketplace = 'mp' }
     }
-    Test-Case 'Plugin up to date: true when the installed version equals plugin.json' {
+    Test-Case 'Plugin up to date: true when the installed version equals plugin.json on main' {
         $t = New-PluginFixture '0.6.0' '0.6.0'
         (Test-DevToolPluginUpToDate $t) -eq $true
     }
-    Test-Case 'Plugin up to date: false when plugin.json is newer' {
+    Test-Case 'Plugin up to date: false when plugin.json on main is newer' {
         $t = New-PluginFixture '0.2.0' '0.6.0'
         (Test-DevToolPluginUpToDate $t) -eq $false
     }
-    Test-Case 'Plugin up to date: refreshes the marketplace before comparing' {
+    Test-Case 'Plugin up to date: compares with GitHub main, not a local copy of the marketplace' {
         $t = New-PluginFixture '0.6.0' '0.6.0'
         $null = Test-DevToolPluginUpToDate $t
-        $script:claudeCalls[0] -ceq 'plugin marketplace update mp'
+        ($script:claudeCalls -join '|') -ceq 'plugin list --json' -and
+        $script:webCalls -contains "$script:DotfilesRawBase/plugins/p/.claude-plugin/plugin.json"
     }
-    Test-Case 'Plugin up to date: null when the marketplace refresh fails' {
-        $t = New-PluginFixture '0.2.0' '0.6.0'
-        $script:mpUpdateExit = 1
-        $null -eq (Test-DevToolPluginUpToDate $t)
-    }
-    Test-Case 'Plugin up to date: null when plugin.json is missing' {
+    Test-Case 'Plugin up to date: null when plugin.json on main cannot be read' {
         $t = New-PluginFixture '0.2.0' $null
         $null -eq (Test-DevToolPluginUpToDate $t)
     }
+    Test-Case 'Plugin up to date: null when the plugin is not installed' {
+        $t = New-PluginFixture '' '0.6.0'
+        $null -eq (Test-DevToolPluginUpToDate $t)
+    }
     Remove-Item function:claude
+
+    Test-Case 'Marketplace dir: under LOCALAPPDATA, named after the marketplace' {
+        (Get-DevToolMarketplaceDir @{ Marketplace = 'mp' }) -eq (Join-Path $env:LOCALAPPDATA 'dotfiles\marketplaces\mp')
+    }
+    # The Invoke-WebRequest fake copies the file registered in $script:webFiles to -OutFile.
+    function New-RepoZip {
+        param([string]$Marker)
+        $src = Join-Path (New-Scratch) 'repo-main'
+        New-Item -ItemType Directory -Path (Join-Path $src '.claude-plugin') -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $src '.claude-plugin\marketplace.json') -Value $Marker
+        $zip = Join-Path (New-Scratch) 'main.zip'
+        Compress-Archive -Path $src -DestinationPath $zip
+        $zip
+    }
+    Test-Case 'Save marketplace: extracts the main ZIP so the repo root is the marketplace dir, replacing old files' {
+        Reset-Fakes
+        $env:LOCALAPPDATA = New-Scratch
+        try {
+            $t = @{ Marketplace = 'mp'; MarketplaceSource = 'owner/repo' }
+            $dest = Get-DevToolMarketplaceDir $t
+            New-Item -ItemType Directory -Path $dest -Force | Out-Null
+            Set-Content -LiteralPath (Join-Path $dest 'stale.txt') -Value 'old'
+            $script:webFiles = @{ 'https://github.com/owner/repo/archive/refs/heads/main.zip' = (New-RepoZip 'v2') }
+            Save-DevToolMarketplace $t
+            (Get-Content -LiteralPath (Join-Path $dest '.claude-plugin\marketplace.json') -Raw).Trim() -ceq 'v2' -and
+            -not (Test-Path -LiteralPath (Join-Path $dest 'stale.txt')) -and
+            -not (Test-Path -LiteralPath "$dest.download")
+        }
+        finally { $env:LOCALAPPDATA = $originalLocalAppData; $script:webFiles = @{} }
+    }
+    Test-Case 'Save marketplace: a failed download keeps the existing marketplace dir' {
+        Reset-Fakes
+        $env:LOCALAPPDATA = New-Scratch
+        try {
+            $t = @{ Marketplace = 'mp'; MarketplaceSource = 'owner/repo' }
+            $dest = Get-DevToolMarketplaceDir $t
+            New-Item -ItemType Directory -Path $dest -Force | Out-Null
+            Set-Content -LiteralPath (Join-Path $dest 'keep.txt') -Value 'old'
+            $script:webFail = $true
+            $threw = $false
+            try { Save-DevToolMarketplace $t } catch { $threw = $true }
+            $threw -and (Test-Path -LiteralPath (Join-Path $dest 'keep.txt')) -and -not (Test-Path -LiteralPath "$dest.download")
+        }
+        finally { $env:LOCALAPPDATA = $originalLocalAppData }
+    }
+
+    Test-Case 'Plugin config args: saved options become --config pairs, booleans in lower case' {
+        $dir = New-Scratch
+        Set-Content -LiteralPath (Join-Path $dir 'settings.json') -Value '{"pluginConfigs":{"p@mp":{"options":{"toastEnabled":false,"linkBarOrganization":"org","toastStallSeconds":120}}}}'
+        $saved = $env:CLAUDE_CONFIG_DIR; $env:CLAUDE_CONFIG_DIR = $dir
+        try { $a = @(Get-DevToolPluginConfigArgs 'p@mp') } finally { $env:CLAUDE_CONFIG_DIR = $saved }
+        ($a -join ' ') -ceq '--config toastEnabled=false --config linkBarOrganization=org --config toastStallSeconds=120'
+    }
+    Test-Case 'Plugin config args: nothing when the plugin has no saved options or there is no settings.json' {
+        $dir = New-Scratch
+        Set-Content -LiteralPath (Join-Path $dir 'settings.json') -Value '{"pluginConfigs":{"other@mp":{"options":{"a":1}}}}'
+        $saved = $env:CLAUDE_CONFIG_DIR
+        try {
+            $env:CLAUDE_CONFIG_DIR = $dir; $a = @(Get-DevToolPluginConfigArgs 'p@mp')
+            $env:CLAUDE_CONFIG_DIR = New-Scratch; $b = @(Get-DevToolPluginConfigArgs 'p@mp')
+        }
+        finally { $env:CLAUDE_CONFIG_DIR = $saved }
+        $a.Count -eq 0 -and $b.Count -eq 0
+    }
     Test-Case 'Remote files up to date: true when the tool lists no remote files' {
         Reset-Fakes
         (Test-DevToolRemoteFilesUpToDate @{ Name = 'n'; Path = (Join-Path (New-Scratch) 'm.ps1'); RemoteFiles = @() }) -eq $true -and
@@ -742,7 +805,7 @@ try {
     # --- claude-plugin ------------------------------------------------------------------
     $script:claudeCalls = @(); $script:claudeOut = '[]'; $script:claudeThrow = $false
     function claude { $script:claudeCalls += , @($args); if ($script:claudeThrow) { throw 'claude exploded' }; $script:claudeOut }
-    $pluginTool = @{ Backend = 'claude-plugin'; Id = 'ado-link-bar@dotfiles-mods' }
+    $pluginTool = @{ Backend = 'claude-plugin'; Id = 'ado-link-bar@dotfiles-mods'; Marketplace = 'dotfiles-mods' }
     Test-Case 'claude-plugin: not installed, and claude is not invoked, when claude is not on PATH' {
         Reset-Fakes; $script:claudeCalls = @(); Set-CmdAvailable -Absent claude
         (Test-ToolInstalled $pluginTool) -eq $false -and $script:claudeCalls.Count -eq 0
@@ -755,18 +818,31 @@ try {
     Test-Case 'claude-plugin: not installed while a plugin named in Replaces is still installed' {
         Reset-Fakes; $script:claudeCalls = @(); Set-CmdAvailable -Present claude
         $script:claudeOut = '[{"id":"ado-link-bar@dotfiles-mods","enabled":true},{"id":"old@dotfiles-mods","enabled":true}]'
-        $tool = @{ Backend = 'claude-plugin'; Id = 'ado-link-bar@dotfiles-mods'; Replaces = @('old@dotfiles-mods') }
+        $tool = @{ Backend = 'claude-plugin'; Id = 'ado-link-bar@dotfiles-mods'; Marketplace = 'dotfiles-mods'; Replaces = @('old@dotfiles-mods') }
         (Test-ToolInstalled $tool) -eq $false
     }
     Test-Case 'claude-plugin: installed when no plugin named in Replaces is installed' {
         Reset-Fakes; $script:claudeCalls = @(); Set-CmdAvailable -Present claude
         $script:claudeOut = '[{"id":"ado-link-bar@dotfiles-mods","enabled":true}]'
-        $tool = @{ Backend = 'claude-plugin'; Id = 'ado-link-bar@dotfiles-mods'; Replaces = @('old@dotfiles-mods') }
+        $tool = @{ Backend = 'claude-plugin'; Id = 'ado-link-bar@dotfiles-mods'; Marketplace = 'dotfiles-mods'; Replaces = @('old@dotfiles-mods') }
         (Test-ToolInstalled $tool) -eq $true
     }
     Test-Case 'claude-plugin: installed when the list contains exactly one plugin (single-element JSON array)' {
         Reset-Fakes; Set-CmdAvailable -Present claude
         $script:claudeOut = '[{"id":"ado-link-bar@dotfiles-mods","enabled":true}]'
+        (Test-ToolInstalled $pluginTool) -eq $true
+    }
+    # The fake answers every claude call with the same JSON, so one array carries both the
+    # plugin entry ("plugin list") and the marketplace entry ("marketplace list").
+    Test-Case 'claude-plugin: not installed while its marketplace is registered at another path (an old clone)' {
+        Reset-Fakes; Set-CmdAvailable -Present claude
+        $script:claudeOut = '[{"id":"ado-link-bar@dotfiles-mods","enabled":true},{"name":"dotfiles-mods","path":"E:\\dotfiles"}]'
+        (Test-ToolInstalled $pluginTool) -eq $false
+    }
+    Test-Case 'claude-plugin: installed when its marketplace is registered at the ZIP folder' {
+        Reset-Fakes; Set-CmdAvailable -Present claude
+        $dir = (Get-DevToolMarketplaceDir $pluginTool) -replace '\\', '\\'
+        $script:claudeOut = "[{`"id`":`"ado-link-bar@dotfiles-mods`",`"enabled`":true},{`"name`":`"dotfiles-mods`",`"path`":`"$dir`"}]"
         (Test-ToolInstalled $pluginTool) -eq $true
     }
     Test-Case 'claude-plugin: not installed when the id is absent from the list' {

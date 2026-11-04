@@ -116,7 +116,7 @@
     "dotfiles-mods": {
       "source": {
         "source": "directory",
-        "path": "{{REPO_DIR}}"
+        "path": "{{MARKETPLACE_DIR}}"
       }
     }
   },

@@ -40,7 +40,7 @@ argument-hint: "[check|fix] [対象: instructions|skills|agents|hooks|mcp|plugin
 | skills | `~/.claude/skills/`、plugin 内 `skills/` | `~/.agents/skills/`、`~/.codex/skills/`、plugin 内 `skills/` | `<dotfiles>/claude/mods/dotfiles/skills/` |
 | subagents | `~/.claude/agents/*.md` | `~/.codex/agents/*.toml` | 無し |
 | hooks | `~/.claude/settings.json` の `hooks`、plugin の `hooks/hooks.json` | `~/.codex/hooks.json`、`config.toml` の `[hooks]` | `<dotfiles>/claude/mods/dotfiles/hooks/hooks.json` |
-| settings | `~/.claude/settings.json` | `~/.codex/config.toml` | `<dotfiles>/claude/settings.template.json`（`{{REPO_DIR}}` は比較から外す） |
+| settings | `~/.claude/settings.json` | `~/.codex/config.toml` | `<dotfiles>/claude/settings.template.json`（`{{MARKETPLACE_DIR}}` は比較から外す） |
 
 doctor が拾わない、参照切れと重複も確かめる。
 

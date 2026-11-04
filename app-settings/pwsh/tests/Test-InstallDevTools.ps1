@@ -73,12 +73,22 @@ if ($h.Throw) { throw $h.Throw }
         $script:claudeCalls.Add($line); Add-Event $line
         $global:LASTEXITCODE = Get-FakeExit $args
         if ($args[0] -eq 'plugin' -and $args[1] -eq 'marketplace' -and $args[2] -eq 'list') {
-            return (ConvertTo-Json -InputObject @($script:marketplaces | ForEach-Object { @{ name = $_ } }) -Compress)
+            # A marketplace is registered at its ZIP folder unless $script:marketplacePaths says otherwise.
+            return (ConvertTo-Json -InputObject @($script:marketplaces | ForEach-Object {
+                        $path = if ($script:marketplacePaths.ContainsKey($_)) { $script:marketplacePaths[$_] } else { Get-DevToolMarketplaceDir @{ Marketplace = $_ } }
+                        @{ name = $_; path = $path }
+                    }) -Compress)
         }
         if ($args[0] -eq 'plugin' -and $args[1] -eq 'list') {
             return (ConvertTo-Json -InputObject @($script:pluginList | ForEach-Object { @{ id = $_; enabled = ($script:disabledPlugins -notcontains $_) } }) -Compress)
         }
-        if ($args[2] -eq 'add' -and $global:LASTEXITCODE -eq 0) { $script:marketplaces += $script:marketplaceNameFor[$args[3]] }
+        if ($global:LASTEXITCODE -ne 0) { return }
+        # "marketplace add <dir>" registers the marketplace named after the folder.
+        if ($args[2] -eq 'add') { $script:marketplaces += (Split-Path -Leaf $args[3]) }
+        if ($args[2] -eq 'remove') {
+            $script:marketplaces = @($script:marketplaces | Where-Object { $_ -ne $args[3] })
+            $script:marketplacePaths.Remove($args[3])
+        }
     }
     function refreshenv {
         $script:refreshCount++; Add-Event 'refreshenv'
@@ -159,6 +169,12 @@ if ($h.Throw) { throw $h.Throw }
     }
     function Test-DevToolRemoteFilesUpToDate { param($Tool) $script:remoteUpToDate[$Tool.Name] }
     function Test-DevToolPluginUpToDate { param($Tool) $script:pluginUpToDate[$Tool.Name] }
+    function Save-DevToolMarketplace {
+        param($Tool)
+        Add-Event "save $($Tool.Marketplace)"
+        if ($script:failIds.ContainsKey('save')) { throw 'download failed' }
+    }
+    function Get-DevToolPluginConfigArgs { param($Id) $script:pluginConfigArgs }
     function Get-DotfilesRemoteConfig {
         param($Tool)
         if (-not $script:remoteContent.ContainsKey($Tool.RepoPath)) { throw "fetch failed: $($Tool.RepoPath)" }
@@ -190,7 +206,8 @@ if ($h.Throw) { throw $h.Throw }
         $script:marketplaces = @()
         $script:pluginList = @()
         $script:disabledPlugins = @()
-        $script:marketplaceNameFor = @{ 'owner/repo' = 'mods' }   # the name "marketplace add <source>" registers
+        $script:marketplacePaths = @{}
+        $script:pluginConfigArgs = @()
         $script:modules = @()
         $script:running = @()
         $script:installedNames = @()
@@ -657,13 +674,36 @@ if ($h.Throw) { throw $h.Throw }
     # ======================================================================================
     $plugin = { param($n) New-Tool $n 'claude-plugin' @{ Id = "$n@mods"; Marketplace = 'mods'; MarketplaceSource = 'owner/repo'; RequiredCommand = 'claude' } }
 
-    Test-Case 'claude-plugin: unknown marketplace is added from MarketplaceSource, then the plugin is installed' {
+    Test-Case 'claude-plugin: the main ZIP is saved, its folder is added as the marketplace, then the plugin is installed' {
         Reset-Fake
         Set-Present 'claude'
         $script:DevTools = @((& $plugin 'p1'))
         Invoke-Install -Yes
-        ($script:claudeCalls -join '|') -ceq 'claude plugin list --json|claude plugin marketplace list --json|claude plugin marketplace add owner/repo|claude plugin install p1@mods' -and
+        $dir = Get-DevToolMarketplaceDir @{ Marketplace = 'mods' }
+        ($script:claudeCalls -join '|') -ceq "claude plugin list --json|claude plugin marketplace list --json|claude plugin marketplace add $dir|claude plugin install p1@mods" -and
+        $script:events.IndexOf('save mods') -lt $script:events.IndexOf("claude plugin marketplace add $dir") -and
         (Get-Row 'p1').Result -ceq 'OK'
+    }
+    Test-Case 'claude-plugin: a marketplace registered at another path (an old clone) is removed and re-added with the saved options' {
+        Reset-Fake
+        Set-Present 'claude'
+        $script:marketplaces = @('mods')
+        $script:marketplacePaths['mods'] = 'E:\clone'
+        $script:pluginList = @('p1@mods')
+        $script:pluginConfigArgs = @('--config', 'toastEnabled=false')
+        $script:DevTools = @((& $plugin 'p1'))
+        Invoke-Install -Yes
+        $dir = Get-DevToolMarketplaceDir @{ Marketplace = 'mods' }
+        ($script:claudeCalls -join '|') -ceq "claude plugin list --json|claude plugin marketplace list --json|claude plugin marketplace remove mods|claude plugin marketplace add $dir|claude plugin install p1@mods --config toastEnabled=false" -and
+        (Get-Row 'p1').Result -ceq 'OK'
+    }
+    Test-Case 'claude-plugin: a failed ZIP download is FAILED and the marketplace is not added' {
+        Reset-Fake
+        Set-Present 'claude'
+        $script:failIds['save'] = 1
+        $script:DevTools = @((& $plugin 'p1'))
+        Invoke-Install -Yes
+        (Get-Row 'p1').Result -ceq 'FAILED' -and -not ($script:claudeCalls | Where-Object { $_ -like '*marketplace add*' })
     }
     Test-Case 'claude-plugin: a marketplace that is already registered is not added again' {
         Reset-Fake
@@ -680,7 +720,7 @@ if ($h.Throw) { throw $h.Throw }
         $script:disabledPlugins = @('p1@mods')
         $script:DevTools = @((New-Tool 'p1' 'claude-plugin' @{ Id = 'p1@mods'; Marketplace = 'mods'; MarketplaceSource = 'owner/repo'; RequiredCommand = 'claude'; Replaces = @('old1@mods', 'old2@mods', 'absent@mods') }))
         Invoke-Install -Yes
-        ($script:claudeCalls -join '|') -ceq 'claude plugin list --json|claude plugin uninstall old1@mods|claude plugin uninstall old2@mods|claude plugin marketplace update mods|claude plugin update p1@mods|claude plugin enable p1@mods' -and
+        ($script:claudeCalls -join '|') -ceq 'claude plugin list --json|claude plugin uninstall old1@mods|claude plugin uninstall old2@mods|claude plugin marketplace list --json|claude plugin marketplace update mods|claude plugin update p1@mods|claude plugin enable p1@mods' -and
         (Get-Row 'p1').Result -ceq 'OK'
     }
     Test-Case 'claude-plugin: a marketplace with a different name is not mistaken for the wanted one' {
@@ -689,7 +729,7 @@ if ($h.Throw) { throw $h.Throw }
         $script:marketplaces = @('other')
         $script:DevTools = @((& $plugin 'p1'))
         Invoke-Install -Yes
-        $script:claudeCalls.Contains('claude plugin marketplace add owner/repo')
+        $script:claudeCalls.Contains("claude plugin marketplace add $(Get-DevToolMarketplaceDir @{ Marketplace = 'mods' })")
     }
     Test-Case 'claude-plugin: two plugins from one marketplace add it only once' {
         Reset-Fake
@@ -706,7 +746,7 @@ if ($h.Throw) { throw $h.Throw }
         $script:DevTools = @((& $plugin 'p1'), (New-Tool 'A' 'winget'))
         Invoke-Install -Yes
         (Get-Row 'p1').Result -ceq 'FAILED' -and -not $script:claudeCalls.Contains('claude plugin install p1@mods') -and
-        $script:log.Contains('claude plugin marketplace add owner/repo failed with exit code 1.') -and
+        $script:log.Contains("claude plugin marketplace add $(Get-DevToolMarketplaceDir @{ Marketplace = 'mods' }) failed with exit code 1.") -and
         (Get-Row 'A').Result -ceq 'OK'
     }
     Test-Case 'claude-plugin: a failed plugin install is FAILED and later plugins are still tried' {
@@ -741,7 +781,8 @@ if ($h.Throw) { throw $h.Throw }
         $script:installedNames = @('p1')
         $script:pluginUpToDate['p1'] = $false
         Invoke-Install -Yes
-        ($script:claudeCalls -join '|') -ceq 'claude plugin list --json|claude plugin marketplace update mods|claude plugin update p1@mods' -and
+        ($script:claudeCalls -join '|') -ceq 'claude plugin list --json|claude plugin marketplace list --json|claude plugin marketplace update mods|claude plugin update p1@mods' -and
+        $script:events.Contains('save mods') -and
         (Get-Row 'p1').Action -ceq 'Updating' -and (Get-Row 'p1').Result -ceq 'OK'
     }
     Test-Case 'claude-plugin: an installed plugin whose version cannot be checked warns and is left alone' {

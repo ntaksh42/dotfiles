@@ -106,10 +106,11 @@ pwsh -NoProfile -File tools/Sync-DevToolSkills.ps1
 ## Claude Code Mods
 
 `Install-DevTools` は `claude/mods/dotfiles` plugin を導入します。自作の skills・hooks・Mod（`auto-session-title`、`ado-link-bar`、`toast-notify`、`cmdHistory`）はすべてこの 1 つの plugin にまとめてあります（スキル名は `dotfiles:<name>`）。
-`dotfiles-mods` マーケットプレイスが未登録なら GitHub の `ntaksh42/dotfiles` から登録し、
-その後 `claude plugin install` を実行します。`claude/install.ps1` がクローン先のパスで
-登録済みの場合は、そのマーケットプレイスをそのまま使います。GitHub から登録する場合は、
-Mod が `main` に取り込まれている必要があります。`claude` が PATH に無いとスキップされます。
+GitHub の `ntaksh42/dotfiles` の `main` を ZIP で取得して `%LOCALAPPDATA%\dotfiles\marketplaces\dotfiles-mods` に展開し、
+そのフォルダを `dotfiles-mods` マーケットプレイスとして登録してから `claude plugin install` を実行します。
+git やクローンは使わないため、Mod の変更は `main` に push してから導入します。更新は、導入済みの版が
+`main` の `plugin.json` より古いときだけ ZIP を取り直して行います。以前の版がクローン先のパスで登録した
+マーケットプレイスは、plugin の設定値を引き継いで登録し直します。`claude` が PATH に無いとスキップされます。
 
 - `toast-notify`: 入力待ち中は停滞警告を抑え、長時間コマンドは「コマンド実行中」として通知します。
 - `ado-link-bar`: 表示中の Work Item のタイトル・状態を5分ごとに再取得します。取得失敗時は前回の表示を保ち、1分後に再試行します。
