@@ -62,8 +62,8 @@
 ## 論点の印 — `#p1` と [判断] の対応
 
 - 1 論点 = 1 つの `<section class="pt" id="pN">`。`N` は 1 から振り、全体図の赤 ①②③ と番号を揃える
-- 中身は見出し 1 行 (何の違いを見るか。問いの形にしない) + 選択肢 A / B の絵 (`.ab`) + 各絵に 1 行のキャプション。段落は足さない
-- [判断] の JSON では `selector: "#pN"` でこの要素を指し、会話の問いの頭には同じ番号 (①②③) を付ける。人は番号を頼りに、問いと絵を突き合わせる
+- 中身は見出し 1 行 (何の違いを見るか。問いの形にしない) + 選択肢 A / B の絵 (`.ab`) + 各絵に 1 行のキャプション。キャプションの頭には [判断] と同じ案の名前を書く (「A」「B」の記号にしない)。段落は足さない
+- [判断] の JSON では `selector: "#pN"` でこの要素を指し、会話の問いの頭には同じ番号と論点の名前 (「①ボタンの位置」) を付ける。人は番号を頼りに、問いと絵を突き合わせる
 - id は `#pN` 形式の固定文字列にする。クラスや構造に依存した selector は、シートを直すとずれる
 - `check-sheet.py --comments` が、selector がシートに存在するか、論点に [判断] が刺さっているかを検査する
 
@@ -138,7 +138,7 @@ summary{cursor:pointer;color:var(--accent);font-weight:500;font-size:13.5px}
 <div class="concl"><b>結論:</b> {2 文以内・120 字以内}</div>
 <figure>{全体図 — インライン SVG で題材の全体像 + 論点の場所に赤の ①②③}<figcaption>{1 行}</figcaption></figure>
 <section class="pt" id="p1"><h2><span class="no">①</span>{何の違いを見るか}</h2>
-<div class="ab"><figure>{A の絵}<figcaption>A — {1 行}</figcaption></figure><figure>{B の絵}<figcaption>B — {1 行}</figcaption></figure></div></section>
+<div class="ab"><figure>{A の絵}<figcaption>{案の名前} — {1 行}</figcaption></figure><figure>{B の絵}<figcaption>{案の名前} — {1 行}</figcaption></figure></div></section>
 <details><summary>{中身と分量を予告する見出し}</summary><p class="m">{判断から外した決定・落とした案・実測ログ}</p></details>
 </main></body></html>
 ```

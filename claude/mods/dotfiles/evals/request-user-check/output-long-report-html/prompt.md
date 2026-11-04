@@ -8,7 +8,7 @@ timeout_seconds: 300
 allowed_tools: [Read, Glob, Grep, Skill, Write]
 ---
 
-次の 6 つのシェル関数がそれぞれ何をするか、危ない点があるかを一覧にして。
+次の 6 つのシェル関数がそれぞれ何をするか、危ない点があるかを一覧にして。報告シートを作るなら、作業ディレクトリに保存して。
 
 bk() { cp "$1" "$1.bak"; }
 clean() { rm -rf ./tmp/*; }
