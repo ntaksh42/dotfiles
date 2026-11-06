@@ -1,6 +1,6 @@
 {
   "name": "dotfiles",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "description": "Skills (jp-deslop, request-user-check, harness), the mods (auto-session-title, ado-link-bar, toast-notify), and settings-hook fallbacks (scripts/lite-hook.mjs, statusline/pr-line.mjs) for environments where mods are refused.",
   "types": "./types/index.d.ts",
   "userConfig": {
