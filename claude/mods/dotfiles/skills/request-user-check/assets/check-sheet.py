@@ -12,7 +12,7 @@
   - [判断] に 推奨 / 根拠 の書き忘れ
   - 文字の多すぎ (本文の文章 600 字超、結論 120 字超)
   - 報告シート: 図の欠落、要点の印 (class="key") の欠落、
-    文字の多すぎ (本文 300 字超、結論 80 字超、表のセル 40 字超)
+    文字の多すぎ (本文 600 字超、結論 80 字超、表のセル 60 字超)、畳みが本文より長い
 
 終了コード 0 = 出してよい / 1 = 直してから出す。標準ライブラリのみ (python3.8+)。
 """
@@ -26,9 +26,9 @@ from pathlib import Path
 
 PROSE_LIMIT = 600
 CONCL_LIMIT = 120
-REPORT_PROSE_LIMIT = 300
+REPORT_PROSE_LIMIT = 600
 REPORT_CONCL_LIMIT = 80
-REPORT_CELL_LIMIT = 40
+REPORT_CELL_LIMIT = 60
 
 
 def visible_len(fragment: str) -> int:
@@ -66,7 +66,10 @@ def check_sheet(html: str):
         elif not re.search(r'class=["\'][^"\']*\bkey\b', live):
             warns.append('要点の印 (class="key") が無い — 図の中で要点の要素だけを赤くする')
         if total > REPORT_PROSE_LIMIT:
-            warns.append(f'本文の文章が {total} 字 (目安 {REPORT_PROSE_LIMIT} 字以内)。説明は図のラベルへ移し、経緯は <details> へ')
+            warns.append(f'本文の文章が {total} 字 (目安 {REPORT_PROSE_LIMIT} 字以内)。説明は図のラベルへ移すか、項目を絞る。判断や行動に要る項目は畳まない')
+        folded = sum(visible_len(t) for t in re.findall(r'<details\b[^>]*>(.*?)</details>', live, flags=re.DOTALL))
+        if folded > total:
+            warns.append(f'畳みの中 ({folded} 字) が本文 ({total} 字) より長い。読み手が判断や行動に使う項目が <details> に入っていないか見直す')
         if concl > REPORT_CONCL_LIMIT:
             warns.append(f'結論が {concl} 字 (目安 {REPORT_CONCL_LIMIT} 字以内・1 文)')
         body = re.sub(r'<(svg|details)\b.*?</\1>', '', live, flags=re.DOTALL)
