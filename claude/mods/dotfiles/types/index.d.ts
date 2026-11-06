@@ -10,9 +10,6 @@ export type TitleSession = { count: number; first: string; recent: string[] }
 // auto-session-title: 今のタイトルと、それが手動の /rename で付いたものか
 export type TitleCurrent = { title: string; manual: boolean }
 
-// cmdHistory: 新しい順・重複なしの PowerShell 履歴
-export type CmdHistoryEntries = string[]
-
 declare module 'claude-code' {
   interface PluginState {
     dotfiles: {
@@ -20,10 +17,6 @@ declare module 'claude-code' {
       details: WorkItemDetails
       sessions: Record<string, TitleSession>
       current: TitleCurrent
-      entries: CmdHistoryEntries
-      filter: string
-      historyPage: number
-      historySelected: string
     }
   }
 }

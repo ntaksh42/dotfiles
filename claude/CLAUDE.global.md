@@ -1,3 +1,12 @@
+# 返信前チェック（最優先）
+
+ユーザーに返信する直前に確認する。次のどれかに当たるなら、会話に書く前に `dotfiles:request-user-check` を呼び、HTML の報告シートで見せる。会話には結論 1 文と判断だけを書く。
+
+- 会話に書く内容が 10 行を超える
+- 3 項目以上の一覧・比較・調査結果・レビュー指摘がある
+- 作業の完了報告で、変更点が複数ある
+
+
 <!--
 このファイルは Claude Code と Codex の共通ルールの管理元 (claude/CLAUDE.global.md)。
 tools/Install-AgentInstructions.ps1 が ~/.claude/CLAUDE.md と ~/.codex/AGENTS.md へ配置する（Codex は CODEX_HOME にも対応）。配置先を直接編集せず、このファイルを編集して再配置すること。

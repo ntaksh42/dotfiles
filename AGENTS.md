@@ -25,7 +25,7 @@ tools/               汎用PowerShellユーティリティ
 - skills と hooks は `claude/mods/dotfiles` plugin に置く。導入は `Install-DevTools` が行う。GitHub の main の ZIP を展開したフォルダをマーケットプレイスとして登録し、`claude plugin install` する。手元のクローンは使わないので、変更は push してから導入する
 - スキルは `claude/mods/dotfiles/skills/<name>/SKILL.md`。plugin 内なのでスキル名は `dotfiles:<name>` になる
 - Mod（TypeScript の hooks module）は `hooks/<mod>/register.ts(x)` に置き、`hooks/register.ts` から呼ぶ。エンジンは同じイベントの matcher 無しフックを plugin につき 1 つしか許さないので、イベントが重なる Mod は `hooks/register.ts` でネストして束ねる
-- 組織の管理設定（`allowManagedModsOnly` 等）で mod が拒否される環境向けに、mod を使わない代替を同じ plugin に置く: toast-notify と auto-session-title は `scripts/lite-hook.mjs`（`hooks.json` の settings hook）、ado-pr-status は ccstatusline が呼ぶ `statusline/pr-line.mjs` の自己更新、cmdHistory は `skills/cmd-history`。mod が動くセッションでは mod が環境変数 `DOTFILES_MOD_TOAST` / `DOTFILES_MOD_TITLE` を設定し、`lite-hook.mjs` はそれを見て何もしない（二重通知を避ける）。通知の送信は `scripts/toast-send.ps1` を mod と共有する
+- 組織の管理設定（`allowManagedModsOnly` 等）で mod が拒否される環境向けに、mod を使わない代替を同じ plugin に置く: toast-notify と auto-session-title は `scripts/lite-hook.mjs`（`hooks.json` の settings hook）、ado-pr-status は ccstatusline が呼ぶ `statusline/pr-line.mjs` の自己更新。mod が動くセッションでは mod が環境変数 `DOTFILES_MOD_TOAST` / `DOTFILES_MOD_TITLE` を設定し、`lite-hook.mjs` はそれを見て何もしない（二重通知を避ける）。通知の送信は `scripts/toast-send.ps1` を mod と共有する
 - Mod の設定（userConfig）は `plugin.json` に Mod 名の接頭辞（`toast*`、`linkBar*`）を付けて置く
 - hook は `claude/mods/dotfiles/hooks/hooks.json` に登録し、スクリプトは `${CLAUDE_PLUGIN_ROOT}` で参照する
 - スキルからスクリプト等を参照するときは `~/.claude/skills/...` と決め打ちせず、SKILL.md のあるディレクトリからの相対で書く

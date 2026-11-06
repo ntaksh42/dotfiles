@@ -105,7 +105,7 @@ pwsh -NoProfile -File tools/Sync-DevToolSkills.ps1
 
 ## Claude Code Mods
 
-`Install-DevTools` は `claude/mods/dotfiles` plugin を導入します。自作の skills・hooks・Mod（`auto-session-title`、`ado-link-bar`、`toast-notify`、`cmdHistory`）はすべてこの 1 つの plugin にまとめてあります（スキル名は `dotfiles:<name>`）。
+`Install-DevTools` は `claude/mods/dotfiles` plugin を導入します。自作の skills・hooks・Mod（`auto-session-title`、`ado-link-bar`、`toast-notify`）はすべてこの 1 つの plugin にまとめてあります（スキル名は `dotfiles:<name>`）。
 GitHub の `ntaksh42/dotfiles` の `main` を ZIP で取得して `%LOCALAPPDATA%\dotfiles\marketplaces\dotfiles-mods` に展開し、
 そのフォルダを `dotfiles-mods` マーケットプレイスとして登録してから `claude plugin install` を実行します。
 git やクローンは使わないため、Mod の変更は `main` に push してから導入します。更新は、導入済みの版が
@@ -114,11 +114,10 @@ git やクローンは使わないため、Mod の変更は `main` に push し�
 
 - `toast-notify`: 入力待ち中は停滞警告を抑え、長時間コマンドは「コマンド実行中」として通知します。
 - `ado-link-bar`: 表示中の Work Item のタイトル・状態を5分ごとに再取得します。取得失敗時は前回の表示を保ち、1分後に再試行します。
-- `/cmdHistory`: 検索結果を「前へ」「次へ」で移動し、項目の全文を確認してから「入力欄に挿入」で `!` コマンドとして入力できます。
 
 組織の管理設定（`allowManagedModsOnly` など）で Mod が拒否される環境では、同じ plugin の代替が働きます。
 トースト通知とセッション名は settings hook（`scripts/lite-hook.mjs`）、PR 表示は ccstatusline の
-`statusline/pr-line.mjs`、`/cmdHistory` は `/dotfiles:cmd-history` スキルです。代替では停滞検知、
+`statusline/pr-line.mjs` です。代替では停滞検知、
 モデルによるセッション名の要約、リンクバー（ado-link-bar）は使えません。Node 22.18 以上が必要です。
 
 ## Codex ステータスライン
