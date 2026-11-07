@@ -46,7 +46,7 @@ svg .key text{fill:var(--ag-red);font-weight:700}
 <body><main>
 
 <h1><!-- TODO: 要点を 1 行で言い切る (読み手が 1 つだけ持ち帰ること) --></h1>
-<div class="concl"><b>結論:</b> <!-- TODO: 1 文・80 字以内 --></div>
+<div class="concl"><b>結論:</b> <!-- TODO: 1 文・80 字以内。根拠から「だから」でつながる形にし、推測に頼るならそう書く --></div>
 
 <!-- 図は任意。形 (流れ・構造・前後の違い・量) が分からないと伝わらないときだけ置く。表で足りるなら <svg> ごと削る。
      置くなら 1 枚 (多くても 2 枚)、見出しは付けない。要点の要素だけ <g class="key"> で包む -->
@@ -59,8 +59,8 @@ svg .key text{fill:var(--ag-red);font-weight:700}
 
 <!-- 項目の表: 図に出した項目ごとに 1 行。何が・なぜ・どうするかと根拠を句で書く。列は中身に合わせて変えてよい -->
 <table>
-<tr><th>#</th><th>項目</th><th>中身・理由</th><th>どうするか</th><th>根拠</th></tr>
-<tr><td class="no">①</td><td><!-- TODO --></td><td><!-- TODO --></td><td><!-- TODO --></td><td class="mono"><!-- TODO: file:line か実行結果 --></td></tr>
+<tr><th>#</th><th>項目</th><th>中身・理由</th><th>どうするか</th><th>根拠</th><th>確度</th></tr>
+<tr><td class="no">①</td><td><!-- TODO --></td><td><!-- TODO --></td><td><!-- TODO --></td><td class="mono"><!-- TODO: file:line か実行結果 --></td><td><!-- TODO: 確認済み (このセッションで実行・読んだ) / 推測 --></td></tr>
 </table>
 
 <!-- 注意点: 失敗したテスト・飛ばした作業・未確認のこと。無ければ節ごと削る -->
