@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{TITLE}}</title>
+<style>
+  :root {
+    --accent: {{ACCENT_COLOR}};
+    --accent-light: {{ACCENT_LIGHT}};
+    --accent-on-dark: {{ACCENT_ON_DARK}};
+    --accent-dim: {{ACCENT_DIM}};
+    --text: #1a1a2e;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --bg: #f9fafb;
+    --card: #ffffff;
+    --header-text: #ffffff;
+    --code-bg: #1e1e2e;
+    --code-text: #cdd6f4;
+  }
+
+  /* ターミナル作業の合間に開くことが多いので、OS の設定に追従する。
+     暗所では accent をそのまま使うと沈むため、明るめの派生色に差し替える。 */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --accent: var(--accent-on-dark);
+      --accent-light: var(--accent-dim);
+      --text: #e5e7eb;
+      --text-muted: #9ca3af;
+      --border: #374151;
+      --bg: #111827;
+      --card: #1b2230;
+      --header-text: #f9fafb;
+      --code-bg: #0f1420;
+      --code-text: #cdd6f4;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', 'Meiryo', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 2rem 1rem;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+
+  /* ヘッダー */
+  .header {
+    background: var(--accent);
+    color: var(--header-text);
+    border-radius: 12px;
+    padding: 2rem 2.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .header .badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.25);
+    border-radius: 999px;
+    padding: 0.2rem 0.8rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.6rem;
+  }
+  .header h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.3rem; }
+  .header .meta { font-size: 0.85rem; opacity: 0.8; }
+
+  /* サマリーカード */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .summary-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+  }
+  .summary-card .label { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  .summary-card .value { font-size: 1.4rem; font-weight: 700; color: var(--accent); margin-top: 0.2rem; }
+  .summary-card .sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.1rem; }
+
+  /* セクション */
+  .section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 1.2rem;
+    overflow: hidden;
+  }
+  .section-header {
+    background: var(--accent-light);
+    padding: 0.8rem 1.5rem;
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--accent);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .section-body { padding: 1.2rem 1.5rem; }
+
+  /* テーブル */
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th { background: var(--accent-light); color: var(--accent); font-weight: 600; padding: 0.6rem 0.8rem; text-align: left; }
+  td { padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg); }
+
+  /* バッジ類 */
+  .tag {
+    display: inline-block;
+    border-radius: 4px;
+    padding: 0.1rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin: 0.1rem;
+  }
+  .tag-red    { background: #fee2e2; color: #b91c1c; }
+  .tag-yellow { background: #fef9c3; color: #92400e; }
+  .tag-green  { background: #dcfce7; color: #15803d; }
+  .tag-blue   { background: #dbeafe; color: #1d4ed8; }
+  .tag-gray   { background: #f3f4f6; color: #374151; }
+
+  /* バッジは淡い地に濃い文字なので、暗所ではそのまま反転させると
+     コントラストが落ちる。地を沈めて文字を明るくする。 */
+  @media (prefers-color-scheme: dark) {
+    .tag-red    { background: #4c1d1d; color: #fca5a5; }
+    .tag-yellow { background: #4a3a12; color: #fcd34d; }
+    .tag-green  { background: #14361f; color: #86efac; }
+    .tag-blue   { background: #1e3054; color: #93c5fd; }
+    .tag-gray   { background: #2d3543; color: #d1d5db; }
+  }
+
+  /* コードブロック */
+  pre {
+    background: var(--code-bg);
+    color: var(--code-text);
+    border-radius: 6px;
+    padding: 1rem;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    margin: 0.5rem 0;
+  }
+  code { font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 0.88em; }
+  p code, li code {
+    background: var(--accent-light);
+    color: var(--accent);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+  }
+
+  /* リスト */
+  ul, ol { padding-left: 1.4rem; }
+  li { margin-bottom: 0.3rem; }
+
+  /* フッター */
+  .footer {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+  }
+
+  /* セクション本文のタイポグラフィ */
+  .content p  { margin-bottom: 0.8rem; }
+  .content h2 { font-size: 1.1rem; font-weight: 700; margin: 1.2rem 0 0.5rem; color: var(--accent); }
+  .content h3 { font-size: 1rem; font-weight: 600; margin: 1rem 0 0.4rem; }
+  .content ul, .content ol { margin-bottom: 0.8rem; }
+
+  /* 引用 */
+  blockquote {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-light);
+    padding: 0.7rem 1rem;
+    margin: 0.8rem 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 0.9rem;
+  }
+
+  /* 折りたたみ（長い表の残り行） */
+  details { margin-top: 0.6rem; }
+  details summary {
+    cursor: pointer;
+    color: var(--accent);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.4rem 0;
+    user-select: none;
+  }
+  details summary:hover { text-decoration: underline; }
+
+  /* 図（Mermaid / SVG） */
+  .figure, pre.mermaid {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.2rem;
+    margin: 0.8rem 0;
+    text-align: center;
+    overflow-x: auto;
+  }
+  pre.mermaid {
+    color: inherit;
+    font-family: inherit;
+    font-size: inherit;
+  }
+  .figure svg, pre.mermaid svg { max-width: 100%; height: auto; }
+
+  /* Mermaid が読み込めなかったとき — 定義がそのまま残るので、
+     コードとして読める体裁に落として理由を添える */
+  .mermaid-note {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 0.8rem 0 -0.4rem;
+  }
+  pre.mermaid.mermaid-offline {
+    text-align: left;
+    background: var(--code-bg);
+    color: var(--code-text);
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 0.85rem;
+  }
+
+  /* 進捗バー（:::bar 記法） */
+  .bar-row {
+    display: grid;
+    grid-template-columns: minmax(80px, 1fr) 3fr auto;
+    align-items: center;
+    gap: 0.8rem;
+    margin: 0.5rem 0;
+    font-size: 0.85rem;
+  }
+  .bar-label { color: var(--text-muted); font-weight: 600; }
+  .bar-track {
+    background: var(--border);
+    border-radius: 999px;
+    height: 0.6rem;
+    overflow: hidden;
+  }
+  .bar-fill {
+    background: var(--accent);
+    height: 100%;
+    border-radius: 999px;
+  }
+  .bar-value { font-weight: 700; color: var(--accent); min-width: 3rem; text-align: right; }
+
+  /* 目次 — セクションが増えたときに全体像を見失わないための一覧。
+     セクションが少ないうちは生成側で省く。 */
+  .toc {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 1rem 1.4rem;
+    margin-bottom: 1.2rem;
+  }
+  .toc .toc-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+  }
+  .toc ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.2rem 1.2rem;
+  }
+  .toc li { margin: 0; counter-increment: toc; }
+  .toc a {
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.88rem;
+    display: block;
+    padding: 0.15rem 0;
+  }
+  .toc a::before {
+    content: counter(toc) ".";
+    color: var(--accent);
+    font-weight: 700;
+    margin-right: 0.4rem;
+  }
+  .toc a:hover { color: var(--accent); text-decoration: underline; }
+  .toc ol { counter-reset: toc; }
+
+  /* 目次の項目数・重大度。どの節が重いかを開く前に見当づけるための印なので、
+     本文の邪魔にならない小ささに留める。 */
+  .toc a { display: flex; align-items: baseline; gap: 0.4rem; }
+  .toc .toc-label { flex: 1; }
+  .toc .toc-count {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .toc .toc-flag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    border-radius: 3px;
+    padding: 0 0.3rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .toc-red    { background: #fee2e2; color: #b91c1c; }
+  .toc-yellow { background: #fef9c3; color: #92400e; }
+
+  /* 重要度サマリー — 重大が何件あるかを本文を読む前に示す */
+  .severity-bar {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.2rem;
+    flex-wrap: wrap;
+  }
+  .sev {
+    font-size: 0.82rem;
+    font-weight: 700;
+    border-radius: 6px;
+    padding: 0.35rem 0.9rem;
+  }
+  .sev-red    { background: #fee2e2; color: #b91c1c; }
+  .sev-yellow { background: #fef9c3; color: #92400e; }
+
+  @media (prefers-color-scheme: dark) {
+    .toc-red { background: #4c1d1d; color: #fca5a5; }
+    .toc-yellow { background: #4a3a12; color: #fcd34d; }
+    .sev-red { background: #4c1d1d; color: #fca5a5; }
+    .sev-yellow { background: #4a3a12; color: #fcd34d; }
+  }
+
+  /* 読了プログレス — 20KB を超えるレポートで現在地が分からなくなるため */
+  .progress {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: transparent;
+    z-index: 50;
+  }
+  .progress > div {
+    height: 100%;
+    width: 0;
+    background: var(--accent);
+    transition: width 0.08s linear;
+  }
+
+  /* 先頭へ戻る */
+  .to-top {
+    position: fixed;
+    right: 1.5rem;
+    bottom: 1.5rem;
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--accent);
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    z-index: 50;
+  }
+  .to-top.visible { opacity: 1; pointer-events: auto; }
+  .to-top:hover { background: var(--accent-light); }
+
+  /* 動きを減らす設定を尊重する */
+  @media (prefers-reduced-motion: reduce) {
+    .progress > div, .to-top { transition: none; }
+  }
+
+  /* 見出しへ飛んだときヘッダーの下に潜らないようにする */
+  .section { scroll-margin-top: 1rem; }
+
+  /* 印刷 */
+  @media print {
+    body { background: white; padding: 0; }
+    .section, .summary-card { break-inside: avoid; }
+    details { display: block; }
+    details > summary { display: none; }
+    /* 画面内リンクは紙では機能しないので目次は落とす */
+    .toc { display: none; }
+    /* 画面用の補助 UI は印刷しない */
+    .progress, .to-top { display: none; }
+    /* 暗所配色のまま印刷すると地が真っ黒になるため明るい配色へ戻す */
+    :root {
+      --text: #1a1a2e; --text-muted: #6b7280; --border: #e5e7eb;
+      --bg: #ffffff; --card: #ffffff;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="progress"><div id="progress-fill"></div></div>
+<div class="container">
+
+  <div class="header">
+    <div class="badge">{{BADGE_LABEL}}</div>
+    <h1>{{TITLE}}</h1>
+    <div class="meta">{{SUBTITLE}} &nbsp;|&nbsp; 作成: {{DATE}} &nbsp;|&nbsp; ID: {{DOC_ID}}</div>
+  </div>
+
+  {{SEVERITY}}
+
+  {{SUMMARY_CARDS}}
+
+  {{TOC}}
+
+  {{MAIN_CONTENT}}
+
+  <div class="footer">
+    Generated by Claude Code &mdash; {{DATE}}
+  </div>
+</div>
+
+<button class="to-top" id="to-top" title="先頭へ戻る" aria-label="先頭へ戻る">&uarr;</button>
+
+<script>
+  // 読了位置の表示と「先頭へ戻る」。長いレポートで現在地を見失わないための補助で、
+  // 無くても内容は読めるため、失敗しても本文に影響しないようにしておく。
+  (function () {
+    var fill = document.getElementById('progress-fill');
+    var toTop = document.getElementById('to-top');
+
+    function update() {
+      var max = document.documentElement.scrollHeight - window.innerHeight;
+      var y = window.scrollY;
+      fill.style.width = (max > 0 ? (y / max) * 100 : 0) + '%';
+      toTop.classList.toggle('visible', y > 400);
+    }
+
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    toTop.addEventListener('click', function () {
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+    });
+    update();
+  })();
+</script>
+</body>
+</html>
