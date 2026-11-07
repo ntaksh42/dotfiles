@@ -11,7 +11,7 @@
   - 論点 (#p1 …) と [判断] の数のズレ、5 件以上
   - [判断] に 推奨 / 根拠 の書き忘れ
   - 文字の多すぎ (本文の文章 600 字超、結論 120 字超)
-  - 報告シート: 図の欠落、要点の印 (class="key") の欠落、
+  - 報告シート: 図がある場合の要点の印 (class="key") の欠落、
     文字の多すぎ (本文 600 字超、結論 80 字超、表のセル 60 字超)、畳みが本文より長い
 
 終了コード 0 = 出してよい / 1 = 直してから出す。標準ライブラリのみ (python3.8+)。
@@ -61,9 +61,7 @@ def check_sheet(html: str):
         warns.append('<!-- review-sheet-format: v5 --> が無い (どの規約で書いたシートかの目印)')
     total, concl = prose_length(live)
     if is_report:
-        if '<svg' not in live:
-            errors.append('図 (インライン SVG) が無い — 報告シートは図で全体を見せる。図が要らない報告は会話で書く')
-        elif not re.search(r'class=["\'][^"\']*\bkey\b', live):
+        if '<svg' in live and not re.search(r'class=["\'][^"\']*\bkey\b', live):
             warns.append('要点の印 (class="key") が無い — 図の中で要点の要素だけを赤くする')
         if total > REPORT_PROSE_LIMIT:
             warns.append(f'本文の文章が {total} 字 (目安 {REPORT_PROSE_LIMIT} 字以内)。説明は図のラベルへ移すか、項目を絞る。判断や行動に要る項目は畳まない')

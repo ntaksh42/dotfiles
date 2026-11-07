@@ -51,5 +51,8 @@ $script:DevTools = @(
     # Everything は終了時に Filters.csv を上書き保存するため、反映前に終了させておくこと。
     @{ Name = 'Everything Filters.csv'; Backend = 'remote-config'; RepoPath = 'app-settings/everything/Filters.csv'; Dest = (Join-Path $env:APPDATA 'Everything\Filters.csv') }
     @{ Name = 'dotfiles (mod)'; Backend = 'claude-plugin'; Id = 'dotfiles@dotfiles-mods'; Marketplace = 'dotfiles-mods'; MarketplaceSource = 'ntaksh42/dotfiles'; RequiredCommand = 'claude'; Replaces = @('auto-session-title@dotfiles-mods', 'ado-pr-status@dotfiles-mods', 'ado-link-bar@dotfiles-mods', 'toast-notify@dotfiles-mods') }
+    # 返信チェックの Stop hook。plugin に依存せず ~/.claude/settings.json に登録する（会社で plugin が制限されても動くように）。
+    # 導入済み判定は hook ファイルの有無、更新は RemoteFiles（GitHub の main の hook との比較）で行う。
+    @{ Name = 'reply-check hook'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-ReplyCheckHook.ps1"; Path = (Join-Path $env:USERPROFILE '.claude\hooks\reply-check.mjs'); RemoteFiles = @('claude/hooks/reply-check.mjs') }
 )
 

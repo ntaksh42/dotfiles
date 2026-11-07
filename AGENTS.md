@@ -44,6 +44,11 @@ powershell.exe -ExecutionPolicy Bypass -File claude/install.ps1
 # 共通ルールだけを配置する
 pwsh -NoProfile -File tools/Install-AgentInstructions.ps1
 
+# 返信チェックの Stop hook（claude/hooks/reply-check.mjs）を ~/.claude/hooks/ へ置き、settings.json に登録する。
+# plugin に依存しない。既存の hooks は残す。Install-DevTools も devtools カタログの 'reply-check hook' で同じことをする
+# （GitHub の main から取得するので push 後に効く）。単体テストは node --test claude/hooks/reply-check.test.mjs
+pwsh -NoProfile -File tools/Install-ReplyCheckHook.ps1
+
 # app-settings/ の設定ファイルを実環境へ配置する（pwsh プロファイル経由。GitHub の main から取得）
 # 配置対象は app-settings/pwsh/profile.d/devtools-catalog.ps1 のカタログで定義する。プロファイル自体は Update-Profile
 Install-DevTools
