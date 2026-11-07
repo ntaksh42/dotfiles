@@ -1,6 +1,6 @@
 ﻿# Claude Code dotfiles installer for Windows
 # Usage: .\install.ps1
-# skills・hooks は claude/mods/ の plugin として Install-DevTools が導入する。
+# skills・hooks は Install-DevTools が ~/.claude/skills と ~/.claude/hooks へ置く。Mod は claude/mods/ の plugin として導入する。
 # 共通ルールを Claude Code と Codex へ、settings.json を Claude Code へ配置する。
 
 param()
@@ -61,5 +61,5 @@ Write-Host "  - $SettingsFile" -ForegroundColor Gray
 
 Write-Host ""
 Write-Host "Installation complete!" -ForegroundColor Green
-Write-Host "Run Install-DevTools to install the dotfiles plugins (skills, hooks, mods)." -ForegroundColor Yellow
+Write-Host "Run Install-DevTools to install the skills, hooks, and the mods plugin." -ForegroundColor Yellow
 Write-Host "Note: Restart Claude Code for changes to take effect." -ForegroundColor Yellow

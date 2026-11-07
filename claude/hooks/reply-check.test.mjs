@@ -43,7 +43,7 @@ test('シートを出した返信 (::orca-visual) は通す', () => {
 })
 
 test('このターンで skill を呼んでいれば通す', () => {
-  const transcript = [user('調べて'), skillCall('dotfiles:request-user-check'), meta('Base directory for this skill'), toolResult()].join('\n')
+  const transcript = [user('調べて'), skillCall('request-user-check'), meta('Base directory for this skill'), toolResult()].join('\n')
   assert.equal(calledSkillThisTurn(transcript.split('\n')), true)
   assert.equal(decide({ last_assistant_message: long }, transcript), undefined)
 })
@@ -55,7 +55,7 @@ test('HTML のシートを書いたターンは、skill を呼び直さなくて
 })
 
 test('前のターンで呼んだだけなら止める', () => {
-  const transcript = [user('前の依頼'), skillCall('dotfiles:request-user-check'), user('次の依頼')].join('\n')
+  const transcript = [user('前の依頼'), skillCall('request-user-check'), user('次の依頼')].join('\n')
   assert.equal(calledSkillThisTurn(transcript.split('\n')), false)
   assert.equal(decide({ last_assistant_message: long }, transcript).decision, 'block')
 })

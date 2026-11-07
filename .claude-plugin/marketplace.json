@@ -7,7 +7,7 @@
     {
       "name": "dotfiles",
       "source": "./claude/mods/dotfiles",
-      "description": "Skills (jp-deslop, request-user-check, harness) and the mods: auto-session-title, ado-pr-status, ado-link-bar, toast-notify."
+      "description": "The mods: auto-session-title, ado-link-bar, toast-notify."
     }
   ]
 }

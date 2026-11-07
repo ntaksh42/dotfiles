@@ -8,7 +8,7 @@
 
 ### この dotfiles リポジトリを使っている場合
 
-`claude/mods/dotfiles` の dotfiles plugin に含まれているので、個別の作業は要りません。plugin は `Install-DevTools` が導入します。
+`claude/skills/` にあり、`Install-DevTools` が `~/.claude/skills/` へ置きます。個別の作業は要りません。
 
 ```powershell
 Install-DevTools

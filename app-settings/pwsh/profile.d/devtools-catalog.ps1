@@ -53,6 +53,10 @@ $script:DevTools = @(
     @{ Name = 'dotfiles (mod)'; Backend = 'claude-plugin'; Id = 'dotfiles@dotfiles-mods'; Marketplace = 'dotfiles-mods'; MarketplaceSource = 'ntaksh42/dotfiles'; RequiredCommand = 'claude'; Replaces = @('auto-session-title@dotfiles-mods', 'ado-pr-status@dotfiles-mods', 'ado-link-bar@dotfiles-mods', 'toast-notify@dotfiles-mods') }
     # 返信チェックの Stop hook。plugin に依存せず ~/.claude/settings.json に登録する（会社で plugin が制限されても動くように）。
     # 導入済み判定は hook ファイルの有無、更新は RemoteFiles（GitHub の main の hook との比較）で行う。
+    # 自作のスキル。~/.claude/skills へ置く。更新判定は request-user-check の SKILL.md だけを見る（他のスキルの変更は手で tools/Install-DotfilesSkills.ps1 を実行する）。
+    @{ Name = 'dotfiles skills'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-DotfilesSkills.ps1"; Path = (Join-Path $env:USERPROFILE '.claude\skills\request-user-check\SKILL.md'); RemoteFiles = @('claude/skills/request-user-check/SKILL.md') }
+    # toast 通知とセッション名の settings hook。plugin の Mod が動くセッションでは何もしない。
+    @{ Name = 'lite hooks'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-LiteHooks.ps1"; Path = (Join-Path $env:USERPROFILE '.claude\hooks\lite-hook.mjs'); RemoteFiles = @('claude/hooks/lite-hook.mjs') }
     @{ Name = 'reply-check hook'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-ReplyCheckHook.ps1"; Path = (Join-Path $env:USERPROFILE '.claude\hooks\reply-check.mjs'); RemoteFiles = @('claude/hooks/reply-check.mjs') }
 )
 

@@ -1,6 +1,6 @@
 ---
 name: harness
-description: Claude Code と Codex CLI のハーネス環境（指示ファイル、skills、subagents、hooks、MCP、plugins、feature flags）を公式の診断コマンドで点検し、両者のずれと不具合を一覧にして、公式の手段で直す。「ハーネスを点検して」「Claude と Codex の設定を揃えて」「スキルが Codex に無い」「hooks が効かない」「設定が壊れていないか見て」「使っていないスキルを整理したい」と言われたとき、/dotfiles:harness で使う。エージェントの設計そのものの相談には使わない。
+description: Claude Code と Codex CLI のハーネス環境（指示ファイル、skills、subagents、hooks、MCP、plugins、feature flags）を公式の診断コマンドで点検し、両者のずれと不具合を一覧にして、公式の手段で直す。「ハーネスを点検して」「Claude と Codex の設定を揃えて」「スキルが Codex に無い」「hooks が効かない」「設定が壊れていないか見て」「使っていないスキルを整理したい」と言われたとき、/harness で使う。エージェントの設計そのものの相談には使わない。
 argument-hint: "[check|fix] [対象: instructions|skills|agents|hooks|mcp|plugins]"
 ---
 
@@ -37,9 +37,9 @@ argument-hint: "[check|fix] [対象: instructions|skills|agents|hooks|mcp|plugin
 | 対象 | Claude Code | Codex | 正本 |
 |---|---|---|---|
 | 指示ファイル | `~/.claude/CLAUDE.md` | `~/.codex/AGENTS.md`（`CODEX_HOME` 設定時はその配下） | 共通: `<dotfiles>/claude/CLAUDE.global.md`。`tools/Install-AgentInstructions.ps1` で両方へ配置 |
-| skills | `~/.claude/skills/`、plugin 内 `skills/` | `~/.agents/skills/`、`~/.codex/skills/`、plugin 内 `skills/` | `<dotfiles>/claude/mods/dotfiles/skills/` |
+| skills | `~/.claude/skills/` | `~/.agents/skills/`、`~/.codex/skills/`、plugin 内 `skills/` | `<dotfiles>/claude/skills/` |
 | subagents | `~/.claude/agents/*.md` | `~/.codex/agents/*.toml` | 無し |
-| hooks | `~/.claude/settings.json` の `hooks`、plugin の `hooks/hooks.json` | `~/.codex/hooks.json`、`config.toml` の `[hooks]` | `<dotfiles>/claude/mods/dotfiles/hooks/hooks.json` |
+| hooks | `~/.claude/settings.json` の `hooks` | `~/.codex/hooks.json`、`config.toml` の `[hooks]` | `<dotfiles>/claude/hooks/`（`tools/Install-*Hook*.ps1` が settings.json へ登録） |
 | settings | `~/.claude/settings.json` | `~/.codex/config.toml` | `<dotfiles>/claude/settings.template.json`（`{{MARKETPLACE_DIR}}` は比較から外す） |
 
 doctor が拾わない、参照切れと重複も確かめる。
@@ -79,10 +79,10 @@ doctor が拾わない、参照切れと重複も確かめる。
 
 | 直すもの | 使う公式手段 |
 |---|---|
-| Claude の settings / hooks / 権限 | `update-config` スキル。恒久化するなら `settings.template.json` か plugin の `hooks/hooks.json` に反映する |
+| Claude の settings / hooks / 権限 | `update-config` スキル。恒久化するなら `settings.template.json` か `claude/hooks/` の hook に反映する |
 | skill の新規作成・改善 | Claude: `skill-creator`。Codex: `$skill-creator` |
 | Claude の資産を Codex へ移す | Codex の `migrate-to-codex` スキル（`$skill-installer` で導入）。Claude 側のファイルは触らない |
-| skills を両方へ配る | dotfiles の plugin に置き、Codex でも `codex plugin marketplace add <dotfiles>` と `codex plugin add` で入れる。Codex は `.claude-plugin/marketplace.json` を読み、`CLAUDE_PLUGIN_ROOT` も設定する |
+| skills を両方へ配る | `~/.agents/skills/` に置き、`~/.claude/skills` をそこへのジャンクションにする（`Sync-DevToolSkills`） |
 | MCP | `claude mcp add|remove`、`codex mcp add|remove` |
 | Codex の feature flag | `codex features enable|disable <name>` |
 | plugin の更新・無効化 | `claude plugin update|disable|uninstall`、`codex plugin remove`、`codex plugin marketplace upgrade` |

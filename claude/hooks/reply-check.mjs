@@ -68,7 +68,7 @@ export function decide(input, transcriptText) {
   return {
     decision: 'block',
     reason:
-      `返信が会話に書く基準を超えています (${found.join('、')})。dotfiles:request-user-check を呼び、中身を報告シートにまとめて見せてください。` +
+      `返信が会話に書く基準を超えています (${found.join('、')})。request-user-check を呼び、中身を報告シートにまとめて見せてください。` +
       '会話には結論 1 文・シートの場所・注意点・[判断] だけを書きます。',
   }
 }

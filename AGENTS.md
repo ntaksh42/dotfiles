@@ -15,19 +15,21 @@ claude/              Claude Code 設定の管理元
   CLAUDE.global.md   共通ルールの管理元（~/.claude/CLAUDE.md と ~/.codex/AGENTS.md へ配置、既存はバックアップ）
   mods/              Claude Code プラグイン。リポジトリ直下の .claude-plugin/marketplace.json で
                      dotfiles-mods マーケットプレイスとして公開し、settings で有効化する
-    dotfiles/        自作の skills・hooks・Mod をまとめた唯一の plugin
+    dotfiles/        自作の Mod だけをまとめた plugin
+  skills/            自作スキルの管理元（~/.claude/skills へ置く）
+  hooks/             自作 hook の管理元（~/.claude/hooks へ置き、settings.json に登録する）
 app-settings/        アプリ設定ファイルのバックアップ・管理
 tools/               汎用PowerShellユーティリティ
 ```
 
 ### skills・hooks の仕組み
 
-- skills と hooks は `claude/mods/dotfiles` plugin に置く。導入は `Install-DevTools` が行う。GitHub の main の ZIP を展開したフォルダをマーケットプレイスとして登録し、`claude plugin install` する。手元のクローンは使わないので、変更は push してから導入する
-- スキルは `claude/mods/dotfiles/skills/<name>/SKILL.md`。plugin 内なのでスキル名は `dotfiles:<name>` になる
+- Mod だけが `claude/mods/dotfiles` plugin。導入は `Install-DevTools` が行う。GitHub の main の ZIP を展開したフォルダをマーケットプレイスとして登録し、`claude plugin install` する。手元のクローンは使わないので、変更は push してから導入する
+- スキルは `claude/skills/<name>/SKILL.md`。plugin ではないのでスキル名に接頭辞は付かない。`tools/Install-DotfilesSkills.ps1` が `~/.claude/skills/` へ写す（Install-DevTools の 'dotfiles skills'。更新判定は request-user-check の SKILL.md だけを見る）
+- hook は `claude/hooks/` に置き、スクリプトを `~/.claude/hooks/` へ写して `~/.claude/settings.json` に登録する（`tools/Install-ReplyCheckHook.ps1`、`tools/Install-LiteHooks.ps1`）
 - Mod（TypeScript の hooks module）は `hooks/<mod>/register.ts(x)` に置き、`hooks/register.ts` から呼ぶ。エンジンは同じイベントの matcher 無しフックを plugin につき 1 つしか許さないので、イベントが重なる Mod は `hooks/register.ts` でネストして束ねる
-- 組織の管理設定（`allowManagedModsOnly` 等）で mod が拒否される環境向けに、mod を使わない代替を同じ plugin に置く: toast-notify と auto-session-title は `scripts/lite-hook.mjs`（`hooks.json` の settings hook）、ado-pr-status は ccstatusline が呼ぶ `statusline/pr-line.mjs` の自己更新。mod が動くセッションでは mod が環境変数 `DOTFILES_MOD_TOAST` / `DOTFILES_MOD_TITLE` を設定し、`lite-hook.mjs` はそれを見て何もしない（二重通知を避ける）。通知の送信は `scripts/toast-send.ps1` を mod と共有する
+- 組織の管理設定（`allowManagedModsOnly` 等）で mod が拒否される環境向けに、mod を使わない代替を同じ plugin に置く: toast-notify と auto-session-title は `claude/hooks/lite-hook.mjs`（settings hook）、ado-pr-status は ccstatusline が呼ぶ `statusline/pr-line.mjs` の自己更新。mod が動くセッションでは mod が環境変数 `DOTFILES_MOD_TOAST` / `DOTFILES_MOD_TITLE` を設定し、`lite-hook.mjs` はそれを見て何もしない（二重通知を避ける）。通知の送信は plugin の `scripts/toast-send.ps1` を mod と共有する（`Install-LiteHooks.ps1` が `~/.claude/hooks/` へ写す）
 - Mod の設定（userConfig）は `plugin.json` に Mod 名の接頭辞（`toast*`、`linkBar*`）を付けて置く
-- hook は `claude/mods/dotfiles/hooks/hooks.json` に登録し、スクリプトは `${CLAUDE_PLUGIN_ROOT}` で参照する
 - スキルからスクリプト等を参照するときは `~/.claude/skills/...` と決め打ちせず、SKILL.md のあるディレクトリからの相対で書く
 
 ### settings.template.json
@@ -67,7 +69,7 @@ Set-WindowsSettings           # 適用（Explorer 系は explorer.exe を再起�
 
 ## 開発規約
 
-- hook を追加したら `claude/mods/dotfiles/hooks/hooks.json` に登録する
+- hook を追加したら `claude/hooks/` に置き、`tools/Install-*Hook*.ps1` で settings.json に登録する
 - スキルはサブディレクトリ形式（`SKILL.md` + `references/`）を使用する
 - plugin の中身を変えたら `plugin.json` の `version` を上げる
 - devtools カタログの winget / msstore 項目は `Upgradable = $true` を付けたものだけ `Install-DevTools` が更新する（既定は未導入時のインストールのみ）。更新で落とされると困るアプリには `ProcessName`（同名の別プロセスがあるなら `ProcessPath` も）を付け、起動中は更新を見送らせる

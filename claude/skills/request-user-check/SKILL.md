@@ -130,7 +130,7 @@ Claude Code でも Codex でも同じ手順で動く。ツール名は環境に�
 
 ## 比較シートの手順 (見た目で比べる論点があるとき)
 
-`<skill dir>` は、この SKILL.md が置かれているディレクトリを指す。plugin として入れた場合は `${CLAUDE_PLUGIN_ROOT}/skills/request-user-check/`、skill として置いた場合はその置き場所。分からなければ、この SKILL.md 自身のパスから求める。
+`<skill dir>` は、この SKILL.md が置かれているディレクトリを指す。`~/.claude/skills/request-user-check/` など、skill として置いた場所。分からなければ、この SKILL.md 自身のパスから求める。
 
 手順 8 つは `references/comparison-sheet.md` にある。比較シートを作るときだけ Read する。
 

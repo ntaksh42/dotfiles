@@ -46,7 +46,7 @@ async function retitle($: EngineInterface, id: string, s: TitleSession, prompt: 
   await update($, current, () => ({ title, manual: false }))
 }
 
-// settings hook 版（scripts/lite-hook.mjs）は、この環境変数があればタイトルを付けない
+// settings hook 版（claude/hooks/lite-hook.mjs）は、この環境変数があればタイトルを付けない
 export async function sessionStart($: EngineInterface, e: Args<'session.start'>, next: Next<'session.start'>) {
   await $.env.set('DOTFILES_MOD_TITLE', '1')
   return next(e)

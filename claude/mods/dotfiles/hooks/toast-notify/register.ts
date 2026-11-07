@@ -2,7 +2,7 @@ import type { Args, EngineInterface, Next, Register } from 'claude-code'
 
 // Windows PowerShell 5.1 の AppUserModelID。pwsh 7 は WinRT を読めないため powershell.exe を使う
 const APP_ID = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe'
-// 送信は scripts/toast-send.ps1（タイトル・本文は環境変数で渡し、スクリプト側で XML エスケープする）。settings hook 版の scripts/lite-hook.mjs と共有する
+// 送信は scripts/toast-send.ps1（タイトル・本文は環境変数で渡し、スクリプト側で XML エスケープする）。settings hook 版の claude/hooks/lite-hook.mjs と共有する
 const MAX_BODY = 200
 // 停滞判定の間隔。活動の記録は同期的にフラグを立てるだけにし、時刻はここで読む
 const STALL_TICK_MS = 15_000
@@ -50,7 +50,7 @@ function notify($: EngineInterface, title: string, body: string, level: Level = 
 
 export async function sessionStart($: EngineInterface, e: Args<'session.start'>, next: Next<'session.start'>) {
   if (!cfg.enabled) return next(e)
-  // settings hook 版（scripts/lite-hook.mjs）は、この環境変数があれば通知しない
+  // settings hook 版（claude/hooks/lite-hook.mjs）は、この環境変数があれば通知しない
   await $.env.set('DOTFILES_MOD_TOAST', '1')
   const started = await next(e)
   if (cfg.stallMs <= 0) return started

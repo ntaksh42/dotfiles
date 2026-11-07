@@ -1,7 +1,7 @@
 {
   "name": "dotfiles",
-  "version": "0.13.5",
-  "description": "Skills (jp-deslop, request-user-check, harness), the mods (auto-session-title, ado-link-bar, toast-notify), and settings-hook fallbacks (scripts/lite-hook.mjs, statusline/pr-line.mjs) for environments where mods are refused.",
+  "version": "0.14.0",
+  "description": "The mods: auto-session-title, ado-link-bar, toast-notify. Skills and settings hooks live outside the plugin (claude/skills, claude/hooks).",
   "types": "./types/index.d.ts",
   "userConfig": {
     "linkBarEnabled": {

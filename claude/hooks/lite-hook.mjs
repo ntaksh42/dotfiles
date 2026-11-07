@@ -1,5 +1,5 @@
-// mod が使えない環境（組織の allowManagedModsOnly など）向けの代替。plugin の hooks/hooks.json から
-// settings hook として呼ばれ、toast-notify と auto-session-title の主な機能を肩代わりする。
+// mod が使えない環境（組織の allowManagedModsOnly など）向けの代替。~/.claude/settings.json の
+// hook として呼ばれ、toast-notify と auto-session-title の主な機能を肩代わりする。
 // mod が動いているセッションでは、mod が DOTFILES_MOD_TOAST / DOTFILES_MOD_TITLE を設定するので何もしない。
 // 使い方: node lite-hook.mjs <prompt|stop|stop-failure|notification|post-tool|post-tool-failure>（標準入力は hook の JSON）
 import { spawn } from 'node:child_process'
@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-// plugin.json の userConfig。hook には CLAUDE_PLUGIN_OPTION_<KEY>（KEY は大文字）で渡る
+// settings hook には plugin の userConfig が渡らないので既定値で動く（環境変数 CLAUDE_PLUGIN_OPTION_<KEY> があれば従う）
 const option = (key, fallback) => process.env[`CLAUDE_PLUGIN_OPTION_${key.toUpperCase()}`] ?? fallback
 const isEnabled = !['false', '0'].includes(String(option('toastEnabled', 'true')).toLowerCase())
 const seconds = (key, fallback) => Math.max(0, Number(option(key, fallback)) || 0) * 1000
