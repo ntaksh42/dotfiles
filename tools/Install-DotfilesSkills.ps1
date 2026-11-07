@@ -21,6 +21,23 @@ try {
     }
 
     New-Item -ItemType Directory -Path $SkillsDir -Force | Out-Null
+    # report-to-user への改名後、旧名のスキルが重複して残らないようにする。
+    if (Test-Path -LiteralPath (Join-Path $source 'report-to-user') -PathType Container) {
+        $skillsRoot = (Resolve-Path -LiteralPath $SkillsDir).Path
+        $legacySkill = [System.IO.Path]::GetFullPath((Join-Path $skillsRoot 'request-user-check'))
+        if ([System.IO.Path]::GetDirectoryName($legacySkill) -ne $skillsRoot) {
+            throw "旧スキルの削除先が skills 直下ではありません: $legacySkill"
+        }
+        if (Test-Path -LiteralPath $legacySkill) {
+            $legacyItem = Get-Item -LiteralPath $legacySkill -Force
+            if ($legacyItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+                Remove-Item -LiteralPath $legacySkill -Force
+            } else {
+                Remove-Item -LiteralPath $legacySkill -Recurse -Force
+            }
+            Write-Host "旧名を削除: $legacySkill"
+        }
+    }
     foreach ($skill in Get-ChildItem -LiteralPath $source -Directory) {
         $dest = Join-Path $SkillsDir $skill.Name
         if (Test-Path -LiteralPath $dest) { Remove-Item -LiteralPath $dest -Recurse -Force }

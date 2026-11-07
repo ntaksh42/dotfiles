@@ -1,4 +1,4 @@
-// Stop hook: 長い・構造のある返信を会話にそのまま出したら止めて、request-user-check のシートにまとめ直させる。
+// Stop hook: 長い・構造のある返信を会話にそのまま出したら止めて、report-to-user のシートにまとめ直させる。
 // plugin や mod に依存しない単体スクリプト。~/.claude/settings.json の Stop に登録して使う（tools/Install-ReplyCheckHook.ps1）。
 // 判定は機械的な数え上げだけ: 空行を除いた行数 > 6、Markdown の表、箇条書き 3 つ以上のどれか。
 // 止めるのは 1 ターンに 1 回（stop_hook_active のとき・このターンで skill を呼んだとき・シートを出したときは通す）。
@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 
 const MAX_LINES = 6
 const MAX_BULLETS = 2
-const SKILL_NAME = 'request-user-check'
+const SKILL_NAME = 'report-to-user'
 
 export function measure(message) {
   const text = String(message ?? '').replace(/```[\s\S]*?```/g, '')
@@ -28,7 +28,7 @@ export function violations(message) {
   return out
 }
 
-// このターン (最後の本物のユーザー入力より後) に request-user-check を使っていたか
+// このターン (最後の本物のユーザー入力より後) に report-to-user を使っていたか
 export function calledSkillThisTurn(transcriptLines) {
   const entries = []
   for (const l of transcriptLines) {
@@ -68,7 +68,7 @@ export function decide(input, transcriptText) {
   return {
     decision: 'block',
     reason:
-      `返信が会話に書く基準を超えています (${found.join('、')})。request-user-check を呼び、中身を報告シートにまとめて見せてください。` +
+      `返信が会話に書く基準を超えています (${found.join('、')})。report-to-user を呼び、中身を報告シートにまとめて見せてください。` +
       '会話には結論 1 文・シートの場所・注意点・[判断] だけを書きます。',
   }
 }
