@@ -11,14 +11,17 @@
       "dashboard.toggle": [
         "Mod+Shift+A"
       ],
-      "terminal.splitRight": [
-        "Alt+Shift+Plus"
-      ],
       "terminal.splitDown": [
-        "Alt+Shift+Minus"
+        "Alt+Shift+Equal"
       ],
       "worktree.palette": [
         "Mod+K"
+      ],
+      "terminal.splitRight": [
+        "Alt+Shift+Plus"
+      ],
+      "tab.newAgent.claude": [
+        "Mod+Alt+C"
       ]
     }
   }
