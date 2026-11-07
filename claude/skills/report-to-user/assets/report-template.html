@@ -4,16 +4,15 @@
 <!-- report-sheet -->
 <!--
   報告シートの雛形。会話で書くと長くなる報告・相談を、図 1 枚と項目の表で見せる。
-  - 骨格は固定: 要点のタイトル → 結論 1 文 → (図: 形が要るときだけ) → 項目の表 → (注意点) → 畳み付録
+  - 骨格は固定: 要点のタイトル → 結論 1 文 → (図: 形が要るときだけ) → 項目の表 → (要判断の表: 決めてもらう事項があるときだけ) → (注意点) → 畳み付録
   - 読み手が判断・行動・確認に使う情報は本文 (図と表) に出す。畳むのは経緯・手順・ログ・生データだけ
   - 先に要点を 1 つ決める。タイトルに 1 行で書き、図では要点の要素だけを class="key" で赤くする。他は灰色
   - 図は SKILL.md「図の選び方」から選ぶ (流れ・構成・前後・状態の格子・横棒)。説明は文章でなく図のラベルに書く
   - 文字の上限: 本文 600 字、結論 80 字、表のセル 60 字 (SVG と <details> の中は数えない)。畳みを本文より長くしない
-  - 問い・選択肢・推奨はシートに書かない。[判断] は会話で聞く
+  - 決めてもらう事項は「要判断」の表に 1 問 1 行で書く。回答用の入力欄は置かず、答えは会話の [判断] で受ける (番号と問いを揃える)
   - 色は Orca のテーマ変数を優先し、無い環境 (ブラウザ) では固定色に戻る
-  - 色の役割は 4 つだけ。赤 = 要点・要対応 (表では読み手が先に判断・対応すべき行を <tr class="key"> にする。件数は決めないが、半数未満に絞る)、
-    緑 = 確認済み、琥珀 = 推測・未確認、灰 = 補足。色だけに頼らず、バッジの文字 (要対応 / 確認済み / 推測) でも読めるようにする
-  - 表は重要な行を上から並べる。先に対応すべき行に <span class="badge key">要対応</span> を付け、それ以外に赤を使わない
+  - 赤は要点 1 つだけ (タイトル横の結論の線と、図の class="key")。表や注意点には使わない
+  - 表は重要な行を上から並べ、先に対応すべき行だけ <tr class="key"> で太字にする (背景色は付けない)。確度は、推測の行だけ <span class="badge guess">推測</span> を付ける。付いていない行は確認済み
   - 相対 URL 禁止。100vh 禁止
 -->
 <title><!-- TODO: タイトル --></title>
@@ -21,7 +20,7 @@
 :root{
   --ag-ink:var(--foreground,#212529);--ag-muted:var(--muted-foreground,#64707C);
   --ag-line:var(--border,#DEE2E6);--ag-paper:var(--background,#FFFFFF);
-  --ag-dim:var(--muted,#F6F8FA);--ag-link:var(--primary,#2563EB);--ag-red:#DC2626;--ag-green:#15803D;--ag-amber:#B45309}
+  --ag-dim:var(--muted,#F6F8FA);--ag-link:var(--primary,#2563EB);--ag-red:#DC2626;--ag-amber:#B45309}
 *{box-sizing:border-box}
 body{background:var(--ag-paper);color:var(--ag-ink);font-family:'IBM Plex Sans JP','Hiragino Kaku Gothic ProN','Yu Gothic UI','Meiryo',sans-serif;font-size:15px;line-height:1.75;margin:0;padding:12px 20px 24px}
 main{max-width:1000px;margin:0 auto}
@@ -35,14 +34,11 @@ table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.6;margin:
 th,td{border-bottom:1px solid var(--ag-line);padding:6px 8px;text-align:left;vertical-align:top}
 th{font-size:12px;color:var(--ag-muted);font-weight:500;white-space:nowrap}
 td.no{width:2.5em;color:var(--ag-muted);font-family:'IBM Plex Mono',Consolas,monospace}
-.warn{border-left:3px solid var(--ag-red);padding:4px 12px;margin:6px 0}
-/* 色の役割: 赤 = 要点・要対応 / 緑 = 確認済み / 琥珀 = 推測・未確認 / 灰 = 補足。文字のバッジでも読めるようにする */
+.warn{border-left:3px solid var(--ag-muted);padding:4px 12px;margin:6px 0}
+/* 色: 赤 = 要点 1 つだけ / 琥珀 = 推測のバッジだけ / 他は灰。確認済みにはバッジを付けない */
 .badge{display:inline-block;font-size:12px;line-height:1.5;font-weight:700;padding:0 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
-.badge.ok{color:var(--ag-green)}
 .badge.guess{color:var(--ag-amber)}
-.badge.key{color:#fff;background:var(--ag-red);border-color:var(--ag-red)}
-tr.key td{background:rgba(220,38,38,.08);font-weight:700}
-tr.key td:first-child{border-left:3px solid var(--ag-red)}
+tr.key td{font-weight:700}
 ul{margin:6px 0;padding-left:1.4em}
 details{border:1px solid var(--ag-line);border-radius:8px;padding:8px 14px;margin:18px 0 6px}
 summary{cursor:pointer;color:var(--ag-link);font-size:13.5px}
@@ -68,10 +64,17 @@ svg .key text{fill:var(--ag-red);font-weight:700}
 </svg>
 
 <!-- 項目の表: 図に出した項目ごとに 1 行。何が・なぜ・どうするかと根拠を句で書く。列は中身に合わせて変えてよい。
-     重要な行を上に並べ、先に対応すべき行 (複数可、半数未満) だけ <tr class="key"> にして項目に <span class="badge key">要対応</span> を付ける。確度は <span class="badge ok">確認済み</span> / <span class="badge guess">推測</span> -->
+     重要な行を上に並べ、先に対応すべき行だけ <tr class="key"> で太字にする。確度は推測の行だけ <span class="badge guess">推測</span> を付ける (無ければ確認済み) -->
 <table>
 <tr><th>#</th><th>項目</th><th>中身・理由</th><th>どうするか</th><th>根拠</th><th>確度</th></tr>
-<tr><td class="no">①</td><td><!-- TODO --></td><td><!-- TODO --></td><td><!-- TODO --></td><td class="mono"><!-- TODO: file:line か実行結果 --></td><td><!-- TODO: <span class="badge ok">確認済み</span> (このセッションで実行・読んだ) か <span class="badge guess">推測</span> --></td></tr>
+<tr><td class="no">①</td><td><!-- TODO --></td><td><!-- TODO --></td><td><!-- TODO --></td><td class="mono"><!-- TODO: file:line か実行結果 --></td><td><!-- TODO: 推測の行だけ <span class="badge guess">推測</span>。確認済みは空欄 --></td></tr>
+</table>
+
+<!-- 要判断: 決めてもらう事項があるときだけ。1 問 1 行、通常 1〜3 件 (多くても 4 件)。推奨を先に書く。無ければ節ごと削る -->
+<h2>要判断</h2>
+<table>
+<tr><th>#</th><th>問い</th><th>推奨と理由</th><th>他案 (利点 / 代償)</th></tr>
+<tr><td class="no">A</td><td><!-- TODO --></td><td><!-- TODO: 案の名前 — 理由 --></td><td><!-- TODO: 案の名前 — 利点 / 代償 --></td></tr>
 </table>
 
 <!-- 注意点: 失敗したテスト・飛ばした作業・未確認のこと。無ければ節ごと削る -->
