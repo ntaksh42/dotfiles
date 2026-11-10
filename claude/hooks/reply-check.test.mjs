@@ -22,9 +22,9 @@ test('表は短くても止める', () => {
   assert.equal(decide({ last_assistant_message: '| a | b |\n|---|---|\n| 1 | 2 |' }, '').decision, 'block')
 })
 
-test('箇条書き 3 つで止める、2 つは通す', () => {
-  assert.equal(decide({ last_assistant_message: '- a\n- b\n- c' }, '').decision, 'block')
-  assert.equal(decide({ last_assistant_message: '- a\n- b' }, ''), undefined)
+test('箇条書き 6 つで止める、5 つは通す', () => {
+  assert.equal(decide({ last_assistant_message: '- a\n- b\n- c\n- d\n- e\n- f' }, '').decision, 'block')
+  assert.equal(decide({ last_assistant_message: '- a\n- b\n- c\n- d\n- e' }, ''), undefined)
 })
 
 test('コードブロックの中は数えない', () => {

@@ -1,6 +1,6 @@
 // Stop hook: 長い・構造のある返信を会話にそのまま出したら止めて、report-to-user のシートにまとめ直させる。
 // plugin や mod に依存しない単体スクリプト。~/.claude/settings.json の Stop に登録して使う（tools/Install-ReplyCheckHook.ps1）。
-// 判定は機械的な数え上げだけ: 空行を除いた行数 > 6、Markdown の表、箇条書き 3 つ以上のどれか。
+// 判定は機械的な数え上げだけ: 空行を除いた行数 > 6、Markdown の表、箇条書き 6 つ以上のどれか。
 // 止めるのは 1 ターンに 1 回（stop_hook_active のとき・このターンで skill を呼んだとき・シートを出したときは通す）。
 // 環境変数 REPLY_CHECK=off で無効にできる。失敗したときは何もしない（hook で作業を止めない）。
 import { readFileSync } from 'node:fs'
@@ -8,7 +8,7 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const MAX_LINES = 6
-const MAX_BULLETS = 2
+const MAX_BULLETS = 5
 const SKILL_NAME = 'report-to-user'
 
 export function measure(message) {

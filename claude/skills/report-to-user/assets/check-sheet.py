@@ -11,8 +11,8 @@
   - 論点 (#p1 …) と [判断] の数のズレ、5 件以上
   - [判断] に 推奨 / 根拠 の書き忘れ
   - 文字の多すぎ (本文の文章 600 字超、結論 120 字超)
-  - 報告シート: 図がある場合の要点の印 (class="key") の欠落、
-    文字の多すぎ (本文 600 字超、結論 80 字超、表のセル 60 字超)、畳みが本文より長い
+  - 報告シート: 図の欠落、図がある場合の要点の印 (class="key") の欠落、状態の語の欠落、
+    箇条書き 6 個以上、文字の多すぎ (本文 800 字超、結論 80 字超、表のセル 60 字超)、畳みが本文より長い
 
 終了コード 0 = 出してよい / 1 = 直してから出す。標準ライブラリのみ (python3.8+)。
 """
@@ -26,9 +26,10 @@ from pathlib import Path
 
 PROSE_LIMIT = 600
 CONCL_LIMIT = 120
-REPORT_PROSE_LIMIT = 600
+REPORT_PROSE_LIMIT = 800
 REPORT_CONCL_LIMIT = 80
 REPORT_CELL_LIMIT = 60
+REPORT_BULLET_LIMIT = 5
 
 
 def visible_len(fragment: str) -> int:
@@ -41,9 +42,12 @@ def prose_length(live: str):
     body = re.sub(r'<(svg|details|style)\b.*?</\1>', '', live, flags=re.DOTALL)
     parts = re.findall(r'<(h1|h2|p|figcaption|td|th|li)\b[^>]*>(.*?)</\1>', body, flags=re.DOTALL)
     concl = re.search(r'<div class=["\']concl["\'][^>]*>(.*?)</div>', body, flags=re.DOTALL)
-    concl_len = visible_len(concl.group(1)) if concl else 0
+    concl_html = concl.group(1) if concl else ''
+    concl_len = visible_len(concl_html)
+    # 結論の中の <p> は parts で数えているので、合計には足さない
+    concl_rest = visible_len(re.sub(r'<p\b.*?</p>', '', concl_html, flags=re.DOTALL))
     gl = sum(visible_len(t) for t in re.findall(r'<div class=["\']gl["\'][^>]*>(.*?)</div>', body, flags=re.DOTALL))
-    return sum(visible_len(t) for _, t in parts) + concl_len + gl, concl_len
+    return sum(visible_len(t) for _, t in parts) + concl_rest + gl, concl_len
 
 
 def check_sheet(html: str):
@@ -61,8 +65,17 @@ def check_sheet(html: str):
         warns.append('<!-- review-sheet-format: v5 --> が無い (どの規約で書いたシートかの目印)')
     total, concl = prose_length(live)
     if is_report:
-        if '<svg' in live and not re.search(r'class=["\'][^"\']*\bkey\b', live):
+        if '<svg' not in live:
+            warns.append('図が無い — 既定で 1 枚置く。省くのは内容に形 (前後・流れ・構成・量・状態の並び) が無いときだけ')
+        elif not re.search(r'class=["\'][^"\']*\bkey\b', live):
             warns.append('要点の印 (class="key") が無い — 図の中で要点の要素だけを赤くする')
+        verdict = re.search(r'<p class=["\']verdict["\'][^>]*>(.*?)</p>', live, flags=re.DOTALL)
+        if verdict:
+            state = re.search(r'<span class=["\']state["\'][^>]*>(.*?)</span>', verdict.group(1), flags=re.DOTALL)
+            state_len = visible_len(state.group(1)) if state else 0
+            if not state_len:
+                warns.append('状態の語が無い — 結論の先頭に 完了 / 要判断 n 件 / 問題あり / 未完了 のどれかを置く')
+            concl = visible_len(verdict.group(1)) - state_len
         if total > REPORT_PROSE_LIMIT:
             warns.append(f'本文の文章が {total} 字 (目安 {REPORT_PROSE_LIMIT} 字以内)。説明は図のラベルへ移すか、項目を絞る。判断や行動に要る項目は畳まない')
         folded = sum(visible_len(t) for t in re.findall(r'<details\b[^>]*>(.*?)</details>', live, flags=re.DOTALL))
@@ -71,7 +84,11 @@ def check_sheet(html: str):
         if concl > REPORT_CONCL_LIMIT:
             warns.append(f'結論が {concl} 字 (目安 {REPORT_CONCL_LIMIT} 字以内・1 文)')
         body = re.sub(r'<(svg|details)\b.*?</\1>', '', live, flags=re.DOTALL)
-        long_cells = [n for n in (visible_len(t) for t in re.findall(r'<td\b[^>]*>(.*?)</td>', body, flags=re.DOTALL)) if n > REPORT_CELL_LIMIT]
+        n_li = len(re.findall(r'<li\b', body))
+        if n_li > REPORT_BULLET_LIMIT:
+            warns.append(f'箇条書きが {n_li} 個 (上限 {REPORT_BULLET_LIMIT} 個)。それ以上は表にする')
+        cells = re.findall(r'<td\b[^>]*>(.*?)</td>', re.sub(r'<code class=["\']evidence-line["\'].*?</code>', '', body, flags=re.DOTALL), flags=re.DOTALL)
+        long_cells = [n for n in (visible_len(t) for t in cells) if n > REPORT_CELL_LIMIT]
         if long_cells:
             warns.append(f'表のセル {len(long_cells)} 個が {REPORT_CELL_LIMIT} 字超 (最長 {max(long_cells)} 字)。文でなく句で書く')
     if not is_report and total > PROSE_LIMIT:
