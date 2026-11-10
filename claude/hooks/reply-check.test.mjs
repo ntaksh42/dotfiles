@@ -14,8 +14,10 @@ test('短い返信は通す', () => {
   assert.equal(decide({ last_assistant_message: '結論です。\n続きです。' }, ''), undefined)
 })
 
-test('7 行以上は止める', () => {
+test('結論 + 6 行は止める、結論 + 5 行は通す', () => {
   assert.equal(decide({ last_assistant_message: long }, '').decision, 'block')
+  assert.equal(decide({ last_assistant_message: '結論\na\nb\nc\nd\ne\nf' }, '').decision, 'block')
+  assert.equal(decide({ last_assistant_message: '結論\na\nb\nc\nd\ne' }, ''), undefined)
 })
 
 test('表は短くても止める', () => {

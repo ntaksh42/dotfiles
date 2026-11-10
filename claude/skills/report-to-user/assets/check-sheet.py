@@ -11,8 +11,9 @@
   - 論点 (#p1 …) と [判断] の数のズレ、5 件以上
   - [判断] に 推奨 / 根拠 の書き忘れ
   - 文字の多すぎ (本文の文章 600 字超、結論 120 字超)
-  - 報告シート: 図の欠落、図がある場合の要点の印 (class="key") の欠落、状態の語の欠落、
-    箇条書き 6 個以上、文字の多すぎ (本文 800 字超、結論 80 字超、表のセル 60 字超)、畳みが本文より長い
+  - 報告シート: 図の欠落、図がある場合の要点の印 (class="key") の欠落、タイトルの状態の語の欠落・ずれ、
+    箇条書き 6 個以上、文字の多すぎ (本文 800 字超、結論 80 字超、表のセル 60 字超)、畳みが本文より長い、
+    表のセルの埋め草 (「特になし」「引き続き注視」など、することの無い対応案)
 
 終了コード 0 = 出してよい / 1 = 直してから出す。標準ライブラリのみ (python3.8+)。
 """
@@ -30,6 +31,8 @@ REPORT_PROSE_LIMIT = 800
 REPORT_CONCL_LIMIT = 80
 REPORT_CELL_LIMIT = 60
 REPORT_BULLET_LIMIT = 5
+STATE_WORDS = r'対応不要|要判断\s*\d+\s*件|要対応|未完了'
+FILLER = r'(特に)?(なし|無し|不要|対応不要|なし。|-|—|ー|－)|(引き続き|今後も)?(注視|様子見|監視|経過観察)(する)?|念のため(確認|見直し)(する)?|現状維持|そのまま'
 
 
 def visible_len(fragment: str) -> int:
@@ -69,20 +72,20 @@ def check_sheet(html: str):
             warns.append('図が無い — 既定で 1 枚置く。省くのは内容に形 (前後・流れ・構成・量・状態の並び) が無いときだけ')
         elif not re.search(r'class=["\'][^"\']*\bkey\b', live):
             warns.append('要点の印 (class="key") が無い — 図の中で要点の要素だけを赤くする')
-        verdict = re.search(r'<p class=["\']verdict["\'][^>]*>(.*?)</p>', live, flags=re.DOTALL)
-        if verdict:
-            state = re.search(r'<span class=["\']state["\'][^>]*>(.*?)</span>', verdict.group(1), flags=re.DOTALL)
-            state_len = visible_len(state.group(1)) if state else 0
-            if not state_len:
-                warns.append('状態の語が無い — 結論の先頭に 完了 / 要判断 n 件 / 問題あり / 未完了 のどれかを置く')
-            concl = visible_len(verdict.group(1)) - state_len
+        title = re.search(r'<h1\b[^>]*>(.*?)</h1>', live, flags=re.DOTALL)
+        if title:
+            state = re.search(r'<span class=["\']state["\'][^>]*>(.*?)</span>', title.group(1), flags=re.DOTALL)
+            state_text = htmllib.unescape(re.sub(r'<[^>]+>', '', state.group(1))).strip() if state else ''
+            if not re.fullmatch(STATE_WORDS, state_text):
+                warns.append(f'状態の語「{state_text}」が決まった語でない — タイトルの先頭に 対応不要 / 要判断 n 件 / 要対応 / 未完了 のどれかを置く')
+            concl = visible_len(title.group(1)) - visible_len(state_text)
         if total > REPORT_PROSE_LIMIT:
             warns.append(f'本文の文章が {total} 字 (目安 {REPORT_PROSE_LIMIT} 字以内)。説明は図のラベルへ移すか、項目を絞る。判断や行動に要る項目は畳まない')
         folded = sum(visible_len(t) for t in re.findall(r'<details\b[^>]*>(.*?)</details>', live, flags=re.DOTALL))
         if folded > total:
             warns.append(f'畳みの中 ({folded} 字) が本文 ({total} 字) より長い。読み手が判断や行動に使う項目が <details> に入っていないか見直す')
         if concl > REPORT_CONCL_LIMIT:
-            warns.append(f'結論が {concl} 字 (目安 {REPORT_CONCL_LIMIT} 字以内・1 文)')
+            warns.append(f'結論 (タイトル) が {concl} 字 (目安 {REPORT_CONCL_LIMIT} 字以内・1 文)')
         body = re.sub(r'<(svg|details)\b.*?</\1>', '', live, flags=re.DOTALL)
         n_li = len(re.findall(r'<li\b', body))
         if n_li > REPORT_BULLET_LIMIT:
@@ -91,6 +94,9 @@ def check_sheet(html: str):
         long_cells = [n for n in (visible_len(t) for t in cells) if n > REPORT_CELL_LIMIT]
         if long_cells:
             warns.append(f'表のセル {len(long_cells)} 個が {REPORT_CELL_LIMIT} 字超 (最長 {max(long_cells)} 字)。文でなく句で書く')
+        fillers = [t for t in (htmllib.unescape(re.sub(r'<[^>]+>', '', c)).strip() for c in cells) if re.fullmatch(FILLER, t)]
+        if fillers:
+            warns.append(f'することの無い埋め草が {len(fillers)} 個 (例「{fillers[0]}」)。対応案のセルは空にし、全行で空なら列ごと削る')
     if not is_report and total > PROSE_LIMIT:
         warns.append(f'本文の文章が {total} 字 (目安 {PROSE_LIMIT} 字以内)。絵で分かる説明から削り、判断外の決定は <details> へ')
     if not is_report and concl > CONCL_LIMIT:
@@ -146,7 +152,7 @@ def main() -> None:
         e2, w2 = check_comments(data, ids, points)
         errors += e2
         warns += w2
-    else:
+    elif '<!-- report-sheet -->' not in path.read_text(encoding='utf-8'):
         warns.append('--comments 未指定 ([判断] JSON の検査を飛ばした)')
 
     out = [f'  NG  {e}' for e in errors] + [f'  ??  {w}' for w in warns]
