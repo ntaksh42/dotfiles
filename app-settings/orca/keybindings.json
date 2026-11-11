@@ -20,6 +20,9 @@
       "terminal.splitRight": [
         "Alt+Shift+Plus"
       ],
+      "tab.newBrowser": [
+        "Mod+Alt+B"
+      ],
       "tab.newAgent.claude": [
         "Mod+Alt+C"
       ]
