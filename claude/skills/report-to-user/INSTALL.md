@@ -6,10 +6,11 @@ Claude Code / Codex共通のスキルです。短い報告は会話で、詳し�
 
 このリポジトリでは `claude/skills/report-to-user/` が管理元です。通常の配布はpush後の `Install-DevTools` で行います。単体導入はこのフォルダを利用するエージェントのskillsディレクトリへコピーします。配置後はエージェントを再起動してください。
 
-詳細レポートの生成にはPowerShell 7 (`pwsh`)、比較シートの機械検査にはPython 3を使います。パスはスキルの配置先から相対で解決するため、Claude / Codexのどちらにも配置できます。
+報告シートの生成と比較シートの機械検査にはPython 3、詳細レポートの生成にはPowerShell 7 (`pwsh`) を使います。パスはスキルの配置先から相対で解決するため、Claude / Codexのどちらにも配置できます。
 
 ## 使い方
 
+- 長くなる作業報告・相談: `scripts/new-sheet.py` で報告シートを作り、会話には結論とシートの場所だけを書く。
 - 「結果をHTMLにまとめて」: `output-config.toml` の保存先へ種別別・自動採番で保存。
 - 「作る前にUIの2案を見せて」: 比較シートに論点ごとの推奨を書いて見せ、答えを会話で受ける。
 - 短い完了報告: 行数・テスト件数だけでHTML化せず、会話で返す。
@@ -18,9 +19,10 @@ Claude Code / Codex共通のスキルです。短い報告は会話で、詳し�
 
 ## 構成と検証
 
-`SKILL.md` が入口、`references/` が用途別手順、`scripts/` と `templates/` が詳細レポート生成器、`assets/` が比較・簡易シートと検査器です。旧 `html-report` / `save-report` の機能を統合しています。既存スキルが併存していても同じ報告を重複生成しません。
+`SKILL.md` が入口、`references/` が用途別の手順です。報告シートは `scripts/new-sheet.py` (Python 3) が `templates/sheet.html` に流し込み、`assets/check-sheet.py` で検査します。詳細レポートは `scripts/New-HtmlReport.ps1` と `templates/base.html` で作ります。比較シートは `assets/sheet-template.html` を埋めて `assets/check-sheet.py` で検査します。
 
 ```powershell
+python -m unittest tests/test_new_sheet.py
 pwsh -NoProfile -File tests/Test-Parser.ps1
 pwsh -NoProfile -File tests/Test-Generator.ps1
 ```

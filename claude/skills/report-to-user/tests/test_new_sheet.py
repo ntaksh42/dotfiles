@@ -64,6 +64,40 @@ class NewSheetTest(unittest.TestCase):
             with self.assertRaises(ns.InputError, msg=src):
                 ns.build(src, 'R')
 
+    def test_rejects_bad_title(self):
+        for src in ('# 要対応 結論に区切りが無い', '# 要判断 n 件 | x', '# | 状態の語が無い'):
+            with self.assertRaises(ns.InputError, msg=src):
+                ns.build(src, 'R')
+
+    def test_rejects_bad_decision(self):
+        for src in ('# 要判断 1 件 | x\n## 要判断: q\n',
+                    '# 要判断 1 件 | x\n## 要判断: q\n推奨: a\n理由をここに書く\n'):
+            with self.assertRaises(ns.InputError, msg=src):
+                ns.build(src, 'R')
+
+    def test_rejects_bad_items(self):
+        for src in ('# 要対応 | x\n## 項目\n',
+                    '# 要対応 | x\n## 項目\n- 区切りの無い項目\n',
+                    '# 要対応 | x\n## 項目\n- a: b\n  メモ: c\n',
+                    '# 要対応 | x\n## 項目\n- a: b\n地の文\n'):
+            with self.assertRaises(ns.InputError, msg=src):
+                ns.build(src, 'R')
+
+    def test_long_title_is_ng(self):
+        page = ns.build('# 対応不要 | ' + 'あ' * 81 + '\n', 'R')
+        errors, _, _, _ = checker.check_sheet(page)
+        self.assertTrue(any('結論' in e for e in errors), errors)
+
+    def test_six_bullets_is_ng(self):
+        page = ns.build('# 対応不要 | x\n' + ''.join(f'- 点{i}\n' for i in range(6)), 'R')
+        errors, _, _, _ = checker.check_sheet(page)
+        self.assertTrue(any('箇条書き' in e for e in errors), errors)
+
+    def test_five_bullets_and_80_chars_pass(self):
+        src = '# 対応不要 | ' + 'あ' * 80 + '\n' + ''.join(f'- 点{i}\n' for i in range(5))
+        errors, _, _, _ = checker.check_sheet(ns.build(src, 'R'))
+        self.assertEqual(errors, [])
+
 
 if __name__ == '__main__':
     unittest.main()
