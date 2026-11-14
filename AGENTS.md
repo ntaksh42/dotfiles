@@ -25,7 +25,7 @@ tools/               汎用PowerShellユーティリティ
 ### skills・hooks の仕組み
 
 - Mod だけが `claude/mods/dotfiles` plugin。導入は `Install-DevTools` が行う。GitHub の main の ZIP を展開したフォルダをマーケットプレイスとして登録し、`claude plugin install` する。手元のクローンは使わないので、変更は push してから導入する
-- スキルは `claude/skills/<name>/SKILL.md`。plugin ではないのでスキル名に接頭辞は付かない。`tools/Install-DotfilesSkills.ps1` が `~/.claude/skills/` へ写す（Install-DevTools の 'dotfiles skills'。更新判定は report-to-user の SKILL.md だけを見る）
+- スキルは `claude/skills/<name>/SKILL.md`。plugin ではないのでスキル名に接頭辞は付かない。`tools/Install-DotfilesSkills.ps1` が `~/.claude/skills/` へ写す（Install-DevTools の 'dotfiles skills'。配置した `claude/skills` の Git ツリー SHA を `~/.claude/skills/.dotfiles-skills-tree` に記録し、GitHub の main と比べて更新を判定する）
 - hook は `claude/hooks/` に置き、スクリプトを `~/.claude/hooks/` へ写して `~/.claude/settings.json` に登録する（`tools/Install-ReplyCheckHook.ps1`、`tools/Install-LiteHooks.ps1`）
 - Mod（TypeScript の hooks module）は `hooks/<mod>/register.ts(x)` に置き、`hooks/register.ts` から呼ぶ。エンジンは同じイベントの matcher 無しフックを plugin につき 1 つしか許さないので、イベントが重なる Mod は `hooks/register.ts` でネストして束ねる
 - 組織の管理設定（`allowManagedModsOnly` 等）で mod が拒否される環境向けに、mod を使わない代替を同じ plugin に置く: toast-notify と auto-session-title は `claude/hooks/lite-hook.mjs`（settings hook）、ado-pr-status は ccstatusline が呼ぶ `statusline/pr-line.mjs` の自己更新。mod が動くセッションでは mod が環境変数 `DOTFILES_MOD_TOAST` / `DOTFILES_MOD_TITLE` を設定し、`lite-hook.mjs` はそれを見て何もしない（二重通知を避ける）。通知の送信は plugin の `scripts/toast-send.ps1` を mod と共有する（`Install-LiteHooks.ps1` が `~/.claude/hooks/` へ写す）

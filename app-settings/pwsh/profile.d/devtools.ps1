@@ -121,6 +121,27 @@ function Test-DevToolRemoteFilesUpToDate {
     return $upToDate
 }
 
+# 配置時の記録（$Tool.Path の 1 行目）が GitHub の main にある $Tool.RemoteTree の Git ツリー SHA と同じか確認する。
+# フォルダ内のどのファイルが変わっても SHA が変わるので、API を 1 回呼ぶだけでフォルダ全体を比べられる。取得できなければ $null。
+function Test-DevToolRemoteTreeUpToDate {
+    param([Parameter(Mandatory)]$Tool)
+    if ($script:DotfilesRawBase -notmatch '^https://raw\.githubusercontent\.com/([^/]+/[^/]+)/([^/]+)$') { return $null }
+    $repo, $ref = $Matches[1], $Matches[2]
+    $parent = ($Tool.RemoteTree -replace '/?[^/]+$', '')
+    $leaf = ($Tool.RemoteTree -split '/')[-1]
+    try {
+        $entries = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/contents/$($parent)?ref=$ref" `
+            -Headers @{ 'User-Agent' = 'dotfiles-install-devtools' }
+    }
+    catch { return $null }
+    $sha = @(@($entries) | Where-Object { $_.name -eq $leaf -and $_.type -eq 'dir' })[0].sha
+    if (-not $sha) { return $null }
+    if (-not (Test-Path -LiteralPath $Tool.Path -PathType Leaf)) { return $false }
+    $recorded = Get-Content -LiteralPath $Tool.Path -TotalCount 1
+    if (-not $recorded) { return $false }
+    return $recorded.Trim() -eq $sha
+}
+
 # 導入済み plugin の版が GitHub の main にある plugin.json と同じか確認する。読めなければ $null。
 # 手元の写し（ZIP の展開先やクローン）は古いことがあるので、比べる相手にしない。
 function Test-DevToolPluginUpToDate {
@@ -523,6 +544,14 @@ function Install-DevTools {
                 $upToDate = Test-DevToolRemoteFilesUpToDate $tool
                 if ($null -eq $upToDate) {
                     Write-Warning "$($tool.Name): remote files could not be checked; skipping update."
+                    continue
+                }
+                if ($upToDate) { continue }
+            }
+            elseif ($tool.RemoteTree) {
+                $upToDate = Test-DevToolRemoteTreeUpToDate $tool
+                if ($null -eq $upToDate) {
+                    Write-Warning "$($tool.Name): remote tree could not be checked; skipping update."
                     continue
                 }
                 if ($upToDate) { continue }

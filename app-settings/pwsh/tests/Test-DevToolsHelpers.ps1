@@ -53,7 +53,7 @@ try {
         'pip'           = 'Id', 'Cmd'
         'npm'           = 'Id', 'Cmd', 'RequiredCommand'
         'psmodule'      = 'Id'
-        'script'        = 'Id', 'Path', 'Args', 'RebootRequiredExitCode', 'RequiredCommand', 'Repo', 'VersionSource', 'InstallOnly', 'RemoteFiles', 'AppxName', 'ProcessName'
+        'script'        = 'Id', 'Path', 'Args', 'RebootRequiredExitCode', 'RequiredCommand', 'Repo', 'VersionSource', 'InstallOnly', 'RemoteFiles', 'RemoteTree', 'AppxName', 'ProcessName'
         'remote-config' = 'RepoPath', 'Dest', 'StripCommentLines'
         'claude-plugin' = 'Id', 'Marketplace', 'MarketplaceSource', 'RequiredCommand', 'Replaces'
     }
@@ -617,6 +617,49 @@ try {
     Test-Case 'Remote files up to date: null (not false) when a later download fails after an earlier mismatch' {
         $t = New-RemoteFilesFixture @{ 'a.ps1' = 'old'; 'b.ps1' = 'B' } @{ 'a.ps1' = 'new' }
         $null -eq (Test-DevToolRemoteFilesUpToDate $t)
+    }
+
+    # =====================================================================================
+    # Test-DevToolRemoteTreeUpToDate
+    # =====================================================================================
+    function New-RemoteTreeFixture {
+        param([AllowNull()][object]$Local, [string]$RemoteSha = 'abc123')
+        Reset-Fakes
+        $dir = New-Scratch
+        $marker = Join-Path $dir '.tree'
+        if ($null -ne $Local) { [IO.File]::WriteAllText($marker, $Local, [Text.UTF8Encoding]::new($false)) }
+        $script:restResult = @(
+            [pscustomobject]@{ name = 'hooks'; type = 'dir'; sha = 'zzz' },
+            [pscustomobject]@{ name = 'skills'; type = 'dir'; sha = $RemoteSha })
+        @{ Name = 'rt'; Path = $marker; RemoteTree = 'claude/skills' }
+    }
+    Test-Case 'Remote tree up to date: true when the recorded SHA matches main' {
+        $t = New-RemoteTreeFixture "abc123`r`n"
+        (Test-DevToolRemoteTreeUpToDate $t) -eq $true
+    }
+    Test-Case 'Remote tree up to date: asks the contents API for the parent folder on the profile ref' {
+        $t = New-RemoteTreeFixture 'abc123'
+        $null = Test-DevToolRemoteTreeUpToDate $t
+        $script:DotfilesRawBase -match '^https://raw\.githubusercontent\.com/([^/]+/[^/]+)/([^/]+)$' | Out-Null
+        $script:restCalls.Count -eq 1 -and $script:restCalls[0].Uri -ceq "https://api.github.com/repos/$($Matches[1])/contents/claude?ref=$($Matches[2])"
+    }
+    Test-Case 'Remote tree up to date: false when the SHA differs' {
+        $t = New-RemoteTreeFixture 'old'
+        (Test-DevToolRemoteTreeUpToDate $t) -eq $false
+    }
+    Test-Case 'Remote tree up to date: false when nothing is recorded' {
+        $t = New-RemoteTreeFixture $null
+        (Test-DevToolRemoteTreeUpToDate $t) -eq $false
+    }
+    Test-Case 'Remote tree up to date: null when the API fails' {
+        $t = New-RemoteTreeFixture 'abc123'
+        $script:restThrow = $true
+        $null -eq (Test-DevToolRemoteTreeUpToDate $t)
+    }
+    Test-Case 'Remote tree up to date: null when the folder is missing on main' {
+        $t = New-RemoteTreeFixture 'abc123'
+        $script:restResult = @([pscustomobject]@{ name = 'hooks'; type = 'dir'; sha = 'zzz' })
+        $null -eq (Test-DevToolRemoteTreeUpToDate $t)
     }
 
     # =====================================================================================
