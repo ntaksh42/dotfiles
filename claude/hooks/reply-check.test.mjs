@@ -20,6 +20,12 @@ test('結論 + 6 行は止める、結論 + 5 行は通す', () => {
   assert.equal(decide({ last_assistant_message: '結論\na\nb\nc\nd\ne' }, ''), undefined)
 })
 
+test('空白を除いて 300 字を超えたら止める、300 字は通す', () => {
+  assert.equal(decide({ last_assistant_message: 'あ'.repeat(301) }, '').decision, 'block')
+  assert.equal(decide({ last_assistant_message: `- ${'あ'.repeat(150)}\n- ${'い'.repeat(148)}` }, ''), undefined)
+  assert.equal(measure('a b\n\n```\n' + 'x'.repeat(400) + '\n```').chars, 2)
+})
+
 test('表は短くても止める', () => {
   assert.equal(decide({ last_assistant_message: '| a | b |\n|---|---|\n| 1 | 2 |' }, '').decision, 'block')
 })

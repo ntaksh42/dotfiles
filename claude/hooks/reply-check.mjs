@@ -1,6 +1,7 @@
 // Stop hook: 長い・構造のある返信を会話にそのまま出したら止めて、report-to-user のシートにまとめ直させる。
 // plugin や mod に依存しない単体スクリプト。~/.claude/settings.json の Stop に登録して使う（tools/Install-ReplyCheckHook.ps1）。
-// 判定は機械的な数え上げだけ: 空行を除いた行数から結論の 1 行目を除いて > 5、Markdown の表、箇条書き 6 つ以上のどれか。
+// 判定は機械的な数え上げだけ: 空行を除いた行数から結論の 1 行目を除いて > 5、空白を除いた字数 > 300、Markdown の表、箇条書き 6 つ以上のどれか。
+// 行数だけだと、1 行に詰め込んだ長い箇条書きをすり抜けるので字数も見る。
 // 止めるのは 1 ターンに 1 回（stop_hook_active のとき・このターンで skill を呼んだとき・シートを出したときは通す）。
 // 環境変数 REPLY_CHECK=off で無効にできる。失敗したときは何もしない（hook で作業を止めない）。
 import { readFileSync } from 'node:fs'
@@ -9,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 
 const MAX_LINES = 5
 const MAX_BULLETS = 5
+const MAX_CHARS = 300
 const SKILL_NAME = 'report-to-user'
 
 export function measure(message) {
@@ -16,13 +18,15 @@ export function measure(message) {
   const lines = text.split('\n').filter(l => l.trim() !== '')
   const table = lines.some(l => /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/.test(l) && l.includes('|'))
   const bullets = lines.filter(l => /^\s*([-*•]|\d+[.)])\s+\S/.test(l)).length
-  return { lines: lines.length, table, bullets }
+  const chars = text.replace(/\s/g, '').length
+  return { lines: lines.length, chars, table, bullets }
 }
 
 export function violations(message) {
-  const { lines, table, bullets } = measure(message)
+  const { lines, chars, table, bullets } = measure(message)
   const out = []
   if (lines - 1 > MAX_LINES) out.push(`${lines} 行 (上限: 結論の 1 行 + ${MAX_LINES} 行)`)
+  if (chars > MAX_CHARS) out.push(`${chars} 字 (上限 ${MAX_CHARS} 字)`)
   if (table) out.push('Markdown の表')
   if (bullets > MAX_BULLETS) out.push(`箇条書き ${bullets} 個 (上限 ${MAX_BULLETS} 個)`)
   return out
