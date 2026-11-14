@@ -50,6 +50,9 @@ $script:DevTools = @(
     @{ Name = 'Orca keybindings.json'; Backend = 'remote-config'; RepoPath = 'app-settings/orca/keybindings.json'; Dest = (Join-Path $env:USERPROFILE '.orca\keybindings.json') }
     # Everything は終了時に Filters.csv を上書き保存するため、反映前に終了させておくこと。
     @{ Name = 'Everything Filters.csv'; Backend = 'remote-config'; RepoPath = 'app-settings/everything/Filters.csv'; Dest = (Join-Path $env:APPDATA 'Everything\Filters.csv') }
+    # Claude Code と Codex の共通ルール。同じ管理元を両方へ配る。
+    @{ Name = 'Claude CLAUDE.md'; Backend = 'remote-config'; RepoPath = 'claude/CLAUDE.global.md'; Dest = (Join-Path $env:USERPROFILE '.claude\CLAUDE.md') }
+    @{ Name = 'Codex AGENTS.md'; Backend = 'remote-config'; RepoPath = 'claude/CLAUDE.global.md'; Dest = (Join-Path $(if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE '.codex' }) 'AGENTS.md') }
     @{ Name = 'dotfiles (mod)'; Backend = 'claude-plugin'; Id = 'dotfiles@dotfiles-mods'; Marketplace = 'dotfiles-mods'; MarketplaceSource = 'ntaksh42/dotfiles'; RequiredCommand = 'claude'; Replaces = @('auto-session-title@dotfiles-mods', 'ado-pr-status@dotfiles-mods', 'ado-link-bar@dotfiles-mods', 'toast-notify@dotfiles-mods') }
     # 返信チェックの Stop hook。plugin に依存せず ~/.claude/settings.json に登録する（会社で plugin が制限されても動くように）。
     # 導入済み判定は hook ファイルの有無、更新は RemoteFiles（GitHub の main の hook との比較）で行う。
