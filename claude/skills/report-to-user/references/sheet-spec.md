@@ -1,9 +1,9 @@
-# シートの規約 v5 — 比較シートの書き方
+# シートの規約 v6 — 比較シートの書き方
 
-> `v5` は**比較シートの体裁**の版で、シート冒頭の `<!-- review-sheet-format: v5 -->` と対になる。
-> v4 からの変更: 本文幅を 760px から 1200px に広げ、A/B の絵を大きく並べる。文字を減らすため、短い説明の節・用語欄・対比表・フッタを既定から外し、文章の量に上限を設けた。
+> `v6` は**比較シートの体裁**の版で、シート冒頭の `<!-- review-sheet-format: v6 -->` と対になる。
+> v5 からの変更: 推奨を会話の [判断] からシートの各論点の下 (`.pick`) へ移した。会話には結論 1 文とシートの場所だけを書く。
 
-比較シート (UI の配置・レイアウト・画面遷移など、見た目で比べる論点) の HTML は、必ずこの規約で書く。シートはブラウザで開いて見せ、人は会話で [判断] に答える。
+比較シート (UI の配置・レイアウト・画面遷移など、見た目で比べる論点) の HTML は、必ずこの規約で書く。シートはブラウザで開いて見せ、人は論点の番号を添えて会話で答える。
 `assets/sheet-template.html` はこの規約を実装した雛形なので、雛形を埋めるだけなら本文の「骨格」と「論点の印」の節だけ読めば足りる。
 雛形を改造する、または雛形を使わず自分で書くときは、末尾の CSS スケルトンを起点にする。
 
@@ -17,7 +17,7 @@
 | **骨格は固定** | 上から順に置く 7 の部品 | **毎回** |
 | 結論ファースト | 冒頭 3 点セットと禁止事項 | 毎回 |
 | 絵の規律 | スクショ・A/B 対比・overlay 注記の描き方 | 絵を描く時 |
-| **論点の印** | `#p1` … の要素と [判断] の対応 | **毎回** |
+| **論点の印** | `#p1` … の要素と推奨の行 | **毎回** |
 | 文章の規律 | 文字数の上限・段落・畳みの規則 | 毎回 |
 | 見た目の規約 | 7 色トークン・書体・幅 (雛形が実装済み) | 雛形を改造する時 |
 | CSS スケルトン | 雛形を使わず自分で書く時の起点 | 雛形を使わない時 |
@@ -37,35 +37,35 @@
 3. **結論ボックス** — 「結論:」で始まる 2 文以内・120 字以内
 4. **モックボタン** (動的論点がある時だけ) — `./review/mock/` に置いたモックへの `file://` リンク
 5. **全体図** — インライン SVG 1 枚。現物スクショや再現モックを兼ねてよい。論点の場所に赤の ①②③ を打つ。論点 3 つ以上なら必須
-6. **論点** (`.pt#p1`, `#p2`, …) — 3±1 個。各論点の選択肢 A / B の絵。書き方は下の「論点の印」
+6. **論点** (`.pt#p1`, `#p2`, …) — 3±1 個。各論点の選択肢 A / B の絵と推奨の行。書き方は下の「論点の印」
 7. **畳み付録** (`<details>`, 任意) — 判断から外した決定事項・落とした案・実測ログ
 
 用語欄 (`.gl`) と対比表は既定で置かない。説明なしに読めない語が残るときだけ用語欄を 3 語以内で、見た目の無い論点 (方針・優先度) にだけ対比表を使う。
 
-**シートに問い文・選択肢の一覧・推奨を書かない。** それは会話で聞く [判断] の役目で、シートにも書くと人は同じ問いを 2 か所で読むことになる。v3 で「問いをシートの先頭に置く」が人の採点で否定されたのと同じ理由で、問いを記憶したまま説明を読ませる形も避ける。
+**推奨は各論点の絵の直後に 1 行で書き、会話には書かない。** 問いと推奨が会話とシートの 2 か所に出ると、人は同じ問いを 2 回読むことになる。v3 で「問いをシートの先頭に置く」が人の採点で否定されたので、問いや推奨をシートの冒頭にまとめない。絵を見た直後に、その論点の推奨を読む位置に置く。
 
 ## 結論ファースト
 
 冒頭は 3 点セット。キッカー → 主張のタイトル → 結論ボックス。結論は 2 文以内・120 字以内。
 
-冒頭に大きな数字を並べる飾り (stat カードの列) は禁止。判断に要る数値は [判断] の文面に再掲する。
+冒頭に大きな数字を並べる飾り (stat カードの列) は禁止。判断に要る数値は推奨の行に再掲する。
 
 ## 絵の規律
 
 - **現物と乖離したモックを描かない。** 既存画面に加えるなら、スクショ埋め込みか DOM 再現で現行 UI を忠実に再現する
 - **変更 = 赤系、現状 = 無彩色。** 再現モックの上に赤で差分を描く
 - **①②③ の番号注記はスクショの上に赤の overlay で乗せる** (`.shotwrap` 部品)。画像の外の段落に赤文字を書いて画像内の黒いバッジと対応させる形にしない。視線が往復して絵が頭に残らず、大きな画像の中の小さな黒点は視覚ガイドとして機能しない。丸ラベル (`.lbl`) が本文や数字に被るシートでは、ラベルを外して図キャプション側に赤の ①②③ で説明を書く
-- **選択肢の対立軸は両方絵にする。** A と B の見た目の違いを `.ab` 部品で並べ、差分に赤丸を打つ。推奨案の挿絵だけ並べて選択肢を [判断] の文字 1 行にすると、人は想像で補えずお任せに倒れる。方針・優先度など見た目の無い論点は、絵の代わりに対比表でよい
+- **選択肢の対立軸は両方絵にする。** A と B の見た目の違いを `.ab` 部品で並べ、差分に赤丸を打つ。推奨案の挿絵だけ並べて他の選択肢を文字 1 行にすると、人は想像で補えずお任せに倒れる。方針・優先度など見た目の無い論点は、絵の代わりに対比表でよい
 - キャプションは 1 行 (40 字以内) の句にする。絵を見れば分かることを文で言い直さない。図はインライン SVG を第一候補にする
 - 再往復の 2 枚目以降は、前のシートで撤回した案を取り消し線で残す (何を捨てたかも情報)
 
-## 論点の印 — `#p1` と [判断] の対応
+## 論点の印 — `#p1` と推奨の行
 
 - 1 論点 = 1 つの `<section class="pt" id="pN">`。`N` は 1 から振り、全体図の赤 ①②③ と番号を揃える
-- 中身は見出し 1 行 (何の違いを見るか。問いの形にしない) + 選択肢 A / B の絵 (`.ab`) + 各絵に 1 行のキャプション。キャプションの頭には [判断] と同じ案の名前を書く (「A」「B」の記号にしない)。段落は足さない
-- [判断] の JSON では `selector: "#pN"` でこの要素を指し、会話の問いの頭には同じ番号と論点の名前 (「①ボタンの位置」) を付ける。人は番号を頼りに、問いと絵を突き合わせる
+- 中身は見出し 1 行 (何の違いを見るか。問いの形にしない) + 選択肢 A / B の絵 (`.ab`) + 各絵に 1 行のキャプション。キャプションの頭には推奨の行と同じ案の名前を書く (「A」「B」の記号にしない)。段落は足さない
+- 絵の下に `<p class="pick"><b>推奨</b><span>案の名前 — 理由と根拠</span></p>` を置く。他案に利点があるときだけ `<p class="pick alt"><b>他案</b><span>案の名前 — 利点 / 代償</span></p>` を足す。利点のある他案が無いなら実質 1 択なので論点にしない。人は番号を添えて会話で答える
 - id は `#pN` 形式の固定文字列にする。クラスや構造に依存した selector は、シートを直すとずれる
-- `check-sheet.py --comments` が、selector がシートに存在するか、論点に [判断] が刺さっているかを検査する
+- `check-sheet.py` が、各論点に推奨の行があるかを検査する
 
 ## 文章の規律
 
@@ -86,7 +86,7 @@
   - 残りは無彩色
 - **本文幅 1200px (画面が狭ければ全幅)、基本文字 15px。** A/B は 900px 未満で縦積み。見出しは h1 25px / h2 19px。高さは内容なり。縦に間延びする空 div や min-height の水増しを置かない
 - **self-contained 必須。** 相対 URL 禁止。画像は data URI か https 絶対 URL。外部 JS を読み込まない。モックへの `file://` リンクは「シートの外へ出る導線」なので合法。モックボタン `.btn` の `href` はシートと同じディレクトリを起点にした `file://` 絶対 URL
-- 冒頭コメント `<!-- review-sheet-format: v5 -->` を残す (どの規約で書いたシートかの目印)
+- 冒頭コメント `<!-- review-sheet-format: v6 -->` を残す (どの規約で書いたシートかの目印)
 
 ## CSS スケルトン (最小テンプレ) — ここから書き始める
 
@@ -94,7 +94,7 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- review-sheet-format: v5 -->
+<!-- review-sheet-format: v6 -->
 <title>{タイトル}</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
@@ -118,7 +118,11 @@ th{font-size:11.5px;letter-spacing:.06em;color:var(--muted);font-weight:500;whit
 td.n{font-family:'IBM Plex Mono',Menlo,monospace;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
 details{border:1px solid var(--line);border-radius:10px;padding:10px 16px;margin:10px 0}
 summary{cursor:pointer;color:var(--accent);font-weight:500;font-size:13.5px}
-/* 論点 ([判断] が指す場所) */
+/* 論点 (人が決める場所) */
+.pick{display:grid;grid-template-columns:3.4em 1fr;gap:8px;margin:10px 0 0;font-size:14px}
+.pick>b{font-size:11.5px;text-align:center;border-radius:4px;height:20px;line-height:20px;margin-top:3px;background:var(--red);color:#fff}
+.pick.alt>b{background:none;color:var(--muted);border:1px solid var(--line);line-height:18px}
+.pick.alt{color:var(--muted);margin-top:2px}
 .pt{border-left:3px solid var(--red);padding-left:14px;margin:18px 0}
 .pt .no{font-family:'IBM Plex Mono',Menlo,monospace;font-weight:600;color:var(--red);margin-right:6px}
 /* overlay 注記 (赤を画像の上に乗せる部品 — 座標は画像に対する %) */
@@ -138,7 +142,8 @@ summary{cursor:pointer;color:var(--accent);font-weight:500;font-size:13.5px}
 <div class="concl"><b>結論:</b> {2 文以内・120 字以内}</div>
 <figure>{全体図 — インライン SVG で題材の全体像 + 論点の場所に赤の ①②③}<figcaption>{1 行}</figcaption></figure>
 <section class="pt" id="p1"><h2><span class="no">①</span>{何の違いを見るか}</h2>
-<div class="ab"><figure>{A の絵}<figcaption>{案の名前} — {1 行}</figcaption></figure><figure>{B の絵}<figcaption>{案の名前} — {1 行}</figcaption></figure></div></section>
+<div class="ab"><figure>{A の絵}<figcaption>{案の名前} — {1 行}</figcaption></figure><figure>{B の絵}<figcaption>{案の名前} — {1 行}</figcaption></figure></div>
+<p class="pick"><b>推奨</b><span>{案の名前} — {理由と根拠}</span></p></section>
 <details><summary>{中身と分量を予告する見出し}</summary><p class="m">{判断から外した決定・落とした案・実測ログ}</p></details>
 </main></body></html>
 ```
@@ -153,7 +158,8 @@ summary{cursor:pointer;color:var(--accent);font-weight:500;font-size:13.5px}
 | `.red` | 本文中の赤い注記 |
 | `.m` | 補足の小さい文字 (畳みの中身など) |
 | `.mono` / `td.n` | 数値・パス・時刻の等幅 |
-| `.pt#pN` / `.no` | 論点 ([判断] が指す場所) / 見出しの赤い番号 |
+| `.pt#pN` / `.no` | 論点 (人が決める場所) / 見出しの赤い番号 |
+| `.pick` / `.pick.alt` | 論点の下の推奨の行 / 他案の行 |
 | `.shotwrap` / `.mark` / `.lbl` | スクショの上に乗せる赤丸 ①②③ / 赤い帯ラベル。位置は `style="left:NN%;top:NN%"` |
 | `.ab` | A / B の絵を横に並べる格子 (900px 未満で縦積み) |
 | `details` / `summary` | 畳み付録 (印刷時は開いた中身だけ残る) |

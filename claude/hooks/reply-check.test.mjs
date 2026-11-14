@@ -56,6 +56,12 @@ test('HTML のシートを書いたターンは、skill を呼び直さなくて
   assert.equal(decide({ last_assistant_message: long }, transcript), undefined)
 })
 
+test('生成器 (new-sheet.py) でシートを作ったターンは通す', () => {
+  const run = JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', name: 'Bash', input: { command: 'python "x/scripts/new-sheet.py" - --name a' } }] } })
+  const transcript = [user('調べて'), run].join('\n')
+  assert.equal(decide({ last_assistant_message: long }, transcript), undefined)
+})
+
 test('前のターンで呼んだだけなら止める', () => {
   const transcript = [user('前の依頼'), skillCall('report-to-user'), user('次の依頼')].join('\n')
   assert.equal(calledSkillThisTurn(transcript.split('\n')), false)

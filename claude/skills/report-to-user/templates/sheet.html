@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- report-sheet -->
+<!-- scripts/new-sheet.py が {{...}} を埋めて出力する。手で埋めない。色は Orca のテーマ変数を優先し、無い環境では固定色に戻る -->
+<title>{{TAB_TITLE}}</title>
+<style>
+:root{
+  --ag-ink:var(--foreground,#212529);--ag-muted:var(--muted-foreground,#64707C);
+  --ag-line:var(--border,#DEE2E6);--ag-paper:var(--background,#FFFFFF);
+  --ag-dim:var(--muted,#F6F8FA);--ag-link:var(--primary,#2563EB);
+  --ag-red:#DC2626;--ag-red-bg:rgba(220,38,38,.12);
+  --ag-amber:#B45309;--ag-amber-dot:#D97706;--ag-amber-bg:rgba(217,119,6,.10)}
+@media (prefers-color-scheme:dark){:root{--ag-ink:var(--foreground,#E6E8EB);--ag-muted:var(--muted-foreground,#9AA4AE);--ag-line:var(--border,#343A40);--ag-paper:var(--background,#16181B);--ag-dim:var(--muted,#22262A);--ag-link:var(--primary,#6EA0FF);--ag-red:#F87171;--ag-amber:#FBBF24}}
+*{box-sizing:border-box}
+body{background:var(--ag-paper);color:var(--ag-ink);font-family:'IBM Plex Sans JP','Hiragino Kaku Gothic ProN','Yu Gothic UI','Meiryo',sans-serif;font-size:15px;line-height:1.75;margin:0;padding:12px 20px 28px}
+main{max-width:1000px;margin:0 auto}
+a{color:var(--ag-link)}
+code{font-family:'IBM Plex Mono',Consolas,Menlo,monospace;font-size:.9em}
+.meta{font-family:'IBM Plex Mono',Consolas,monospace;font-size:11.5px;color:var(--ag-muted);letter-spacing:.04em}
+h1{font-size:22px;line-height:1.45;margin:4px 0 10px}
+.state{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;padding:1px 11px;border-radius:999px;margin-right:10px;vertical-align:3px;white-space:nowrap;background:var(--ag-dim);color:var(--ag-muted)}
+.state::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.state.ask{background:var(--ag-amber-bg);color:var(--ag-amber)}
+.state.act{background:var(--ag-red-bg);color:var(--ag-red)}
+.sub{margin:0 0 8px;color:var(--ag-ink)}
+.next{display:flex;gap:12px;align-items:baseline;background:var(--ag-dim);border-radius:6px;padding:8px 14px;font-size:14px}
+.next b{font-size:12px;color:var(--ag-muted);white-space:nowrap}
+.points{margin:12px 0 0;padding-left:1.4em;font-size:14.5px}
+.points li{margin:2px 0}
+h2{font-size:12px;color:var(--ag-muted);font-weight:700;letter-spacing:.08em;margin:22px 0 6px}
+svg{display:block;margin:14px 0 4px;max-width:100%;height:auto}
+svg text{fill:var(--ag-ink);font-size:14px}
+svg .sub{fill:var(--ag-muted);font-size:12px}
+svg rect,svg line,svg path,svg circle{stroke:var(--ag-muted);fill:none;stroke-width:1.5}
+svg .key rect,svg .key line,svg .key path,svg .key circle{stroke:var(--ag-red);stroke-width:3}
+svg .key text{fill:var(--ag-red);font-weight:700}
+.decision{border:1.5px solid var(--ag-amber-dot);background:var(--ag-amber-bg);border-radius:8px;padding:10px 14px;margin:16px 0 8px}
+.decision h3{font-size:15px;margin:0 0 6px}
+.choice{display:grid;grid-template-columns:3.4em 1fr;gap:8px;margin:3px 0;font-size:14px}
+.choice>b{font-size:11.5px;text-align:center;border-radius:4px;height:20px;line-height:18px;margin-top:2px;border:1px solid var(--ag-amber-dot)}
+.choice.rec>b{background:var(--ag-amber-dot);color:#fff}
+.choice.alt>b{color:var(--ag-amber)}
+.choice p{margin:0}
+table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.6;margin:16px 0 4px}
+th,td{padding:7px 8px;text-align:left;vertical-align:top;border-bottom:1px solid var(--ag-line);overflow-wrap:anywhere}
+thead th{font-size:11.5px;color:var(--ag-muted);font-weight:600;letter-spacing:.06em;border-bottom:1.5px solid var(--ag-ink)}
+tbody th{font-weight:700}
+td p{margin:0}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:0 7px;border-radius:4px;margin-bottom:2px;background:var(--ag-dim);color:var(--ag-muted)}
+.tag.priority{background:var(--ag-red-bg);color:var(--ag-red)}
+.tag.guess{background:var(--ag-amber-bg);color:var(--ag-amber)}
+.evidence-line{display:block;font-family:'IBM Plex Mono',Consolas,monospace;font-size:12px;color:var(--ag-muted);margin-top:3px}
+.warn{border-left:3px solid var(--ag-muted);padding:2px 12px;margin:4px 0;font-size:14px}
+.warn ul{margin:0;padding-left:1.2em}
+details{border:1px solid var(--ag-line);border-radius:8px;padding:8px 14px;margin:20px 0 6px}
+summary{cursor:pointer;color:var(--ag-link);font-size:13.5px}
+details pre{white-space:pre-wrap;font-family:'IBM Plex Mono',Consolas,monospace;font-size:12.5px;color:var(--ag-muted);margin:8px 0 0}
+</style></head>
+<body><main>
+{{BODY}}
+</main></body></html>

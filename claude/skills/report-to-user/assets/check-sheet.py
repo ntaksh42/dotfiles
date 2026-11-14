@@ -60,12 +60,12 @@ def check_sheet(html: str):
     if n_todo:
         errors.append(f'TODO が {n_todo} 箇所残っている (雛形のコメントを埋めるか削る)')
     if re.search(r'class=["\'][^"\']*\bqcard\b', live) or re.search(r'<input[^>]*type=["\']radio', live):
-        errors.append('問いカード / radio がある — 問いはシートに書かず会話の [判断] で出す')
+        errors.append('問いカード / radio がある — 推奨は論点の下の .pick 行に書き、答えは会話で受ける')
     for m in re.finditer(r'<(?:script|link|img)[^>]*(?:src|href)=["\'](?!https:|data:|file:|#|mailto:|//)([^"\']+)["\']', live):
         warns.append(f'相対 URL の外部参照: {m.group(1)} (data URI か https 絶対 URL にする)')
     is_report = '<!-- report-sheet -->' in html
-    if not is_report and 'review-sheet-format: v5' not in html:
-        warns.append('<!-- review-sheet-format: v5 --> が無い (どの規約で書いたシートかの目印)')
+    if not is_report and 'review-sheet-format: v6' not in html:
+        warns.append('<!-- review-sheet-format: v6 --> が無い (どの規約で書いたシートかの目印)')
     total, concl = prose_length(live)
     if is_report:
         if '<svg' not in live:
@@ -74,7 +74,7 @@ def check_sheet(html: str):
             warns.append('要点の印 (class="key") が無い — 図の中で要点の要素だけを赤くする')
         title = re.search(r'<h1\b[^>]*>(.*?)</h1>', live, flags=re.DOTALL)
         if title:
-            state = re.search(r'<span class=["\']state["\'][^>]*>(.*?)</span>', title.group(1), flags=re.DOTALL)
+            state = re.search(r'<span class=["\']state\b[^"\']*["\'][^>]*>(.*?)</span>', title.group(1), flags=re.DOTALL)
             state_text = htmllib.unescape(re.sub(r'<[^>]+>', '', state.group(1))).strip() if state else ''
             if not re.fullmatch(STATE_WORDS, state_text):
                 warns.append(f'状態の語「{state_text}」が決まった語でない — タイトルの先頭に 対応不要 / 要判断 n 件 / 要対応 / 未完了 のどれかを置く')
@@ -103,6 +103,10 @@ def check_sheet(html: str):
         warns.append(f'結論が {concl} 字 (目安 {CONCL_LIMIT} 字以内・2 文まで)')
     ids = set(re.findall(r'\bid=["\']([^"\']+)["\']', live))
     points = sorted(i for i in ids if re.fullmatch(r'p\d+', i))
+    if not is_report:
+        for m in re.finditer(r'<section class=["\']pt["\'] id=["\'](p\d+)["\'][^>]*>(.*?)</section>', live, flags=re.DOTALL):
+            if not re.search(r'class=["\']pick["\']', m.group(2)) or '推奨' not in m.group(2):
+                errors.append(f'論点 #{m.group(1)} に推奨の行 (.pick) が無い — 推奨はシートの論点の下に書き、会話には書かない')
     return errors, warns, ids, points
 
 

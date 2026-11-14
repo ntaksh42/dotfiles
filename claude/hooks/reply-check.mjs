@@ -50,7 +50,9 @@ export function calledSkillThisTurn(transcriptLines) {
   })
   // skill を呼んだか、HTML のシートを書いた (skill は一度読み込めば呼び直さない) ターンなら使ったとみなす
   const usedSkill = b => b?.name === 'Skill' && String(b.input?.skill ?? '').includes(SKILL_NAME)
-  const wroteSheet = b => b?.name === 'Write' && /\.html?$/i.test(String(b.input?.file_path ?? ''))
+  const wroteSheet = b =>
+    (b?.name === 'Write' && /\.html?$/i.test(String(b.input?.file_path ?? ''))) ||
+    (/^(Bash|PowerShell)$/.test(String(b?.name)) && String(b.input?.command ?? '').includes('new-sheet.py'))
   return entries.slice(start).some(
     e => e.type === 'assistant' && Array.isArray(e.message?.content) &&
       e.message.content.some(b => b?.type === 'tool_use' && (usedSkill(b) || wroteSheet(b))),
@@ -68,8 +70,8 @@ export function decide(input, transcriptText) {
   return {
     decision: 'block',
     reason:
-      `返信が会話に書く基準を超えています (${found.join('、')})。report-to-user を呼び、中身を報告シートにまとめて見せてください。` +
-      '会話には結論 1 文・シートの場所・注意点・[判断] だけを書きます。',
+      `返信が会話に書く基準を超えています (${found.join('、')})。report-to-user を呼び、今の返信の中身を scripts/new-sheet.py で報告シートにして見せてください。` +
+      '会話には結論 1 文とシートの場所だけを書きます。[判断]・注意点・一覧はシートに入れます。次からは、長くなると分かった時点で返信を書く前にシートを作ります。',
   }
 }
 
