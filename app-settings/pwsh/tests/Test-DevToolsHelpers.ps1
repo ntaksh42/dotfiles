@@ -48,7 +48,7 @@ try {
     # =====================================================================================
     $knownBackends = 'winget', 'msstore', 'pip', 'npm', 'psmodule', 'script', 'remote-config', 'claude-plugin'
     $allowedKeys = @{
-        'winget'        = 'Id', 'Cmd', 'PostInstall', 'Upgradable', 'ProcessName', 'ProcessPath'
+        'winget'        = 'Id', 'Cmd', 'PostInstall', 'Upgradable', 'ProcessName', 'ProcessPath', 'SelfUpdate'
         'msstore'       = 'Id', 'Upgradable', 'ProcessName', 'ProcessPath'
         'pip'           = 'Id', 'Cmd'
         'npm'           = 'Id', 'Cmd', 'RequiredCommand'

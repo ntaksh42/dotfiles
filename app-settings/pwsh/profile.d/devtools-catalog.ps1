@@ -32,7 +32,8 @@ $script:DevTools = @(
     @{ Name = 'lazygit'; Backend = 'winget'; Id = 'JesseDuffield.lazygit'; Cmd = 'lazygit' }
     @{ Name = 'VSCode'; Backend = 'winget'; Id = 'Microsoft.VisualStudioCode'; Cmd = 'code' }
     @{ Name = 'Python'; Backend = 'winget'; Id = 'Python.Python.3.12'; Cmd = 'python' }
-    @{ Name = 'PowerShell 7'; Backend = 'winget'; Id = 'Microsoft.PowerShell'; Cmd = 'pwsh' }
+    # Install-DevTools を動かしている pwsh 自身なので、更新はほかの処理を終えてから別ウィンドウで行う（SelfUpdate）。
+    @{ Name = 'PowerShell 7'; Backend = 'winget'; Id = 'Microsoft.PowerShell'; Cmd = 'pwsh'; Upgradable = $true; SelfUpdate = $true }
     @{ Name = 'PSFzf'; Backend = 'psmodule'; Id = 'PSFzf' }
     @{ Name = 'Terminal-Icons'; Backend = 'psmodule'; Id = 'Terminal-Icons' }
     @{ Name = 'gita'; Backend = 'pip'; Id = 'gita'; Cmd = 'gita' }

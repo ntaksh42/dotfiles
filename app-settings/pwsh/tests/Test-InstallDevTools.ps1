@@ -1063,6 +1063,30 @@ if ($h.Throw) { throw $h.Throw }
         Invoke-Install -Yes
         $script:latestCalls.Count -eq 0 -and $script:wingetCalls.Count -eq 0
     }
+    Test-Case 'Update: a SelfUpdate winget tool is upgraded last, in a separate winget process' {
+        Reset-Fake
+        $script:installedNames = @('Pwsh', 'B')
+        $script:started = @()
+        function Test-DevToolWingetUpgradeAvailable { param($Tool) $true }
+        function Start-Process { param($FilePath, $ArgumentList) $script:started += "$FilePath $($ArgumentList -join ' ')"; Add-Event "start $FilePath" }
+        $script:DevTools = @((New-Tool 'Pwsh' 'winget' @{ Upgradable = $true; SelfUpdate = $true }), (New-Tool 'B' 'winget' @{ Upgradable = $true }))
+        Invoke-Install -Yes
+        $e = @($script:events)
+        $script:wingetCalls.Count -eq 1 -and $script:wingetCalls[0].Contains('id.B') -and
+        $script:started.Count -eq 1 -and
+        $script:started[0] -ceq 'winget upgrade --id id.Pwsh --exact --source winget --accept-package-agreements --accept-source-agreements' -and
+        $e.IndexOf('start winget') -gt $e.IndexOf('agent-skill') -and
+        (Get-Row 'Pwsh').Result -ceq 'STARTED'
+    }
+    Test-Case 'Update: a SelfUpdate tool that fails to start is reported as FAILED' {
+        Reset-Fake
+        $script:installedNames = @('Pwsh')
+        function Test-DevToolWingetUpgradeAvailable { param($Tool) $true }
+        function Start-Process { param($FilePath, $ArgumentList) throw 'no winget' }
+        $script:DevTools = @((New-Tool 'Pwsh' 'winget' @{ Upgradable = $true; SelfUpdate = $true }))
+        Invoke-Install -Yes
+        (Get-Row 'Pwsh').Result -ceq 'FAILED' -and $script:log.Contains('WARNING: Pwsh: update could not be started. no winget')
+    }
 
     # ======================================================================================
     # remote-config

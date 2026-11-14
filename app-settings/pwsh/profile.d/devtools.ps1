@@ -572,8 +572,11 @@ function Install-DevTools {
     try { Sync-DevToolSkills }
     catch { Write-Warning "Sync-DevToolSkills failed: $($_.Exception.Message)" }
 
+    $selfUpdates = @()
     foreach ($t in $pending) {
         $isUpdate = $toUpdate -contains $t
+        # 実行中の pwsh 自身を更新すると MSI がこのセッションを閉じることがあるため、最後に回す。
+        if ($isUpdate -and $t.SelfUpdate) { $selfUpdates += $t; continue }
         $action = if ($isUpdate) { 'Updating' } else { 'Installing' }
         Write-Host "$action $($t.Name)..." -ForegroundColor Green
         $ok = $false
@@ -770,6 +773,19 @@ function Install-DevTools {
     catch { Write-Warning "refreshenv failed: $($_.Exception.Message)" }
     try { Sync-AgentDesktopSkill }
     catch { Write-Warning "Sync-AgentDesktopSkill failed: $($_.Exception.Message)" }
+    # 別ウィンドウの winget で更新するので、このセッションが閉じられても他の処理は終わっている。
+    foreach ($t in $selfUpdates) {
+        $result = 'STARTED'
+        try {
+            Start-Process winget -ArgumentList 'upgrade', '--id', $t.Id, '--exact', '--source', 'winget', '--accept-package-agreements', '--accept-source-agreements'
+            Write-Host "Updating $($t.Name) in a separate window. Restart the shell after it finishes." -ForegroundColor Yellow
+        }
+        catch {
+            Write-Warning "$($t.Name): update could not be started. $($_.Exception.Message)"
+            $result = 'FAILED'
+        }
+        $results += [PSCustomObject]@{ Tool = $t.Name; Action = 'Updating'; Result = $result }
+    }
     Write-Host "`nInstall summary:" -ForegroundColor Cyan
     $results | Format-Table -AutoSize
 }
