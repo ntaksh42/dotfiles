@@ -1,6 +1,6 @@
 {
   "name": "dotfiles",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "description": "The mods: auto-session-title, ado-link-bar, toast-notify. Skills and settings hooks live outside the plugin (claude/skills, claude/hooks).",
   "types": "./types/index.d.ts",
   "userConfig": {

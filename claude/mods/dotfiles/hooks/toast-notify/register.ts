@@ -28,6 +28,9 @@ export const firstLine = (text: string) => {
   return line.length > MAX_BODY ? `${line.slice(0, MAX_BODY - 1)}…` : line
 }
 
+// Orca 上のセッションでは、完了と入力待ちを Orca 自身が通知するので出さない（二重通知を避ける）
+const underOrca = async ($: EngineInterface) => Boolean(await $.env.get('ORCA_AGENT_SESSION_ID'))
+
 async function project($: EngineInterface) {
   const cwd = await $.session.cwd()
   return cwd.split(/[\\/]/).filter(Boolean).pop() ?? cwd
@@ -79,7 +82,7 @@ export async function turnComplete($: EngineInterface, e: Args<'turn.complete'>,
   if (e.reason === 'error' || e.reason === 'refusal') {
     const detail = e.reason === 'refusal' ? e.refusal.explanation ?? '' : firstLine(e.answer)
     notify($, 'Claude: エラーで停止', detail || (e.reason === 'refusal' ? 'リクエストが拒否されました' : 'API エラー'), 'warn')
-  } else if (e.durationMs >= cfg.minTurnMs) {
+  } else if (e.durationMs >= cfg.minTurnMs && !(await underOrca($))) {
     notify($, `Claude: 完了 (${formatDuration(e.durationMs)})`, firstLine(e.answer) || '応答が完了しました')
   }
   return done
@@ -142,7 +145,7 @@ export const register: Register = (on, options) => {
     const done = await next(e)
     if (e.agent_id === undefined && e.notification_type !== 'idle_prompt' && e.notification_type !== 'auth_success') {
       waitingForInput = true
-      notify($, 'Claude: 入力待ち', e.message, 'warn')
+      if (!(await underOrca($))) notify($, 'Claude: 入力待ち', e.message, 'warn')
     }
     return done
   })

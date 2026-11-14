@@ -20,6 +20,8 @@ const TITLE_MAX = 40
 const APP_ID = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe'
 const SEND = join(dirname(fileURLToPath(import.meta.url)), 'toast-send.ps1')
 const STATE = join(tmpdir(), 'dotfiles-lite')
+// Orca 上のセッションでは、完了と入力待ちを Orca 自身が通知するので出さない（二重通知を避ける）
+const UNDER_ORCA = Boolean(process.env.ORCA_AGENT_SESSION_ID)
 
 const formatDuration = ms => {
   const s = Math.round(ms / 1000)
@@ -76,7 +78,7 @@ const handlers = {
     if (!started) return
     rmSync(stateFile('turn', input.session_id), { force: true })
     const elapsed = Date.now() - started
-    if (elapsed >= MIN_TURN_MS) {
+    if (elapsed >= MIN_TURN_MS && !UNDER_ORCA) {
       toast(input, `Claude: 完了 (${formatDuration(elapsed)})`, firstLine(input.last_assistant_message) || '応答が完了しました')
     }
   },
@@ -85,7 +87,7 @@ const handlers = {
   },
   // 許可・質問ダイアログ。idle_prompt はターン完了通知と重なるので出さない
   notification(input) {
-    if (input.agent_id !== undefined || input.notification_type === 'idle_prompt' || input.notification_type === 'auth_success') return
+    if (UNDER_ORCA || input.agent_id !== undefined || input.notification_type === 'idle_prompt' || input.notification_type === 'auth_success') return
     toast(input, 'Claude: 入力待ち', firstLine(input.message), 'warn')
   },
   'post-tool'(input) {

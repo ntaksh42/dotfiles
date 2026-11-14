@@ -6,8 +6,9 @@ import { firstLine, formatDuration } from '../hooks/toast-notify/register'
 type Toast = { title: string; body: string; session?: string; level?: string }
 
 // エンジン側の応答。process.run で出したトーストを記録し、コマンドは runMs だけ時計を進める
-const engine = (on: On, toasts: Toast[], runMs = 0, isError = false) => {
+const engine = (on: On, toasts: Toast[], runMs = 0, isError = false, env: Record<string, string> = {}) => {
   let now = 0
+  on('env.get', (_$, e) => ({ value: env[e.name] }) as never)
   on('session.cwd', () => ({ value: 'E:\\work\\shop' }) as never)
   on('command.register', () => ({ value: undefined }) as never)
   on('ui.log', () => ({ value: undefined }) as never)
@@ -99,6 +100,28 @@ describe('classic.Notification', () => {
   })
 })
 
+describe('Orca 上のセッション', () => {
+  const ORCA = { ORCA_AGENT_SESSION_ID: 'claude_x' }
+
+  test('完了と入力待ちは Orca に任せて通知しない', async ($, on) => {
+    const toasts: Toast[] = []
+    engine(on, toasts, 0, false, ORCA)
+    await $.turn.complete(turn(45_000))
+    await $.classic.Notification({ message: 'Claude needs your permission to use Bash', notification_type: 'permission_prompt' })
+    await settle()
+    expect(toasts).toEqual([])
+  })
+
+  test('エラーと長いコマンドは通知する', async ($, on) => {
+    const toasts: Toast[] = []
+    engine(on, toasts, 90_000, false, ORCA)
+    await $.turn.complete(turn(1_000, { reason: 'error', answer: '' }))
+    await $.tool.call({ tool: 'Bash', command: 'npm test' } as never)
+    await settle()
+    expect(toasts.map(t => t.title)).toEqual(['Claude: エラーで停止 - shop', 'コマンド完了 (1分30秒) - shop'])
+  })
+})
+
 describe('tool.call', () => {
   test('長いコマンドの完了を通知する', async ($, on) => {
     const toasts: Toast[] = []
@@ -132,6 +155,7 @@ describe('停滞検知', () => {
     on('session.cwd', () => ({ value: 'E:/work/shop' }) as never)
     on('command.register', () => ({ value: undefined }) as never)
     on('env.set', () => ({ value: {} }) as never)
+    on('env.get', () => ({ value: undefined }) as never)
     on('ui.log', () => ({ value: undefined }) as never)
     on('process.run', (_$, e) => {
       const env = e.init?.env ?? {}
