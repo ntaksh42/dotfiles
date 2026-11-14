@@ -1,9 +1,3 @@
-<!--
-このファイルは Claude Code と Codex の共通ルールの管理元 (claude/CLAUDE.global.md)。
-tools/Install-AgentInstructions.ps1 が ~/.claude/CLAUDE.md と ~/.codex/AGENTS.md へ配置する（Codex は CODEX_HOME にも対応）。配置先を直接編集せず、このファイルを編集して再配置すること。
-既定の振る舞いで足りることは書かない。
--->
-
 # 報告
 
 - 結論の 1 行を除いて 5 行を超える報告や、6 件以上の一覧・指摘は、`report-to-user` の HTML シートで見せる。会話には結論 1 文と判断だけを書く
