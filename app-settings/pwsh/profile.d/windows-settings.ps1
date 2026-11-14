@@ -33,7 +33,7 @@ function Set-WindowsSettings {
         @{ Group = 'Explorer'; Label = '拡張子を表示'; Path = $adv; Name = 'HideFileExt'; Value = 0; Explorer = $true }
         @{ Group = 'Explorer'; Label = '隠しファイルを表示'; Path = $adv; Name = 'Hidden'; Value = 1; Explorer = $true }
         @{ Group = 'Explorer'; Label = 'タスクバーの「タスクの終了」を有効化'; Path = "$adv\TaskbarDeveloperSettings"; Name = 'TaskbarEndTask'; Value = 1; Explorer = $true }
-        @{ Group = 'Explorer'; Label = 'タスクバーを自動的に隠す'; Path = "$cv\Explorer\StuckRects3"; Name = 'Settings'; Byte = 8; Value = 3; Explorer = $true }
+        @{ Group = 'Explorer'; Label = 'タスクバーを自動的に隠さない'; Path = "$cv\Explorer\StuckRects3"; Name = 'Settings'; Byte = 8; Value = 2; Explorer = $true }
         @{ Group = 'Explorer'; Label = 'スタートの検索で Web 結果を出さない'; Path = 'HKCU:\Software\Policies\Microsoft\Windows\Explorer'; Name = 'DisableSearchBoxSuggestions'; Value = 1; Explorer = $true }
         @{ Group = 'Explorer'; Label = 'スタートの「おすすめ」を非表示'; Path = $adv; Name = 'Start_IrisRecommendations'; Value = 0; Explorer = $true }
         @{ Group = 'Explorer'; Label = 'スタートのアカウント通知を非表示'; Path = $adv; Name = 'Start_AccountNotifications'; Value = 0; Explorer = $true }
