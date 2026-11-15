@@ -69,12 +69,12 @@ $skillDir = Split-Path -Parent $scriptDir
 # OnDark / Dim は暗所用。Accent をそのまま暗所で使うと沈むので、
 # 明度を上げた同系色と、地に敷ける暗い同系色を組にして持つ。
 $themes = @{
-    review        = @{ Accent = '#1d4ed8'; Light = '#dbeafe'; OnDark = '#93b4fd'; Dim = '#1e3054'; Badge = 'CODE REVIEW' }
-    bug           = @{ Accent = '#dc2626'; Light = '#fee2e2'; OnDark = '#fca5a5'; Dim = '#4c1d1d'; Badge = 'BUG ANALYSIS' }
-    investigation = @{ Accent = '#7c3aed'; Light = '#ede9fe'; OnDark = '#c4b5fd'; Dim = '#332a55'; Badge = 'INVESTIGATION' }
-    research      = @{ Accent = '#0891b2'; Light = '#cffafe'; OnDark = '#7dd3e8'; Dim = '#12414f'; Badge = 'RESEARCH' }
-    security      = @{ Accent = '#ea580c'; Light = '#ffedd5'; OnDark = '#fdba74'; Dim = '#4a2a12'; Badge = 'SECURITY AUDIT' }
-    proposal      = @{ Accent = '#0f766e'; Light = '#ccfbf1'; OnDark = '#5eead4'; Dim = '#12433f'; Badge = 'PROPOSAL' }
+    review        = @{ Accent = '#1d4ed8'; Light = '#dbeafe'; OnDark = '#93b4fd'; Dim = '#1e3054'; Badge = 'レビュー' }
+    bug           = @{ Accent = '#dc2626'; Light = '#fee2e2'; OnDark = '#fca5a5'; Dim = '#4c1d1d'; Badge = '不具合' }
+    investigation = @{ Accent = '#7c3aed'; Light = '#ede9fe'; OnDark = '#c4b5fd'; Dim = '#332a55'; Badge = '調査' }
+    research      = @{ Accent = '#0891b2'; Light = '#cffafe'; OnDark = '#7dd3e8'; Dim = '#12414f'; Badge = '技術調査' }
+    security      = @{ Accent = '#ea580c'; Light = '#ffedd5'; OnDark = '#fdba74'; Dim = '#4a2a12'; Badge = 'セキュリティ' }
+    proposal      = @{ Accent = '#0f766e'; Light = '#ccfbf1'; OnDark = '#5eead4'; Dim = '#12433f'; Badge = '提案' }
 }
 $theme = $themes[$Kind]
 
@@ -156,6 +156,13 @@ $mainContent = ConvertTo-ReportHtml -Markdown $markdown
 
 # ---- サマリーカード ------------------------------------------------------
 $cardsHtml = ''
+# pwsh -File で呼ぶと -Cards "a|b","c|d" は配列にならず "a|b,c|d" の 1 つの文字列で届く。
+# そのまま分けると 2 枚目が 1 枚目の値と補足に混ざるので、
+# 「, の直後に短いラベルと |」が続く所でカードを分け直す。
+# ラベルは「結論」「次の行動」のような短い語なので、空白や読点を含む句は区切りとみなさない。
+$Cards = @(foreach ($card in $Cards) {
+    $card -split ',(?=[^,|\s、。]{1,12}\|)'
+})
 if ($Cards.Count -gt 0) {
     $items = foreach ($card in $Cards) {
         $parts = $card -split '\|'
@@ -163,13 +170,10 @@ if ($Cards.Count -gt 0) {
         $value = if ($parts.Count -gt 1) { ConvertTo-HtmlText $parts[1].Trim() } else { '-' }
         $sub = if ($parts.Count -gt 2) { ConvertTo-HtmlText $parts[2].Trim() } else { '' }
 
-        # 値が長いとカード内で折り返して不格好になるので、字数に応じて縮める
-        $style = if ($value.Length -gt 12) { ' style="font-size:1rem"' } else { '' }
-
         @"
   <div class="summary-card">
     <div class="label">$label</div>
-    <div class="value"$style>$value</div>
+    <div class="value">$value</div>
     <div class="sub">$sub</div>
   </div>
 "@
@@ -183,12 +187,11 @@ if ($Cards.Count -gt 0) {
 $tocHtml = ''
 if ($script:ReportSections.Count -ge 5) {
     $links = foreach ($sec in $script:ReportSections) {
-        # 項目数と重大度を添える。数が少ない節にまで数字を出すと
-        # ノイズになるので、ある程度の量があるものだけ。
+        # 重大・注意の件数だけ添える。項目数は何の数か読み取れないので出さない。
+        # 番号は見出し側に書かれることが多いので、目次では振らない。
         $meta = ''
-        if ($sec.Red -gt 0)    { $meta += "<span class=`"toc-flag toc-red`">$($sec.Red)</span>" }
-        if ($sec.Yellow -gt 0) { $meta += "<span class=`"toc-flag toc-yellow`">$($sec.Yellow)</span>" }
-        if ($sec.Items -ge 4)  { $meta += "<span class=`"toc-count`">$($sec.Items)</span>" }
+        if ($sec.Red -gt 0)    { $meta += "<span class=`"toc-flag toc-red`">重大 $($sec.Red)</span>" }
+        if ($sec.Yellow -gt 0) { $meta += "<span class=`"toc-flag toc-yellow`">注意 $($sec.Yellow)</span>" }
         "    <li><a href=`"#$($sec.Anchor)`"><span class=`"toc-label`">$($sec.Title)</span>$meta</a></li>"
     }
     $tocHtml = @"
@@ -219,14 +222,18 @@ $templatePath = Join-Path $skillDir 'templates/base.html'
 $html = Get-Content -LiteralPath $templatePath -Raw -Encoding UTF8
 
 $date = Get-Date -Format 'yyyy-MM-dd'
+# 見出しの上の 1 行: 種別 · 対象 · 日付。対象が無ければ区切りごと省く
+$metaParts = @("<span class=`"kind`">$($theme.Badge)</span>")
+if ($Subtitle) { $metaParts += "<span>$(ConvertTo-HtmlText $Subtitle)</span>" }
+$metaParts += "<span>$date</span>"
+$metaHtml = $metaParts -join ''
 $replacements = @{
     '{{TITLE}}'           = ConvertTo-HtmlText $Title
     '{{ACCENT_COLOR}}'    = $theme.Accent
     '{{ACCENT_LIGHT}}'    = $theme.Light
     '{{ACCENT_ON_DARK}}'  = $theme.OnDark
     '{{ACCENT_DIM}}'      = $theme.Dim
-    '{{BADGE_LABEL}}'     = $theme.Badge
-    '{{SUBTITLE}}'        = ConvertTo-HtmlText $Subtitle
+    '{{META}}'            = $metaHtml
     '{{DATE}}'            = $date
     '{{DOC_ID}}'          = $docId
     '{{SUMMARY_CARDS}}'   = $cardsHtml
@@ -246,16 +253,36 @@ if ($mainContent -match 'class="mermaid"') {
     # 「壊れている」のか「読み込めていない」のかが分かる注記を出す。
     $mermaidInit = @'
 <script type="module">
-  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  // 表示側のテーマ (Orca は OS と別に切り替えられる) に合わせるため、
+  // prefers-color-scheme ではなく実際の背景の明るさで配色を選ぶ。
+  const bg = getComputedStyle(document.body).backgroundColor.match(/\d+(\.\d+)?/g) || [255, 255, 255];
+  const dark = (0.299 * bg[0] + 0.587 * bg[1] + 0.114 * bg[2]) < 128;
   try {
-    const { default: mermaid } = await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs');
-    mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'neutral', securityLevel: 'strict' });
+    const { default: mermaid } = await import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs');
+    // startOnLoad は load イベントで描画する。import を待つ間に load が終わっていると
+    // 何も描かれないので、初期化のあとで明示的に run する。
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: dark ? 'dark' : 'neutral',
+      securityLevel: 'strict',
+      fontFamily: getComputedStyle(document.body).fontFamily,
+    });
+    await mermaid.run({ querySelector: 'pre.mermaid' });
+    // 横に長いシーケンス図を枠の幅まで縮めると字が読めなくなる。
+    // 縮めるのは元の 7 割までにして、はみ出すぶんは枠の中で横スクロールさせる。
+    for (const svg of document.querySelectorAll('pre.mermaid svg')) {
+      const natural = svg.viewBox.baseVal && svg.viewBox.baseVal.width;
+      const box = svg.parentElement.clientWidth - 32;
+      if (!natural || natural <= box) continue;
+      svg.style.maxWidth = 'none';
+      svg.style.width = Math.round(Math.max(box, natural * 0.7)) + 'px';
+    }
   } catch (e) {
-    for (const el of document.querySelectorAll('pre.mermaid')) {
+    for (const el of document.querySelectorAll('pre.mermaid:not([data-processed])')) {
       el.classList.add('mermaid-offline');
       const note = document.createElement('div');
       note.className = 'mermaid-note';
-      note.textContent = '図を描画できませんでした（オフライン）。以下は図の定義です。';
+      note.textContent = '図を描画できませんでした。以下は図の定義です。';
       el.parentNode.insertBefore(note, el);
     }
   }

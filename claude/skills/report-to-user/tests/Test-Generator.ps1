@@ -71,5 +71,15 @@ $mermaidBody = Join-Path $testRoot 'mermaid.md'
 $path = & $generator -Kind research -Title '図' -BodyPath $mermaidBody -NoOpen
 $mermaidHtml = Get-Content -LiteralPath $path -Raw -Encoding utf8
 Assert-Result ($mermaidHtml.Contains('https://cdn.jsdelivr.net/npm/mermaid@11') -and $mermaidHtml.Contains('mermaid-offline')) 'MermaidのみCDNと失敗時の注記を含む'
+Assert-Result ($mermaidHtml.Contains('mermaid.run(') -and $mermaidHtml.Contains('startOnLoad: false')) 'Mermaidはimport後に明示的に描画する'
+
+# pwsh -File 経由では -Cards の配列が "a|b,c|d" の 1 文字列で届く。2 枚に分け直すこと、
+# 値の中の「, 」では分けないことを確かめる。
+$cardsPath = Join-Path $testRoot 'cards.html'
+& pwsh -NoProfile -File $generator -Kind review -Title 'カード' -BodyPath $body -OutputPath $cardsPath -NoOpen `
+    -Cards '結論|A と B を直す,確認状況|テスト 3 件, 実機は未確認|補足' | Out-Null
+$cardsHtml = Get-Content -LiteralPath $cardsPath -Raw -Encoding utf8
+$values = @([regex]::Matches($cardsHtml, '<div class="value">([^<]*)</div>') | ForEach-Object { $_.Groups[1].Value })
+Assert-Result ($values.Count -eq 2 -and $values[0] -eq 'A と B を直す' -and $values[1] -eq 'テスト 3 件, 実機は未確認') 'pwsh -File 経由のカードを分け直す'
 Write-Host "pass: $script:checks  fail: 0"
 Write-Host "検証用成果物: $testRoot"
