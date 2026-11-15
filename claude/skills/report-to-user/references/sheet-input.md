@@ -25,12 +25,11 @@
   根拠: reply-check.mjs:17
   対応: フェンスを先に取り除く
 - [確認済み] 単体テスト: 12 件すべて通過
-  根拠: node --test claude/hooks/reply-check.test.mjs
 
 ## 注意点
 - 実機の Stop hook では未検証
 
-## 付録: 実行ログ
+## 付録: 調査の経緯
 ここはそのまま等幅で畳まれる
 ~~~
 

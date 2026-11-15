@@ -179,7 +179,7 @@ def build(src: str, meta: str):
             body.append('<h2>注意点</h2><div class="warn"><ul>'
                         + ''.join(f'<li>{inline(" ".join(i))}</li>' for i in bullets(lines)) + '</ul></div>')
         elif title.startswith('付録'):
-            summary = re.sub(r'^付録\s*[:：]?\s*', '', title) or '経緯と実行ログ'
+            summary = re.sub(r'^付録\s*[:：]?\s*', '', title) or '経緯'
             text = '\n'.join(lines).strip('\n')
             body.append(f'<details><summary>{inline(summary)}</summary><pre>{html.escape(text, quote=False)}</pre></details>')
         else:
