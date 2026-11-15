@@ -8,7 +8,7 @@
   - 問いカード・回答フォームの混入 (推奨は論点の下の .pick 行に書く)
   - 相対 URL の外部参照 (self-contained 違反)
   - 比較シート: 推奨の行 (.pick) が無い論点、文字の多すぎ (本文の文章 600 字超、結論 120 字超)
-  - 報告シート (NG): 結論 80 字超、箇条書き 6 個以上
+  - 報告シート (NG): 結論 60 字超、「次:」の埋め草、箇条書き 6 個以上
   - 報告シート (警告): 図の欠落、図がある場合の要点の印 (class="key") の欠落、タイトルの状態の語の欠落・ずれ、
     本文 800 字超、表のセル 60 字超、畳みが本文より長い、
     表のセルの埋め草 (「特になし」「引き続き注視」など、することの無い対応案)
@@ -25,7 +25,7 @@ from pathlib import Path
 PROSE_LIMIT = 600
 CONCL_LIMIT = 120
 REPORT_PROSE_LIMIT = 800
-REPORT_CONCL_LIMIT = 80
+REPORT_CONCL_LIMIT = 60
 REPORT_CELL_LIMIT = 60
 REPORT_BULLET_LIMIT = 5
 STATE_WORDS = r'対応不要|要判断\s*\d+\s*件|要対応|未完了'
@@ -65,7 +65,10 @@ def check_sheet(html: str):
         warns.append('<!-- review-sheet-format: v6 --> が無い (どの規約で書いたシートかの目印)')
     total, concl = prose_length(live)
     if is_report:
-        if '<svg' not in live:
+        n_decisions = len(re.findall(r'<section class=["\']decision["\']', live))
+        n_rows = len(re.findall(r'<tr><th scope=["\']row["\']', live))
+        # 要判断が主役で項目が 3 行以下のシートは描く形が無いことが多いので、図を求めない
+        if '<svg' not in live and not (n_decisions and n_rows <= 3):
             warns.append('図が無い — 既定で 1 枚置く。省くのは内容に形 (前後・流れ・構成・量・状態の並び) が無いときだけ')
         elif not re.search(r'class=["\'][^"\']*\bkey\b', live):
             warns.append('要点の印 (class="key") が無い — 図の中で要点の要素だけを赤くする')
@@ -94,6 +97,11 @@ def check_sheet(html: str):
         fillers = [t for t in (htmllib.unescape(re.sub(r'<[^>]+>', '', c)).strip() for c in cells) if re.fullmatch(FILLER, t)]
         if fillers:
             warns.append(f'することの無い埋め草が {len(fillers)} 個 (例「{fillers[0]}」)。対応案のセルは空にし、全行で空なら列ごと削る')
+        nxt = re.search(r'<div class=["\']next["\'][^>]*><b>.*?</b><span>(.*?)</span>', live, flags=re.DOTALL)
+        if nxt:
+            nxt_text = htmllib.unescape(re.sub(r'<[^>]+>', '', nxt.group(1))).strip()
+            if re.match(r'(特に)?(なし|無し|不要|対応不要)(?![^\s。、])|(' + FILLER + r')。?$', nxt_text):
+                errors.append(f'「次:」が埋め草 (「{nxt_text[:20]}」)。読み手がすることが無ければ「次:」の行を消す')
     if not is_report and total > PROSE_LIMIT:
         warns.append(f'本文の文章が {total} 字 (目安 {PROSE_LIMIT} 字以内)。絵で分かる説明から削り、判断外の決定は <details> へ')
     if not is_report and concl > CONCL_LIMIT:

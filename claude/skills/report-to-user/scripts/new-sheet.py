@@ -22,6 +22,7 @@ from pathlib import Path
 SKILL_DIR = Path(__file__).resolve().parent.parent
 TEMPLATE = SKILL_DIR / 'templates' / 'sheet.html'
 CHECKER = SKILL_DIR / 'assets' / 'check-sheet.py'
+FOLD_ROWS = 6  # 優先の行があり、項目がこの数以上なら、優先以外の行を畳む
 STATES = {'要判断': 'ask', '要対応': 'act', '未完了': 'act', '対応不要': ''}
 
 
@@ -155,19 +156,29 @@ def render_items(title, lines):
         raise InputError('「## 項目」に項目が無い')
     head = ''.join(f'<th>{html.escape(c)}</th>' for c in cols + (['対応案'] if has_action else []))
     widths = ['20%', '44%', '36%'] if has_action else ['24%', '76%']
-    out = ['<table><colgroup>' + ''.join(f'<col style="width:{w}">' for w in widths) + '</colgroup>',
-           f'<thead><tr>{head}</tr></thead><tbody>']
-    for label, name, body, ev, act in rows:
-        tag = ''
-        if label:
-            kind = {'優先': ' priority', '推測': ' guess', '確認済み': ' ok', '未検証': ' unverified'}.get(label, '')
-            tag = f'<span class="tag{kind}">{html.escape(label)}</span><br>'
-        evs = ''.join(f'<span class="evidence-line">{inline(e)}</span>' for e in ev)
-        cell = f'<td><p>{inline(body)}</p>{evs}</td>'
-        out.append(f'<tr><th scope="row">{tag}{inline(name)}</th>{cell}'
-                   + (f'<td><p>{inline(act)}</p></td>' if has_action else '') + '</tr>')
-    out.append('</tbody></table>')
-    return '\n'.join(out)
+
+    def table(part):
+        out = ['<table><colgroup>' + ''.join(f'<col style="width:{w}">' for w in widths) + '</colgroup>',
+               f'<thead><tr>{head}</tr></thead><tbody>']
+        for label, name, body, ev, act in part:
+            tag = ''
+            # 確認済みは既定の状態なので札を出さない。札は例外 (優先・推測・未検証など) の行だけに付く
+            if label and label != '確認済み':
+                kind = {'優先': ' priority', '推測': ' guess', '未検証': ' unverified'}.get(label, '')
+                tag = f'<span class="tag{kind}">{html.escape(label)}</span><br>'
+            evs = ''.join(f'<span class="evidence-line">{inline(e)}</span>' for e in ev)
+            cell = f'<td><p>{inline(body)}</p>{evs}</td>'
+            out.append(f'<tr><th scope="row">{tag}{inline(name)}</th>{cell}'
+                       + (f'<td><p>{inline(act)}</p></td>' if has_action else '') + '</tr>')
+        out.append('</tbody></table>')
+        return '\n'.join(out)
+
+    first = [r for r in rows if r[0] == '優先']
+    rest = [r for r in rows if r[0] != '優先']
+    if first and rest and len(rows) >= FOLD_ROWS:
+        return (table(first) + f'\n<details class="rest"><summary>ほかの {len(rest)} 件</summary>\n'
+                + table(rest) + '\n</details>')
+    return table(first + rest)
 
 
 def build(src: str, meta: str):

@@ -99,7 +99,7 @@ class NewSheetTest(unittest.TestCase):
                 ns.build(src, 'R')
 
     def test_long_title_is_ng(self):
-        page = ns.build('# 対応不要 | ' + 'あ' * 81 + '\n', 'R')
+        page = ns.build('# 対応不要 | ' + 'あ' * 61 + '\n', 'R')
         errors, _, _, _ = checker.check_sheet(page)
         self.assertTrue(any('結論' in e for e in errors), errors)
 
@@ -108,10 +108,38 @@ class NewSheetTest(unittest.TestCase):
         errors, _, _, _ = checker.check_sheet(page)
         self.assertTrue(any('箇条書き' in e for e in errors), errors)
 
-    def test_five_bullets_and_80_chars_pass(self):
-        src = '# 対応不要 | ' + 'あ' * 80 + '\n' + ''.join(f'- 点{i}\n' for i in range(5))
+    def test_five_bullets_and_60_chars_pass(self):
+        src = '# 対応不要 | ' + 'あ' * 60 + '\n' + ''.join(f'- 点{i}\n' for i in range(5))
         errors, _, _, _ = checker.check_sheet(ns.build(src, 'R'))
         self.assertEqual(errors, [])
+
+    def test_confirmed_label_shows_no_tag(self):
+        page = ns.build('# 対応不要 | x\n## 項目\n- [確認済み] a: b\n- [未検証] c: d\n', 'R')
+        self.assertNotIn('>確認済み<', page)
+        self.assertIn('class="tag unverified"', page)
+
+    def test_folds_rest_when_priority_and_many_rows(self):
+        rows = '- [優先] p: 直す\n' + ''.join(f'- r{i}: 軽い\n' for i in range(5))
+        page = ns.build('# 要対応 | x\n## 項目\n' + rows, 'R')
+        self.assertIn('<summary>ほかの 5 件</summary>', page)
+        self.assertLess(page.index('>p<'), page.index('<details'))
+        few = ns.build('# 要対応 | x\n## 項目\n- [優先] p: 直す\n- r: 軽い\n', 'R')
+        self.assertNotIn('<details', few)
+
+    def test_no_figure_warning_for_decision_sheet(self):
+        page = ns.build('# 要判断 1 件 | x\n次: 選ぶ\n## 要判断: q\n推奨: a — 理由\n', 'R')
+        _, warns, _, _ = checker.check_sheet(page)
+        self.assertFalse(any('図が無い' in w for w in warns), warns)
+        plain = ns.build('# 対応不要 | x\n', 'R')
+        self.assertTrue(any('図が無い' in w for w in checker.check_sheet(plain)[1]))
+
+    def test_filler_next_is_ng(self):
+        for nxt in ('特になし', '特になし。push 済み', 'なし', '引き続き注視'):
+            errors = checker.check_sheet(ns.build(f'# 対応不要 | x\n次: {nxt}\n', 'R'))[0]
+            self.assertTrue(any('次:' in e for e in errors), (nxt, errors))
+        for nxt in ('閾値を選ぶ', '不要なファイルを消す'):
+            errors = checker.check_sheet(ns.build(f'# 要対応 | x\n次: {nxt}\n', 'R'))[0]
+            self.assertEqual(errors, [], nxt)
 
 
 if __name__ == '__main__':
