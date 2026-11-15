@@ -133,6 +133,13 @@ class NewSheetTest(unittest.TestCase):
         plain = ns.build('# 対応不要 | x\n', 'R')
         self.assertTrue(any('図が無い' in w for w in checker.check_sheet(plain)[1]))
 
+    def test_next_is_filled_from_decisions(self):
+        page = ns.build('# 要判断 2 件 | x\n## 要判断: a\n推奨: a — r\n## 要判断: b\n推奨: b — r\n', 'R')
+        self.assertIn('下の 2 問に答える', page)
+        page = ns.build('# 要判断 1 件 | x\n次: 先に再起動する\n## 要判断: a\n推奨: a — r\n', 'R')
+        self.assertIn('先に再起動する', page)
+        self.assertNotIn('問に答える', page)
+
     def test_filler_next_is_ng(self):
         for nxt in ('特になし', '特になし。push 済み', 'なし', '引き続き注視'):
             errors = checker.check_sheet(ns.build(f'# 対応不要 | x\n次: {nxt}\n', 'R'))[0]

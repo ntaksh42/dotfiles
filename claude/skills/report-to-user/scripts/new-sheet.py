@@ -24,6 +24,7 @@ TEMPLATE = SKILL_DIR / 'templates' / 'sheet.html'
 CHECKER = SKILL_DIR / 'assets' / 'check-sheet.py'
 FOLD_ROWS = 6  # 優先の行があり、項目がこの数以上なら、優先以外の行を畳む
 STATES = {'要判断': 'ask', '要対応': 'act', '未完了': 'act', '対応不要': ''}
+NEXT_SLOT = '<!--next-slot-->'
 
 
 class InputError(Exception):
@@ -109,6 +110,8 @@ def render_head(lines, meta):
         parts.append(f'<p class="sub">{inline(" ".join(sub))}</p>')
     if nxt:
         parts.append(f'<div class="next"><b>次にすること</b><span>{inline(nxt)}</span></div>')
+    else:
+        parts.append(NEXT_SLOT)  # 要判断があれば build() が「下の n 問に答える」を入れる
     parts += svgs
     if pts:
         parts.append('<ul class="points">' + ''.join(f'<li>{inline(p)}</li>' for p in pts) + '</ul>')
@@ -198,6 +201,10 @@ def build(src: str, meta: str):
             body.append(f'<details><summary>{inline(summary)}</summary><pre>{html.escape(text, quote=False)}</pre></details>')
         else:
             raise InputError(f'知らない節「## {title}」。要判断 / 項目 / 注意点 / 付録 のどれかにする')
+    n_dec = sum(1 for t, _ in sections[1:] if t.startswith('要判断'))
+    auto_next = (f'<div class="next"><b>次にすること</b><span>下の {n_dec} 問に答える</span></div>'
+                 if n_dec else '')
+    body = [auto_next if b == NEXT_SLOT else b for b in body]
     page = TEMPLATE.read_text(encoding='utf-8')
     tab = concl if len(concl) <= 40 else concl[:39] + '…'
     return page.replace('{{TAB_TITLE}}', html.escape(tab)).replace('{{BODY}}', '\n'.join(body))

@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: app-settings-structure
+expected_outcome: |
+  構成を一覧にする。図を置くなら表の内容を箱に書き写しただけの図にしない。

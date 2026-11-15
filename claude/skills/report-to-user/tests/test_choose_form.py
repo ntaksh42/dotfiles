@@ -22,6 +22,13 @@ class ChooseFormTest(unittest.TestCase):
         for q in ('ほかに改善ネタはない？', 'コマンドの一覧がほしい', '手順を教えて', '何がある？'):
             self.assertEqual(cf.choose(q, chars=50)[0], '報告シート', q)
 
+    def test_list_word_with_one_item_stays_in_chat(self):
+        for q in ('他に設定ファイルある？', 'テスト通った？まとめて'):
+            form, reason = cf.choose(q, items=1, chars=60, lines=1)
+            self.assertEqual(form, '会話', q)
+            self.assertIn('1 項目', reason)
+        self.assertEqual(cf.choose('他に設定ファイルある？', items=2, chars=60)[0], '報告シート')
+
     def test_list_kinds_go_to_sheet(self):
         for k in ('list', 'compare', 'steps', 'commands'):
             self.assertEqual(cf.choose(kind=k)[0], '報告シート', k)
@@ -33,6 +40,11 @@ class ChooseFormTest(unittest.TestCase):
         self.assertEqual(cf.choose(lines=4)[0], '報告シート')
         self.assertEqual(cf.choose(decisions=2)[0], '報告シート')
         self.assertEqual(cf.choose(chars=200, lines=3, items=3)[0], '会話')
+
+    def test_html_report_request(self):
+        for q in ('結果を HTML レポートにまとめて保存して', 'レポートを保存して', '調査結果をHTMLにまとめて'):
+            self.assertEqual(cf.choose(q, items=1)[0], '詳細レポート', q)
+        self.assertEqual(cf.choose(kind='report')[0], '詳細レポート')
 
     def test_special_forms(self):
         self.assertEqual(cf.choose(kind='ui')[0], '比較シート')
