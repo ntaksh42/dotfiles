@@ -157,7 +157,7 @@ def render_items(title, lines):
     for label, name, body, ev, act in rows:
         tag = ''
         if label:
-            kind = ' priority' if label == '先に対応' else ' guess' if label == '推測' else ''
+            kind = {'先に対応': ' priority', '推測': ' guess', '確認済み': ' ok', '未検証': ' unverified'}.get(label, '')
             tag = f'<span class="tag{kind}">{html.escape(label)}</span><br>'
         evs = ''.join(f'<code class="evidence-line">{html.escape(e)}</code>' for e in ev)
         cell = f'<td><p>{inline(body)}</p>{evs}</td>'
