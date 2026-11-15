@@ -24,7 +24,7 @@ FULL = """# 要判断 1 件 | 閾値だけ決めてほしい
 他案: 8 行 — 止まりにくい / 長文が残る
 
 ## 項目
-- [先に対応] 表の検出: `|---|` を誤検出 <script>
+- [優先] 表の検出: `|---|` を誤検出 <script>
   根拠: reply-check.mjs:17
   対応: フェンスを先に除く
 - 単体テスト: 通過
@@ -58,6 +58,21 @@ class NewSheetTest(unittest.TestCase):
         page = ns.build('# 対応不要 | 済んだ\n\n## 項目: 関数 / 役割\n- mkcd: 作って移動\n', 'R')
         self.assertNotIn('対応案', page)
         self.assertIn('<th>関数</th>', page)
+
+    def test_no_next_box_without_next_line(self):
+        page = ns.build('# 対応不要 | 済んだ\n', 'R')
+        self.assertNotIn('class="next"', page)
+        self.assertIn('class="next"', ns.build(FULL, 'R'))
+
+    def test_rejects_three_column_names(self):
+        with self.assertRaises(ns.InputError):
+            ns.build('# 要対応 | x\n## 項目: 指摘 / 根拠 / 対応案\n- a: b\n', 'R')
+
+    def test_evidence_renders_inline_links(self):
+        page = ns.build('# 対応不要 | x\n## 項目\n- a: b\n  根拠: [仕様](https://example.com/s) と `f.py:3`\n', 'R')
+        self.assertIn('<a href="https://example.com/s">仕様</a>', page)
+        self.assertIn('<code>f.py:3</code>', page)
+        self.assertNotIn('[仕様]', page)
 
     def test_rejects_bad_input(self):
         for src in ('結論だけ', '# 様子見 | x', '# 要対応 | x\n## 要判断: q\n他案: a\n', '# 要対応 | x\n## 雑多\n- a\n'):

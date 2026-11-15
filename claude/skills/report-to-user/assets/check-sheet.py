@@ -87,7 +87,7 @@ def check_sheet(html: str):
         n_li = len(re.findall(r'<li\b', body))
         if n_li > REPORT_BULLET_LIMIT:
             errors.append(f'箇条書きが {n_li} 個 (上限 {REPORT_BULLET_LIMIT} 個)。6 個以上は「## 項目」の表にする')
-        cells = re.findall(r'<td\b[^>]*>(.*?)</td>', re.sub(r'<code class=["\']evidence-line["\'].*?</code>', '', body, flags=re.DOTALL), flags=re.DOTALL)
+        cells = re.findall(r'<td\b[^>]*>(.*?)</td>', re.sub(r'<(span|code) class=["\']evidence-line["\'].*?</\1>', '', body, flags=re.DOTALL), flags=re.DOTALL)
         long_cells = [n for n in (visible_len(t) for t in cells) if n > REPORT_CELL_LIMIT]
         if long_cells:
             warns.append(f'表のセル {len(long_cells)} 個が {REPORT_CELL_LIMIT} 字超 (最長 {max(long_cells)} 字)。文でなく句で書く')

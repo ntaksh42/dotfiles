@@ -106,7 +106,8 @@ def render_head(lines, meta):
             sub.append(line.strip())
     if sub:
         parts.append(f'<p class="sub">{inline(" ".join(sub))}</p>')
-    parts.append(f'<div class="next"><b>次にすること</b><span>{inline(nxt or "対応不要")}</span></div>')
+    if nxt:
+        parts.append(f'<div class="next"><b>次にすること</b><span>{inline(nxt)}</span></div>')
     parts += svgs
     if pts:
         parts.append('<ul class="points">' + ''.join(f'<li>{inline(p)}</li>' for p in pts) + '</ul>')
@@ -129,9 +130,11 @@ def render_decision(title, lines):
 
 def render_items(title, lines):
     cols = ['項目', '確認したこと・根拠']
-    m = re.match(r'^項目\s*[:：]\s*(.+?)\s*/\s*(.+)$', title)
+    m = re.match(r'^項目\s*[:：]\s*(.+)$', title)
     if m:
-        cols = [m.group(1), m.group(2)]
+        cols = [c.strip() for c in m.group(1).split('/')]
+        if len(cols) != 2 or not all(cols):
+            raise InputError(f'列名は「## 項目: <1 列目> / <2 列目>」の 2 つだけ (対応案の列は「対応:」から自動で付く): {title[:40]}')
     rows, has_action = [], False
     for item in bullets(lines):
         m = re.match(r'^(?:\[([^\]]+)\]\s*)?(.+?)\s*[:：]\s*(.+)$', item[0])
@@ -157,9 +160,9 @@ def render_items(title, lines):
     for label, name, body, ev, act in rows:
         tag = ''
         if label:
-            kind = {'先に対応': ' priority', '推測': ' guess', '確認済み': ' ok', '未検証': ' unverified'}.get(label, '')
+            kind = {'優先': ' priority', '推測': ' guess', '確認済み': ' ok', '未検証': ' unverified'}.get(label, '')
             tag = f'<span class="tag{kind}">{html.escape(label)}</span><br>'
-        evs = ''.join(f'<code class="evidence-line">{html.escape(e)}</code>' for e in ev)
+        evs = ''.join(f'<span class="evidence-line">{inline(e)}</span>' for e in ev)
         cell = f'<td><p>{inline(body)}</p>{evs}</td>'
         out.append(f'<tr><th scope="row">{tag}{inline(name)}</th>{cell}'
                    + (f'<td><p>{inline(act)}</p></td>' if has_action else '') + '</tr>')
