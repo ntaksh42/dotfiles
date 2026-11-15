@@ -51,6 +51,11 @@ pwsh -NoProfile -File tools/Install-AgentInstructions.ps1
 # （GitHub の main から取得するので push 後に効く）。単体テストは node --test claude/hooks/reply-check.test.mjs
 pwsh -NoProfile -File tools/Install-ReplyCheckHook.ps1
 
+# 日本語の文章を書くツール呼び出し（.md 等への Write/Edit、PR・Issue の本文、複数行のコミット）を、
+# セッションで jp-deslop を読み込むまで止める PreToolUse hook（claude/hooks/jp-deslop-check.mjs）を登録する。
+# Install-DevTools の 'jp-deslop hook' でも入る。単体テストは node --test claude/hooks/jp-deslop-check.test.mjs
+pwsh -NoProfile -File tools/Install-JpDeslopHook.ps1
+
 # app-settings/ の設定ファイルを実環境へ配置する（pwsh プロファイル経由。GitHub の main から取得）
 # 配置対象は app-settings/pwsh/profile.d/devtools-catalog.ps1 のカタログで定義する。プロファイル自体は Update-Profile
 Install-DevTools

@@ -63,5 +63,6 @@ $script:DevTools = @(
     # toast 通知とセッション名の settings hook。plugin の Mod が動くセッションでは何もしない。
     @{ Name = 'lite hooks'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-LiteHooks.ps1"; Path = (Join-Path $env:USERPROFILE '.claude\hooks\lite-hook.mjs'); RemoteFiles = @('claude/hooks/lite-hook.mjs') }
     @{ Name = 'reply-check hook'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-ReplyCheckHook.ps1"; Path = (Join-Path $env:USERPROFILE '.claude\hooks\reply-check.mjs'); RemoteFiles = @('claude/hooks/reply-check.mjs') }
+    @{ Name = 'jp-deslop hook'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-JpDeslopHook.ps1"; Path = (Join-Path $env:USERPROFILE '.claude\hooks\jp-deslop-check.mjs'); RemoteFiles = @('claude/hooks/jp-deslop-check.mjs') }
 )
 

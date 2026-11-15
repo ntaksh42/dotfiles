@@ -25,7 +25,16 @@
       ],
       "tab.newAgent.claude": [
         "Mod+Alt+C"
+      ],
+      "tab.newAgent.codex": [
+        "Mod+Alt+X"
+      ],
+      "sidebar.sourceControl.toggle": [
+        "Mod+Alt+G"
       ]
     }
+  },
+  "migrations": {
+    "legacySettings": "done"
   }
 }
