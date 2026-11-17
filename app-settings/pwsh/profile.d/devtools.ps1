@@ -492,9 +492,11 @@ function Sync-AgentDesktopSkill {
 # 生きた設定を壊しうるため、-Force でも確認とJSON検証は省略しない
 # （-Force が省略するのは冒頭の一括インストール確認と delta 導入後の確認のみ）。
 # -Yes は上書き確認も含むすべての確認に y と答える（差分表示・JSON検証・バックアップは行う）。
+# -ReinstallPlugins は claude-plugin を版の比較なしに GitHub の main から入れ直す
+# （plugin.json の version を上げ忘れた変更や、壊れた cache を直すため）。
 function Install-DevTools {
     [CmdletBinding()]
-    param([switch]$Force, [switch]$Yes)
+    param([switch]$Force, [switch]$Yes, [switch]$ReinstallPlugins)
 
     $ErrorActionPreference = 'Stop'
     if ($Yes) { $Force = $true }
@@ -520,6 +522,7 @@ function Install-DevTools {
         if (-not $installed[$tool.Name] -or $tool.InstallOnly) { continue }
         try {
             if ($tool.Backend -eq 'claude-plugin') {
+                if ($ReinstallPlugins) { $tool; continue }
                 $upToDate = Test-DevToolPluginUpToDate $tool
                 if ($null -eq $upToDate) { Write-Warning "$($tool.Name): plugin version could not be checked; skipping update." }
                 elseif (-not $upToDate) { $tool }
@@ -675,6 +678,19 @@ function Install-DevTools {
                     }
                     Save-DevToolMarketplace $t
                     $current = $plugins | Where-Object { $_.id -eq $t.Id }
+                    if ($current -and $ReinstallPlugins) {
+                        # 版が同じだと update も install も cache を使い回すので、外して cache を消し、
+                        # 展開し直したマーケットプレイスから入れ直す。設定値は控えて install に渡す。
+                        if ($config.Count -eq 0) { $config = @(Get-DevToolPluginConfigArgs $t.Id) }
+                        claude plugin uninstall $t.Id --keep-data
+                        Assert-NativeCommandSucceeded "claude plugin uninstall $($t.Id)"
+                        if ($current.installPath -and (Test-Path -LiteralPath $current.installPath)) {
+                            Remove-Item -LiteralPath $current.installPath -Recurse -Force
+                        }
+                        claude plugin marketplace update $t.Marketplace
+                        Assert-NativeCommandSucceeded "claude plugin marketplace update $($t.Marketplace)"
+                        $current = $null
+                    }
                     if ($current) {
                         # 統合などで中身が変わっていることがあるので、有効化の前に更新する。
                         claude plugin marketplace update $t.Marketplace
