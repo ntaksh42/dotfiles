@@ -36,7 +36,7 @@ $script:DevTools = @(
     @{ Name = 'PowerShell 7'; Backend = 'winget'; Id = 'Microsoft.PowerShell'; Cmd = 'pwsh'; Upgradable = $true; SelfUpdate = $true }
     @{ Name = 'PSFzf'; Backend = 'psmodule'; Id = 'PSFzf' }
     @{ Name = 'Terminal-Icons'; Backend = 'psmodule'; Id = 'Terminal-Icons' }
-    @{ Name = 'gita'; Backend = 'pip'; Id = 'gita'; Cmd = 'gita' }
+    @{ Name = 'gita'; Backend = 'script'; Id = 'https://github.com/ntaksh42/gita/releases/latest/download/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\gita\gita.exe'); RebootRequiredExitCode = 3010; Repo = 'ntaksh42/gita'; VersionSource = 'command' }
     # Windows-Operation-Cli の後継。スキルは Sync-AgentDesktopSkill が CLI から書き出す。
     @{ Name = 'agent-desktop'; Backend = 'npm'; Id = 'agent-desktop'; Cmd = 'agent-desktop'; RequiredCommand = 'npm' }
     @{ Name = 'git'; Backend = 'winget'; Id = 'Git.Git'; Cmd = 'git' }

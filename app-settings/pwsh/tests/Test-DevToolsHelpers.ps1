@@ -76,8 +76,8 @@ try {
         if ($bad) { throw "unknown backend: $($bad -join ', ')" }
         $true
     }
-    Test-Case 'Every backend is used by at least one catalog entry' {
-        @($knownBackends | Where-Object { (Get-ToolsByBackend $_).Count -eq 0 }).Count -eq 0
+    Test-Case 'The catalog includes entries for each active backend' {
+        @($knownBackends | Where-Object { $_ -ne 'pip' -and (Get-ToolsByBackend $_).Count -eq 0 }).Count -eq 0
     }
     Test-Case 'Entries only use keys that their Backend consumes (catches typos)' {
         $bad = foreach ($t in $tools) {
@@ -110,7 +110,13 @@ try {
     }
     Test-Case 'pip entries have Id and Cmd (Test-ToolInstalled passes Cmd to Test-Cmd, which is mandatory)' {
         $pip = @(Get-ToolsByBackend 'pip')
-        $pip.Count -gt 0 -and @($pip | Where-Object { [string]::IsNullOrWhiteSpace($_.Id) -or [string]::IsNullOrWhiteSpace($_.Cmd) }).Count -eq 0
+        @($pip | Where-Object { [string]::IsNullOrWhiteSpace($_.Id) -or [string]::IsNullOrWhiteSpace($_.Cmd) }).Count -eq 0
+    }
+    Test-Case 'gita uses the versioned MSI installer even when the Python command is on PATH' {
+        $gita = @($tools | Where-Object Name -eq 'gita')
+        $gita.Count -eq 1 -and $gita[0].Backend -eq 'script' -and $gita[0].VersionSource -eq 'command' -and
+            $gita[0].Repo -eq 'ntaksh42/gita' -and $gita[0].Id -eq "https://github.com/$($gita[0].Repo)/releases/latest/download/install.ps1" -and
+            $gita[0].Path -eq (Join-Path $originalLocalAppData 'Programs\gita\gita.exe')
     }
     Test-Case 'psmodule entries have an Id' {
         $ps = @(Get-ToolsByBackend 'psmodule')
