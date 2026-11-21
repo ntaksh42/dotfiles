@@ -12,6 +12,7 @@
   - 報告シート (警告): 図の欠落、図がある場合の要点の印 (class="key") の欠落、タイトルの状態の語の欠落・ずれ、
     本文 800 字超、表のセル 60 字超、畳みが本文より長い、
     表のセルの埋め草 (「特になし」「引き続き注視」など、することの無い対応案)
+  - 詳細 (<!-- report-sheet detail -->): 結論・「次:」・埋め草だけを見る。字数・箇条書き・図の目安は当てない
 
 終了コード 0 = 出してよい / 1 = 直してから出す。標準ライブラリのみ (python3.8+)。
 """
@@ -60,7 +61,9 @@ def check_sheet(html: str):
         errors.append('問いカード / radio がある — 推奨は論点の下の .pick 行に書き、答えは会話で受ける')
     for m in re.finditer(r'<(?:script|link|img)[^>]*(?:src|href)=["\'](?!https:|data:|file:|#|mailto:|//)([^"\']+)["\']', live):
         warns.append(f'相対 URL の外部参照: {m.group(1)} (data URI か https 絶対 URL にする)')
-    is_report = '<!-- report-sheet -->' in html
+    is_report = bool(re.search(r'<!-- report-sheet( detail)? -->', html))
+    # 詳細 (本文 800 字超で new-sheet.py が選ぶ形) には、シートの字数・箇条書き・図の目安を当てない
+    is_detail = '<!-- report-sheet detail -->' in html
     if not is_report and 'review-sheet-format: v6' not in html:
         warns.append('<!-- review-sheet-format: v6 --> が無い (どの規約で書いたシートかの目印)')
     total, concl = prose_length(live)
@@ -68,7 +71,11 @@ def check_sheet(html: str):
         n_decisions = len(re.findall(r'<section class=["\']decision["\']', live))
         n_rows = len(re.findall(r'<tr><th scope=["\']row["\']', live))
         # 要判断が主役で項目が 3 行以下のシートは描く形が無いことが多いので、図を求めない
-        if '<svg' not in live and not (n_decisions and n_rows <= 3):
+        if is_detail:
+            pass
+        elif '<svg' not in live and 'class="mermaid"' in live:
+            pass  # Mermaid の図は描画前に印を付けられないので、要点の印を求めない
+        elif '<svg' not in live and not (n_decisions and n_rows <= 3):
             warns.append('図が無い — 既定で 1 枚置く。省くのは内容に形 (前後・流れ・構成・量・状態の並び) が無いときだけ')
         elif not re.search(r'class=["\'][^"\']*\bkey\b', live):
             warns.append('要点の印 (class="key") が無い — 図の中で要点の要素だけを赤くする')
@@ -79,20 +86,20 @@ def check_sheet(html: str):
             if not re.fullmatch(STATE_WORDS, state_text):
                 warns.append(f'状態の語「{state_text}」が決まった語でない — タイトルの先頭に 対応不要 / 要判断 n 件 / 要対応 / 未完了 のどれかを置く')
             concl = visible_len(title.group(1)) - visible_len(state_text)
-        if total > REPORT_PROSE_LIMIT:
+        if not is_detail and total > REPORT_PROSE_LIMIT:
             warns.append(f'本文の文章が {total} 字 (目安 {REPORT_PROSE_LIMIT} 字以内)。説明は図のラベルへ移すか、項目を絞る。判断や行動に要る項目は畳まない')
         folded = sum(visible_len(t) for t in re.findall(r'<details\b[^>]*>(.*?)</details>', live, flags=re.DOTALL))
-        if folded > total:
+        if not is_detail and folded > total:
             warns.append(f'畳みの中 ({folded} 字) が本文 ({total} 字) より長い。読み手が判断や行動に使う項目が <details> に入っていないか見直す')
         if concl > REPORT_CONCL_LIMIT:
             errors.append(f'結論 (タイトル) が {concl} 字 (上限 {REPORT_CONCL_LIMIT} 字・1 文)。補足は次の行へ移す')
         body = re.sub(r'<(svg|details)\b.*?</\1>', '', live, flags=re.DOTALL)
         n_li = len(re.findall(r'<li\b', body))
-        if n_li > REPORT_BULLET_LIMIT:
+        if not is_detail and n_li > REPORT_BULLET_LIMIT:
             errors.append(f'箇条書きが {n_li} 個 (上限 {REPORT_BULLET_LIMIT} 個)。6 個以上は「## 項目」の表にする')
         cells = re.findall(r'<td\b[^>]*>(.*?)</td>', re.sub(r'<(span|code) class=["\']evidence-line["\'].*?</\1>', '', body, flags=re.DOTALL), flags=re.DOTALL)
         long_cells = [n for n in (visible_len(t) for t in cells) if n > REPORT_CELL_LIMIT]
-        if long_cells:
+        if long_cells and not is_detail:
             warns.append(f'表のセル {len(long_cells)} 個が {REPORT_CELL_LIMIT} 字超 (最長 {max(long_cells)} 字)。文でなく句で書く')
         fillers = [t for t in (htmllib.unescape(re.sub(r'<[^>]+>', '', c)).strip() for c in cells) if re.fullmatch(FILLER, t)]
         if fillers:

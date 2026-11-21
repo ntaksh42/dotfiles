@@ -12,7 +12,8 @@
   --lines      結論の 1 文を除いた本文のおよその行数
   --decisions  決めてもらう問いの数
 
-出力は 1 行目が「形: 会話 / 報告シート / 詳細レポート / 比較シート / 原稿ファイル」、2 行目が理由。
+出力は 1 行目が「形: 会話 / 報告シート / 比較シート / 原稿ファイル」、2 行目が理由。
+報告シートを短いシートにするか詳細にするかは、ここでなく new-sheet.py が本文の長さで決める。
 終了コードは会話なら 0、それ以外は 10 (シェルで分岐したいとき用)。標準ライブラリのみ。
 """
 import argparse
@@ -37,7 +38,7 @@ def choose(question='', kind='answer', items=None, chars=0, lines=0, decisions=0
     r = re.search(REPORT_WORDS, question or '', flags=re.I)
     if kind == 'report' or r:
         why = f'問いに「{r.group(0)}」がある' if r else '種類が report'
-        return '詳細レポート', f'{why}。HTML レポートの保存を頼まれている。references/html-report.md を読む'
+        return '報告シート', f'{why}。保存を頼まれているので new-sheet.py に --save を付ける (シートか詳細かは生成器が本文の長さで決める)'
     if kind == 'ui':
         return '比較シート', 'UI の配置や画面を見て選ぶ相談。references/comparison-sheet.md を読む'
     if kind in SHEET_KINDS:

@@ -1,6 +1,9 @@
 """new-sheet.py の単体テスト。python -m unittest claude/skills/report-to-user/tests/test_new_sheet.py"""
 import importlib.util
+import os
+import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -75,7 +78,7 @@ class NewSheetTest(unittest.TestCase):
         self.assertNotIn('[仕様]', page)
 
     def test_rejects_bad_input(self):
-        for src in ('結論だけ', '# 様子見 | x', '# 要対応 | x\n## 要判断: q\n他案: a\n', '# 要対応 | x\n## 雑多\n- a\n'):
+        for src in ('結論だけ', '# 様子見 | x', '# 要対応 | x\n## 要判断: q\n他案: a\n'):
             with self.assertRaises(ns.InputError, msg=src):
                 ns.build(src, 'R')
 
@@ -147,6 +150,98 @@ class NewSheetTest(unittest.TestCase):
         for nxt in ('閾値を選ぶ', '不要なファイルを消す'):
             errors = checker.check_sheet(ns.build(f'# 要対応 | x\n次: {nxt}\n', 'R'))[0]
             self.assertEqual(errors, [], nxt)
+
+    # ---- 自由な節と、形・種別・保存先の静的な判定 ----
+
+    def test_free_section_renders_markdown(self):
+        src = ('# 対応不要 | x\n## 背景\n段落の文。\n\n### 小見出し\n- a\n  - a1\n1. b\n'
+               '| 列 | 値 |\n|---|---|\n| p \\| q | [!red 重大] |\n> 引用\n:::bar 進捗|85\n'
+               '```js\nx < 1\n```\n')
+        page = ns.build(src, 'R')
+        self.assertIn('<h2 class="sec">背景</h2>', page)
+        self.assertIn('<ul><li>a<ul><li>a1</li></ul></li></ul><ol><li>b</li></ol>', page)
+        self.assertIn('<td>p | q</td>', page)
+        self.assertIn('class="tag tag-red">重大</span>', page)
+        self.assertIn('<blockquote>引用</blockquote>', page)
+        self.assertIn('width:85%', page)
+        self.assertIn('<pre data-lang="js"><code>x &lt; 1</code></pre>', page)
+        self.assertNotIn('<script', page)
+
+    def test_short_body_is_sheet_long_body_is_detail(self):
+        short = ns.build('# 対応不要 | x\n## 背景\n' + 'あ' * 700 + '\n', 'R')
+        self.assertIn('<!-- report-sheet -->', short)
+        long = ns.build('# 対応不要 | x\n## 背景\n' + 'あ' * 801 + '\n', 'R')
+        self.assertIn('<!-- report-sheet detail -->', long)
+        # 付録の中は数えない
+        appendix = ns.build('# 対応不要 | x\n## 付録: ログ\n' + 'あ' * 2000 + '\n', 'R')
+        self.assertIn('<!-- report-sheet -->', appendix)
+
+    def test_detail_skips_sheet_limits_but_keeps_title_limit(self):
+        src = '# 要対応 | x\n' + ''.join(f'- 点{i}\n' for i in range(7)) + '## 背景\n' + 'あ' * 900 + '\n'
+        errors, warns, _, _ = checker.check_sheet(ns.build(src, 'R'))
+        self.assertEqual((errors, warns), ([], []))
+        long_title = ns.build('# 要対応 | ' + 'あ' * 61 + '\n## 背景\n' + 'い' * 900 + '\n', 'R')
+        self.assertTrue(any('結論' in e for e in checker.check_sheet(long_title)[0]))
+
+    def test_detail_has_toc_from_five_sections(self):
+        body = ''.join(f'## 節{i}\n' + 'あ' * 200 + '\n' for i in range(5))
+        page = ns.build('# 対応不要 | x\n' + body, 'R')
+        self.assertIn('<nav class="toc">', page)
+        self.assertIn('<a href="#sec-1">節0</a>', page)
+        self.assertNotIn('class="toc"', ns.build('# 対応不要 | x\n## 節\nあ\n', 'R'))
+
+    def test_long_table_folds(self):
+        rows = ''.join(f'| r{i} | v |\n' for i in range(18))
+        page = ns.build('# 対応不要 | x\n## 表\n| a | b |\n|---|---|\n' + rows, 'R')
+        self.assertIn('残り 3 行を表示', page)
+
+    def test_svg_and_links_are_sanitized(self):
+        src = ('# 対応不要 | x\n```svg\n<svg onload="alert(1)"><script>x</script><g class="key"><rect/></g></svg>\n```\n'
+               '## 背景\n[悪い](javascript:alert(1)) と [良い](https://example.com)\n')
+        page = ns.build(src, 'R')
+        self.assertNotIn('onload', page)
+        self.assertNotIn('<script>x', page)
+        self.assertNotIn('javascript:', page)
+        self.assertIn('<a href="https://example.com">良い</a>', page)
+
+    def test_mermaid_adds_script_only_when_used(self):
+        page = ns.build('# 対応不要 | x\n## 図\n```mermaid\nflowchart LR\n A-->B\n```\n', 'R')
+        self.assertIn('<pre class="mermaid">', page)
+        self.assertIn('mermaid.esm.min.mjs', page)
+        self.assertNotIn('mermaid.esm', ns.build('# 対応不要 | x\n', 'R'))
+
+    def test_infer_kind(self):
+        cases = {'XSS の脆弱性を見つけた': 'security', 'PR #12 のレビュー結果': 'review',
+                 'ログインが失敗する原因': 'bug', '生成器を統合する案': 'proposal',
+                 'ライブラリの比較': 'research', 'ディレクトリ構成': 'investigation'}
+        for words, kind in cases.items():
+            self.assertEqual(ns.infer_kind(words), kind, words)
+
+    def test_keep_path_numbers_from_existing(self):
+        with tempfile.TemporaryDirectory() as d:
+            conf = {'base_dir': d, 'subdirs': {}, 'prefixes': {}}
+            first = ns.keep_path('bug', conf)
+            self.assertEqual(first, Path(d) / 'bugs' / 'bug001.html')
+            first.parent.mkdir(parents=True)
+            (first.parent / 'bug007.html').write_text('x')
+            (first.parent / 'bug008-mockup.html').write_text('x')
+            self.assertEqual(ns.keep_path('bug', conf).name, 'bug008.html')
+
+    def test_plan_paths(self):
+        keep = Path('/k/bug001.html')
+        with mock.patch.dict(os.environ, {'ORCA_CHAT_SCRATCH_DIR': ''}), \
+                mock.patch.object(ns, 'keep_path', return_value=keep):
+            sheet = ns.plan_paths('sheet', 'bug')
+            self.assertEqual(len(sheet), 1)
+            self.assertNotEqual(sheet[0], keep)
+            self.assertEqual(ns.plan_paths('detail', 'bug'), [keep])
+            self.assertEqual(ns.plan_paths('sheet', 'bug', save=True), [keep])
+            self.assertEqual(ns.plan_paths('detail', 'bug', out='x.html'), [Path('x.html').resolve()])
+        with mock.patch.dict(os.environ, {'ORCA_CHAT_SCRATCH_DIR': '/s'}), \
+                mock.patch.object(ns, 'keep_path', return_value=keep):
+            paths = ns.plan_paths('detail', 'bug', name='t')
+            self.assertEqual(paths[0], keep)
+            self.assertEqual(paths[1].parent, Path('/s'))
 
 
 if __name__ == '__main__':

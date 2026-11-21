@@ -1,4 +1,5 @@
-# report-to-user 詳細レポートの出力設定
+# report-to-user で残すレポート (詳細の形と --save) の出力設定
+# 種別は scripts/new-sheet.py の infer_kind() がタイトルと見出しから決める
 # このファイルを編集して保存先や番号の管理方法を設定してください
 
 [output]

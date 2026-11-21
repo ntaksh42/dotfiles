@@ -43,8 +43,10 @@ class ChooseFormTest(unittest.TestCase):
 
     def test_html_report_request(self):
         for q in ('結果を HTML レポートにまとめて保存して', 'レポートを保存して', '調査結果をHTMLにまとめて'):
-            self.assertEqual(cf.choose(q, items=1)[0], '詳細レポート', q)
-        self.assertEqual(cf.choose(kind='report')[0], '詳細レポート')
+            form, why = cf.choose(q, items=1)
+            self.assertEqual(form, '報告シート', q)
+            self.assertIn('--save', why, q)
+        self.assertIn('--save', cf.choose(kind='report')[1])
 
     def test_special_forms(self):
         self.assertEqual(cf.choose(kind='ui')[0], '比較シート')

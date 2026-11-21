@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- report-sheet -->
-<!-- scripts/new-sheet.py が {{...}} を埋めて出力する。手で埋めない。色は Orca のテーマ変数を優先し、無い環境では固定色に戻る -->
+<!-- report-sheet{{LAYOUT}} -->
+<!-- scripts/new-sheet.py が二重波括弧の欄を埋めて出力する。シートと詳細で同じ雛形を使う。手で埋めない。色は Orca のテーマ変数を優先し、無い環境では固定色に戻る -->
 <title>{{TAB_TITLE}}</title>
 <style>
 :root{
@@ -61,7 +61,39 @@ details.rest table{margin-top:4px}
 details{border:1px solid var(--ag-line);border-radius:8px;padding:8px 14px;margin:20px 0 6px}
 summary{cursor:pointer;color:var(--ag-link);font-size:13.5px}
 details pre{white-space:pre-wrap;font-family:'IBM Plex Mono',Consolas,monospace;font-size:12.5px;color:var(--ag-muted);margin:8px 0 0}
+
+/* ---- 自由な節と詳細 (scripts/new-sheet.py の render_blocks が出す要素) ---- */
+.block{scroll-margin-top:12px}
+h2.sec{font-size:18px;color:var(--ag-ink);letter-spacing:0;margin:30px 0 8px;padding-left:10px;border-left:4px solid var(--ag-muted)}
+.content p{margin:0 0 10px}
+.content h3{font-size:15.5px;margin:18px 0 6px}
+.content ul,.content ol{margin:0 0 10px;padding-left:1.5em}
+.content li{margin:2px 0}
+.content table{margin:6px 0 12px}
+.content pre,.content blockquote{margin:6px 0 12px}
+pre{background:var(--ag-dim);border:1px solid var(--ag-line);border-radius:8px;padding:10px 14px;overflow-x:auto;font-family:'IBM Plex Mono',Consolas,monospace;font-size:13px;line-height:1.6}
+p code,li code,td code{background:var(--ag-dim);border:1px solid var(--ag-line);border-radius:4px;padding:0 4px}
+blockquote{border-left:3px solid var(--ag-muted);background:var(--ag-dim);border-radius:0 6px 6px 0;padding:8px 14px;font-size:14px}
+.figure,pre.mermaid{background:transparent;border:1px solid var(--ag-line);border-radius:8px;padding:14px;overflow-x:auto}
+.figure svg,pre.mermaid svg{margin:0 auto}
+pre.mermaid:not([data-processed]){background:var(--ag-dim);white-space:pre;font-size:12.5px;color:var(--ag-muted)}
+.mermaid-note{font-size:12.5px;color:var(--ag-muted)}
+.tag-red{background:var(--ag-red-bg);color:var(--ag-red)}
+.tag-yellow{background:var(--ag-amber-bg);color:var(--ag-amber)}
+.tag-green{background:var(--ag-green-bg);color:var(--ag-green)}
+.tag-gray{background:var(--ag-dim);color:var(--ag-muted)}
+.tag-blue{background:rgba(37,99,235,.12);color:var(--ag-link)}
+.bar-row{display:grid;grid-template-columns:minmax(80px,1fr) 3fr 3.5rem;align-items:center;gap:12px;margin:6px 0;font-size:14px}
+.bar-label{color:var(--ag-muted)}
+.bar-track{background:var(--ag-dim);border:1px solid var(--ag-line);border-radius:999px;height:10px;overflow:hidden}
+.bar-fill{background:var(--ag-muted);height:100%}
+.bar-value{font-family:'IBM Plex Mono',Consolas,monospace;font-size:13px;text-align:right}
+.toc{background:var(--ag-dim);border-radius:8px;padding:8px 16px;margin:16px 0 0;font-size:14px}
+.toc b{font-size:11.5px;color:var(--ag-muted)}
+.toc ol{margin:2px 0 0;padding-left:1.4em;columns:2 260px}
 </style></head>
 <body><main>
 {{BODY}}
-</main></body></html>
+</main>
+{{SCRIPTS}}
+</body></html>
