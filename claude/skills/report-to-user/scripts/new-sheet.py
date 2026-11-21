@@ -23,6 +23,8 @@ import secrets
 import subprocess
 import sys
 import tempfile
+import urllib.parse
+from functools import lru_cache
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
@@ -72,7 +74,7 @@ def inline(text: str) -> str:
         out.append(html.escape(text[pos:m.start()], quote=False))
         code, bold, em, color, badge, label, url = m.groups()
         if code is not None:
-            out.append(f'<code>{html.escape(code, quote=False)}</code>')
+            out.append(source_link(code) or f'<code>{html.escape(code, quote=False)}</code>')
         elif bold is not None:
             out.append(f'<b>{inline(bold)}</b>')
         elif em is not None:
@@ -86,6 +88,44 @@ def inline(text: str) -> str:
         pos = m.end()
     out.append(html.escape(text[pos:], quote=False))
     return ''.join(out)
+
+
+@lru_cache(maxsize=1)
+def repo_root() -> Path:
+    try:
+        top = subprocess.run(['git', 'rev-parse', '--show-toplevel'], capture_output=True, text=True, timeout=5)
+        if top.returncode == 0 and top.stdout.strip():
+            return Path(top.stdout.strip())
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return Path.cwd()
+
+
+SOURCE_RE = re.compile(r'((?:[A-Za-z]:)?[\w.~/\-]*[\w-]\.\w+):(\d+)(?:-\d+)?')
+
+
+def source_link(token: str):
+    """`path:line` が実在するファイルを指すなら、エディタの該当行を開くリンクにする。そうでなければ None。"""
+    m = SOURCE_RE.fullmatch(token.strip())
+    if not m:
+        return None
+    path = Path(os.path.expanduser(m.group(1)))
+    if not path.is_absolute():
+        path = repo_root() / path
+    if not path.is_file():
+        return None
+    uri = 'vscode://file/' + urllib.parse.quote(path.resolve().as_posix(), safe='/:') + f':{m.group(2)}'
+    return (f'<a class="src" href="{html.escape(uri)}" title="エディタで開く">'
+            f'<code>{html.escape(token.strip(), quote=False)}</code></a>')
+
+
+def mark_sources(text: str) -> str:
+    """根拠の行の素の file:line をコード表記で包み、inline() でリンクにできるようにする。リンクとコードの中は触らない。"""
+    parts = re.split(r'(`[^`]+`|\[[^\]]+\]\([^)]*\))', text)
+    for i in range(0, len(parts), 2):
+        parts[i] = re.sub(r'(?<![\w/.:\-])' + SOURCE_RE.pattern + r'(?![\w/])',
+                          lambda m: f'`{m.group(0)}`', parts[i])
+    return ''.join(parts)
 
 
 def clean_svg(svg: str) -> str:
@@ -102,8 +142,27 @@ def fence_html(lang: str, code: str, figure_wrap=True) -> str:
         return f'<div class="figure">{svg}</div>' if figure_wrap else svg
     if lang == 'mermaid':
         return f'<pre class="mermaid">{html.escape(code, quote=False)}</pre>'
+    if lang == 'diff':
+        return diff_html(code)
     attr = f' data-lang="{html.escape(lang)}"' if lang else ''
     return f'<pre{attr}><code>{html.escape(code, quote=False)}</code></pre>'
+
+
+def diff_html(code: str) -> str:
+    """差分を行ごとに色分けする。「>> 指摘」の行は直前の行に付く注記として行の下に出す ([優先] などの札も付けられる)。"""
+    rows = []
+    for line in code.split('\n'):
+        note = re.match(r'^>>\s*(?:\[([^\]]+)\]\s*)?(.*)$', line)
+        if note:
+            label, text = note.groups()
+            kind = {'優先': ' priority', '推測': ' guess', '未検証': ' unverified'}.get(label or '', '')
+            tag = f'<span class="tag{kind}">{html.escape(label)}</span> ' if label else ''
+            rows.append(f'<div class="d-note">{tag}{inline(text)}</div>')
+            continue
+        cls = ('d-hunk' if line.startswith('@@') else 'd-add' if line.startswith('+')
+               else 'd-del' if line.startswith('-') else 'd-ctx')
+        rows.append(f'<div class="{cls}">{html.escape(line, quote=False) or " "}</div>')
+    return '<pre class="diff"><code>' + ''.join(rows) + '</code></pre>'
 
 
 # ---- 自由な節の本文 (段落・小見出し・リスト・表・コード・図・引用・横棒) ----------
@@ -317,7 +376,12 @@ def render_decision(title, lines):
         m = re.match(r'^(推奨|他案)\s*[:：]\s*(.+)$', line.strip())
         if m:
             cls = 'rec' if m.group(1) == '推奨' else 'alt'
-            rows.append(f'<div class="choice {cls}"><b>{m.group(1)}</b><p>{inline(m.group(2))}</p></div>')
+            # 案の名前 (「 — 」の前) で返答の文を作り、ボタンでコピーさせる。答えは会話に貼って受ける
+            name = re.split(r'\s+[—–-]{1,2}\s+', m.group(2), maxsplit=1)[0].replace('`', '').replace('**', '').strip()
+            question = re.sub(r'^要判断\s*[:：]\s*', '', title)
+            reply = f'要判断「{question}」は「{name}」で進めて'
+            btn = f'<button type="button" class="copy reply" data-copy="{html.escape(reply)}">この案で返答をコピー</button>'
+            rows.append(f'<div class="choice {cls}"><b>{m.group(1)}</b><p>{inline(m.group(2))}</p>{btn}</div>')
         elif line.strip():
             raise InputError(f'要判断の中は「推奨:」「他案:」の行だけ: {line.strip()[:40]}')
     if not rows or 'rec' not in rows[0]:
@@ -362,7 +426,7 @@ def render_items(title, lines):
             if label and label != '確認済み':
                 kind = {'優先': ' priority', '推測': ' guess', '未検証': ' unverified'}.get(label, '')
                 tag = f'<span class="tag{kind}">{html.escape(label)}</span><br>'
-            evs = ''.join(f'<span class="evidence-line">{inline(e)}</span>' for e in ev)
+            evs = ''.join(f'<span class="evidence-line">{inline(mark_sources(e))}</span>' for e in ev)
             cell = f'<td><p>{inline(body)}</p>{evs}</td>'
             out.append(f'<tr><th scope="row">{tag}{inline(name)}</th>{cell}'
                        + (f'<td><p>{inline(act)}</p></td>' if has_action else '') + '</tr>')
@@ -515,6 +579,35 @@ MERMAID = '''<script type="module">
 </script>'''
 
 
+COPY = """<script>
+  // コピーボタン: 要判断の返答 (data-copy) と、コードブロックの中身。クリップボードが使えない枠では選択して execCommand に戻る
+  (function () {
+    function copy(text, btn) {
+      var done = function () { var t = btn.textContent; btn.textContent = 'コピーした'; setTimeout(function () { btn.textContent = t; }, 1400); };
+      var fallback = function () {
+        var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(); } catch (e) { btn.textContent = 'コピーできない'; }
+        document.body.removeChild(ta);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+    }
+    document.querySelectorAll('pre:not(.mermaid) > code').forEach(function (code) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'copy code-copy'; b.textContent = 'コピー';
+      code.parentNode.appendChild(b);
+      b.addEventListener('click', function () {
+        var text = code.classList && code.parentNode.classList.contains('diff')
+          ? Array.prototype.map.call(code.querySelectorAll('div:not(.d-note)'), function (d) { return d.textContent; }).join('\\n')
+          : code.textContent;
+        copy(text, b);
+      });
+    });
+    document.querySelectorAll('button[data-copy]').forEach(function (b) {
+      b.addEventListener('click', function () { copy(b.getAttribute('data-copy'), b); });
+    });
+  })();
+</script>"""
+
+
 def wrap(body, concl, toc, layout, meta):
     parts = [f'<div class="meta">{html.escape(meta)}</div>', body]
     if layout == 'detail' and len(toc) >= TOC_MIN:
@@ -528,7 +621,8 @@ def wrap(body, concl, toc, layout, meta):
     return (page.replace('{{LAYOUT}}', ' detail' if layout == 'detail' else '')
                 .replace('{{TAB_TITLE}}', html.escape(tab))
                 .replace('{{BODY}}', '\n'.join(parts))
-                .replace('{{SCRIPTS}}', MERMAID if 'class="mermaid"' in body else ''))
+                .replace('{{SCRIPTS}}', (MERMAID if 'class="mermaid"' in body else '')
+                         + (COPY if ('data-copy=' in body or '<code>' in body and '<pre' in body) else '')))
 
 
 def build(src: str, meta: str, layout=None):
@@ -538,14 +632,7 @@ def build(src: str, meta: str, layout=None):
 
 
 def repo_name():
-    cwd = Path.cwd()
-    try:
-        top = subprocess.run(['git', 'rev-parse', '--show-toplevel'], capture_output=True, text=True, timeout=5)
-        if top.returncode == 0 and top.stdout.strip():
-            cwd = Path(top.stdout.strip())
-    except (OSError, subprocess.SubprocessError):
-        pass
-    return cwd.name
+    return repo_root().name
 
 
 def default_meta(layout, kind, doc_id=None):

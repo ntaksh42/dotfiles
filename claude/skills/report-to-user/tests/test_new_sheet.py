@@ -55,7 +55,7 @@ class NewSheetTest(unittest.TestCase):
         page = ns.build(FULL, 'REPORT')
         self.assertIn('&lt;script&gt;', page)
         self.assertIn('ok 1 &lt;b&gt;', page)
-        self.assertNotIn('<script>', page)
+        self.assertNotIn('<script>', page.split('</main>')[0])
 
     def test_two_columns_without_action(self):
         page = ns.build('# 対応不要 | 済んだ\n\n## 項目: 関数 / 役割\n- mkcd: 作って移動\n', 'R')
@@ -165,7 +165,7 @@ class NewSheetTest(unittest.TestCase):
         self.assertIn('<blockquote>引用</blockquote>', page)
         self.assertIn('width:85%', page)
         self.assertIn('<pre data-lang="js"><code>x &lt; 1</code></pre>', page)
-        self.assertNotIn('<script', page)
+        self.assertNotIn('<script', page.split('</main>')[0])
 
     def test_short_body_is_sheet_long_body_is_detail(self):
         short = ns.build('# 対応不要 | x\n## 背景\n' + 'あ' * 700 + '\n', 'R')
@@ -200,7 +200,7 @@ class NewSheetTest(unittest.TestCase):
                '## 背景\n[悪い](javascript:alert(1)) と [良い](https://example.com)\n')
         page = ns.build(src, 'R')
         self.assertNotIn('onload', page)
-        self.assertNotIn('<script>x', page)
+        self.assertNotIn('<script>x', page.split('</main>')[0])
         self.assertNotIn('javascript:', page)
         self.assertIn('<a href="https://example.com">良い</a>', page)
 
@@ -242,6 +242,31 @@ class NewSheetTest(unittest.TestCase):
             paths = ns.plan_paths('detail', 'bug', name='t')
             self.assertEqual(paths[0], keep)
             self.assertEqual(paths[1].parent, Path('/s'))
+
+    # ---- 読んだ後に動くための仕掛け ----
+
+    def test_evidence_links_existing_files_only(self):
+        src = ('# 対応不要 | x\n## 項目\n- a: b\n'
+               '  根拠: scripts/new-sheet.py:10 と missing.py:3 と `tests/test_new_sheet.py:1`\n')
+        with mock.patch.object(ns, 'repo_root', return_value=ROOT):
+            page = ns.build(src, 'R')
+        self.assertRegex(page, r'href="vscode://file/[^"]*/scripts/new-sheet\.py:10"')
+        self.assertRegex(page, r'href="vscode://file/[^"]*/tests/test_new_sheet\.py:1"')
+        self.assertIn('<code>missing.py:3</code>', page)
+        self.assertNotIn('missing.py:3"', page)
+
+    def test_decision_has_reply_copy_buttons(self):
+        page = ns.build('# 要判断 1 件 | x\n## 要判断: 上限\n推奨: **5 行** — 理由\n他案: 8 行 — 利点 / 代償\n', 'R')
+        self.assertIn('data-copy="要判断「上限」は「5 行」で進めて"', page)
+        self.assertIn('data-copy="要判断「上限」は「8 行」で進めて"', page)
+        self.assertIn('button[data-copy]', page)
+
+    def test_diff_fence(self):
+        page = ns.build('# 対応不要 | x\n## 差分\n```diff\n@@ -1 +1 @@\n-old\n+new\n>> [優先] ここが危ない\n ctx\n```\n', 'R')
+        for cls in ('d-hunk', 'd-del', 'd-add', 'd-ctx', 'd-note'):
+            self.assertIn(f'class="{cls}"', page)
+        self.assertIn('<span class="tag priority">優先</span> ここが危ない', page)
+        self.assertIn(r".join('\n')", page)  # JS の文字列の中で改行文字にならない
 
 
 if __name__ == '__main__':

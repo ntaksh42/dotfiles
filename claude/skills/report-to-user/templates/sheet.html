@@ -91,6 +91,35 @@ pre.mermaid:not([data-processed]){background:var(--ag-dim);white-space:pre;font-
 .toc{background:var(--ag-dim);border-radius:8px;padding:8px 16px;margin:16px 0 0;font-size:14px}
 .toc b{font-size:11.5px;color:var(--ag-muted)}
 .toc ol{margin:2px 0 0;padding-left:1.4em;columns:2 260px}
+/* ---- 読んだ後に動くための仕掛け: 根拠のリンク、返答とコードのコピー、差分 ---- */
+a.src{text-decoration:none}
+a.src code{color:var(--ag-link);border-bottom:1px dotted var(--ag-link)}
+a.src:hover code{background:var(--ag-dim)}
+.choice{grid-template-columns:3.4em 1fr auto;align-items:start}
+button.copy{font:inherit;font-size:11.5px;line-height:1.4;padding:2px 9px;border-radius:5px;border:1px solid var(--ag-line);background:var(--ag-paper);color:var(--ag-muted);cursor:pointer;white-space:nowrap}
+button.copy:hover{color:var(--ag-ink);border-color:var(--ag-muted)}
+.choice.rec button.reply{border-color:var(--ag-amber-dot);color:var(--ag-amber)}
+pre{position:relative}
+pre .code-copy{position:absolute;top:6px;right:6px;opacity:.55}
+pre:hover .code-copy{opacity:1}
+pre.diff>code{display:block}
+pre.diff>code>div{white-space:pre;padding:0 6px;margin:0 -6px}
+.d-add{background:var(--ag-green-bg);color:var(--ag-green)}
+.d-del{background:var(--ag-red-bg);color:var(--ag-red)}
+.d-hunk{color:var(--ag-muted)}
+.d-note{white-space:normal !important;font-family:'IBM Plex Sans JP','Yu Gothic UI',sans-serif;font-size:13px;color:var(--ag-ink);background:var(--ag-amber-bg);border-left:3px solid var(--ag-amber-dot);padding:3px 10px !important;margin:2px -6px 4px !important}
+/* 詳細の目次: 本文の左に余白がある広い画面では固定して、読みながら節を移れるようにする */
+@media (min-width:1480px){.toc{position:fixed;top:16px;left:16px;width:210px;max-height:calc(100vh - 32px);overflow:auto;margin:0}.toc ol{columns:auto;padding-left:1.2em}}
+/* 狭い画面: 項目の表を行ごとに縦へ積む */
+@media (max-width:600px){
+  body{padding:10px 14px 24px}
+  table.items colgroup,table.items thead{display:none}
+  table.items,table.items tbody,table.items tr,table.items th,table.items td{display:block;width:auto}
+  table.items tr{border-bottom:1px solid var(--ag-line);padding:6px 0}
+  table.items th,table.items td{border:0;padding:2px 0}
+  .choice{grid-template-columns:3.4em 1fr}
+  .choice button.reply{grid-column:2;justify-self:start}
+}
 </style></head>
 <body><main>
 {{BODY}}
