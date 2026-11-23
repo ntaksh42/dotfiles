@@ -6,7 +6,7 @@
 本文は「-」で標準入力から読める (Bash の heredoc で 1 回の呼び出しで済む)。書式は references/sheet-input.md。
 
 形と保存先は呼び出し側が選ばず、この生成器が本文から決める:
-  - 形: 本文の文章が 800 字以内なら「シート」、超えたら「詳細」(目次・長い表の畳み・字数の上限なし)。choose_layout()
+  - 形: 本文の文章が 800 字以内なら「シート」、超えたら「詳細」(要判断・優先の帯、長い表の畳み、字数の上限なし)。choose_layout()
   - 種別: タイトルと見出しの語から review / bug / security / proposal / research / investigation を決める。infer_kind()
   - 保存先: 詳細と --save は output-config.toml の保存先へ連番で残す。シートは ORCA_CHAT_SCRATCH_DIR か
     一時ディレクトリの report-sheets/ に置く。Orca では残すものも scratch に写しを置いて会話に貼れるようにする。
@@ -15,8 +15,10 @@
 """
 import argparse
 import datetime
+import hashlib
 import html
 import importlib.util
+import json
 import os
 import re
 import secrets
@@ -33,7 +35,6 @@ CHECKER = SKILL_DIR / 'assets' / 'check-sheet.py'
 CONFIG = SKILL_DIR / 'output-config.toml'
 FOLD_ROWS = 6        # 優先の行があり、項目がこの数以上なら、優先以外の行を畳む
 TABLE_FOLD = 15      # 自由な節の表は、データ行がこの数を超えたら残りを畳む
-TOC_MIN = 5          # 詳細で節がこの数以上なら目次を出す
 STATES = {'要判断': 'ask', '要対応': 'act', '未完了': 'act', '対応不要': ''}
 NEXT_SLOT = '<!--next-slot-->'
 
@@ -148,21 +149,55 @@ def fence_html(lang: str, code: str, figure_wrap=True) -> str:
     return f'<pre{attr}><code>{html.escape(code, quote=False)}</code></pre>'
 
 
+HUNK_RE = re.compile(r'^@@\s*(?:-(\d+)(?:,\d+)?\s+\+(\d+)(?:,\d+)?|(.+?)(?::(\d+))?)\s*@@(.*)$')
+
+
 def diff_html(code: str) -> str:
-    """差分を行ごとに色分けする。「>> 指摘」の行は直前の行に付く注記として行の下に出す ([優先] などの札も付けられる)。"""
-    rows = []
+    """差分を行ごとに色分けする。「>> 指摘」の行は直前の行に付く注記として行の下に出す ([優先] などの札も付けられる)。
+
+    見出しが `@@ -a,b +c,d @@` か `@@ <path>:<行> @@` なら、行番号を左に出す (<path>:<行> は根拠と同じくエディタへのリンク)。
+    注記の付いた行は、札の色で塗って指している行を示す。
+    """
+    rows, old, new = [], None, None
+    target = None  # 直前のコード行の rows での位置。注記が付いたら塗る
     for line in code.split('\n'):
         note = re.match(r'^>>\s*(?:\[([^\]]+)\]\s*)?(.*)$', line)
         if note:
             label, text = note.groups()
             kind = {'優先': ' priority', '推測': ' guess', '未検証': ' unverified'}.get(label or '', '')
             tag = f'<span class="tag{kind}">{html.escape(label)}</span> ' if label else ''
-            rows.append(f'<div class="d-note">{tag}{inline(text)}</div>')
+            if target is not None:
+                rows[target] = rows[target].replace('<div class="', f'<div class="d-target{kind} ', 1)
+            rows.append(f'<div class="d-note{kind}">{tag}{inline(text)}</div>')
             continue
-        cls = ('d-hunk' if line.startswith('@@') else 'd-add' if line.startswith('+')
-               else 'd-del' if line.startswith('-') else 'd-ctx')
-        rows.append(f'<div class="{cls}">{html.escape(line, quote=False) or " "}</div>')
-    return '<pre class="diff"><code>' + ''.join(rows) + '</code></pre>'
+        hunk = HUNK_RE.match(line)
+        if hunk:
+            a, c, path, at, rest = hunk.groups()
+            old, new = (int(a), int(c)) if c else (None, int(at) if at else None)
+            head = (source_link(f'{path.strip()}:{at}') if path and at else None) or html.escape(line, quote=False)
+            if path and at and head.startswith('<a'):
+                head = f'@@ {head} @@{html.escape(rest, quote=False)}'
+            rows.append(f'<div class="d-hunk">{head}</div>')
+            target = None
+            continue
+        if line.startswith('\\') and old is not None:  # 「\ No newline at end of file」は行を数えない
+            rows.append(f'<div class="d-hunk"><span class="ln"></span><span class="tx">{html.escape(line, quote=False)}</span></div>')
+            continue
+        excerpt = new is not None and old is None  # @@ path:行 @@ の抜粋: 先頭の記号に関係なく全行が 1 行
+        cls = 'd-ctx' if excerpt else 'd-add' if line.startswith('+') else 'd-del' if line.startswith('-') else 'd-ctx'
+        num = ''
+        if excerpt:
+            num, new = str(new), new + 1
+        elif new is not None:
+            if cls == 'd-del':
+                num, old = (str(old) if old is not None else ''), (old + 1 if old is not None else None)
+            else:
+                num, new = str(new), new + 1
+                old = old + 1 if old is not None and cls == 'd-ctx' else old
+        target = len(rows)
+        rows.append(f'<div class="{cls}"><span class="ln">{num}</span><span class="tx">{html.escape(line, quote=False) or " "}</span></div>')
+    numbered = ' numbered' if any('<span class="ln">' in r and '<span class="ln"></span>' not in r for r in rows) else ''
+    return f'<pre class="diff{numbered}"><code>' + ''.join(rows) + '</code></pre>'
 
 
 # ---- 自由な節の本文 (段落・小見出し・リスト・表・コード・図・引用・横棒) ----------
@@ -371,25 +406,51 @@ def render_head(lines):
 
 
 def render_decision(title, lines):
-    rows = []
+    rows, kinds = [], []
     for line in lines:
         m = re.match(r'^(推奨|他案)\s*[:：]\s*(.+)$', line.strip())
         if m:
             cls = 'rec' if m.group(1) == '推奨' else 'alt'
+            kinds.append(cls)
             # 案の名前 (「 — 」の前) で返答の文を作り、ボタンでコピーさせる。答えは会話に貼って受ける
             name = re.split(r'\s+[—–-]{1,2}\s+', m.group(2), maxsplit=1)[0].replace('`', '').replace('**', '').strip()
             question = re.sub(r'^要判断\s*[:：]\s*', '', title)
             reply = f'要判断「{question}」は「{name}」で進めて'
             btn = f'<button type="button" class="copy reply" data-copy="{html.escape(reply)}">この案で返答をコピー</button>'
-            rows.append(f'<div class="choice {cls}"><b>{m.group(1)}</b><p>{inline(m.group(2))}</p>{btn}</div>')
+            # data-q / data-name は、複数の要判断の答えをまとめてコピーするボタン (SHEET_JS) が読む
+            rows.append(f'<div class="choice {cls}" data-q="{html.escape(question)}" data-name="{html.escape(name)}">'
+                        f'<b>{m.group(1)}</b><p>{inline(m.group(2))}</p>{btn}</div>')
         elif line.strip():
             raise InputError(f'要判断の中は「推奨:」「他案:」の行だけ: {line.strip()[:40]}')
-    if not rows or 'rec' not in rows[0]:
+    if not kinds or kinds[0] != 'rec':
         raise InputError(f'要判断「{title}」の最初の行は「推奨:」にする')
     return f'<section class="decision"><h3>{inline(title)}</h3>' + ''.join(rows) + '</section>'
 
 
-def render_items(title, lines):
+def plain(text: str) -> str:
+    """行内記法の印 (**、札、リンク) を外した素の文。鍵や依頼文に使う。コード表記の ` は残す。"""
+    text = re.sub(r'\[!(?:red|yellow|green|blue|gray)\s+([^\]]+)\]', r'\1', text)
+    text = re.sub(r'\[([^\]]+)\]\([^)]*\)', r'\1', text)
+    return re.sub(r'\s+', ' ', text.replace('**', '')).strip()
+
+
+def item_key(name: str, seen: dict) -> str:
+    """項目の行の鍵 (前回との差分に使う)。名前で見分け、同じ名前が 2 回目以降に出たら「#2」のように番号を付ける。
+
+    内容は鍵に含めない。内容を書き直した行は同じ項目のまま扱い、「新」を付けない。
+    """
+    base = plain(name)
+    seen[base] = seen.get(base, 0) + 1
+    return base if seen[base] == 1 else f'{base}#{seen[base]}'
+
+
+def action_request(name, act, ev):
+    """対応案を、会話に貼ればそのまま依頼になる 1 文にする。"""
+    text = f'「{plain(name)}」を対応して: {plain(act)}'
+    return text + (f' (根拠: {", ".join(plain(e) for e in ev)})' if ev else '')
+
+
+def render_items(title, lines, ctx=None):
     cols = ['項目', '確認したこと・根拠']
     m = re.match(r'^項目\s*[:：]\s*(.+)$', title)
     if m:
@@ -412,6 +473,8 @@ def render_items(title, lines):
             else:
                 act, has_action = e.group(2), True
         rows.append((label, name, body, ev, act))
+    ctx = ctx if ctx is not None else {}
+    prev = ctx.get('prev')
     if not rows:
         raise InputError('「## 項目」に項目が無い')
     head = ''.join(f'<th>{html.escape(c)}</th>' for c in cols + (['対応案'] if has_action else []))
@@ -425,10 +488,20 @@ def render_items(title, lines):
             # 確認済みは既定の状態なので札を出さない。札は例外 (優先・推測・未検証など) の行だけに付く
             if label and label != '確認済み':
                 kind = {'優先': ' priority', '推測': ' guess', '未検証': ' unverified'}.get(label, '')
-                tag = f'<span class="tag{kind}">{html.escape(label)}</span><br>'
+                tag = f'<span class="tag{kind}">{html.escape(label)}</span>'
+            key = item_key(name, ctx.setdefault('seen', {}))
+            if prev is not None and key not in prev:  # 同じ --name の前回のシートに無かった行
+                tag += '<span class="tag tag-blue">新</span>'
+            tag += '<br>' if tag else ''
+            request = action_request(name, act, ev) if act else ''
+            ctx.setdefault('items', []).append({'key': key, 'label': label or '', 'name': plain(name),
+                                                'act': plain(act), 'request': request})
+            # 依頼のコピーは SHEET_JS が data-act から足す (静的な字数の検査に数えない)
+            attrs = f' id="item-{len(ctx["items"])}"'
+            attrs += f' data-act="{html.escape(request)}"' if act else ''
             evs = ''.join(f'<span class="evidence-line">{inline(mark_sources(e))}</span>' for e in ev)
             cell = f'<td><p>{inline(body)}</p>{evs}</td>'
-            out.append(f'<tr><th scope="row">{tag}{inline(name)}</th>{cell}'
+            out.append(f'<tr{attrs}><th scope="row">{tag}{inline(name)}</th>{cell}'
                        + (f'<td><p>{inline(act)}</p></td>' if has_action else '') + '</tr>')
         out.append('</tbody></table>')
         return '\n'.join(out)
@@ -441,17 +514,41 @@ def render_items(title, lines):
     return table(first + rest)
 
 
-def render_body(src: str):
-    """本文の HTML 片、結論、節の (id, 見出し) の列、本文の語 (種別の判定用) を返す。形には依らない。"""
+def gone_html(prev, items):
+    """前回のシートにあって今回ない行。項目の節がいくつあっても、ページ全体で 1 回だけ数える。"""
+    now = {it['key'] for it in items}
+    gone = [k for k in (prev or []) if k not in now]
+    if not gone:
+        return ''
+    names = ''.join(f'<li>{html.escape(k)}</li>' for k in gone)
+    return (f'<details class="gone"><summary>前回のシートにあって今回ない {len(gone)} 件 (済んだか名前を変えた行)</summary>'
+            f'<ul>{names}</ul></details>')
+
+
+def render_body(src: str, prev=None, ctx=None):
+    """本文の HTML 片、結論、節の (id, 見出し) の列、本文の語 (種別の判定用) を返す。形には依らない。
+
+    prev は同じ --name の前回のシートの項目の鍵の列 (無ければ None)。ctx には状態・項目・要判断の数を集め、
+    wrap() がページの report-data に埋める (保存先の一覧と次回の差分が読む)。
+    """
+    ctx = ctx if ctx is not None else {}
+    ctx['prev'] = prev
     sections = split_sections(src)
     body, concl = render_head(sections[0][1])
     toc = []
+    n_dec = sum(1 for t, _ in sections[1:] if t.startswith('要判断'))
+    seen = 0
     for n, (title, lines) in enumerate(sections[1:], 1):
         sid = f'sec-{n}'
         if title.startswith('要判断'):
             part = render_decision(title, lines)
+            ctx.setdefault('first_dec', sid)
+            seen += 1
+            if n_dec >= 2 and seen == n_dec:  # 最後の要判断の下に、選んだ案をまとめて返すボタン
+                part += ('\n<div class="reply-all"><button type="button" class="copy reply-all-btn">選んだ案をまとめてコピー</button>'
+                         '<span>各問の「この案で返答をコピー」で選び直せる。選んでいない問いは推奨で返す</span></div>')
         elif re.match(r'^項目(\s*[:：]|$)', title):
-            part = render_items(title, lines)
+            part = render_items(title, lines, ctx)
         elif title == '注意点':
             part = ('<h2>注意点</h2><div class="warn"><ul>'
                     + ''.join(f'<li>{inline(" ".join(i))}</li>' for i in bullets(lines)) + '</ul></div>')
@@ -463,7 +560,15 @@ def render_body(src: str):
             part = f'<h2 class="sec">{inline(title)}</h2>\n<div class="content">\n{render_blocks(lines)}\n</div>'
         body.append(f'<div class="block" id="{sid}">\n{part}\n</div>')
         toc.append((sid, title))
-    n_dec = sum(1 for t, _ in sections[1:] if t.startswith('要判断'))
+        if part.startswith('<table class="items"'):
+            ctx['last_items'] = len(body) - 1
+    gone = gone_html(prev, ctx.get('items', []))
+    if gone and 'last_items' in ctx:  # 最後の項目の節の下に置く。項目の節が無ければ本文の最後に置く
+        at = ctx['last_items']
+        body[at] = body[at][:-len('\n</div>')] + '\n' + gone + '\n</div>'
+    elif gone:
+        body.append(gone)
+    ctx.update(decisions=n_dec, state=parse_title(sections[0][1])[1], concl=concl)
     auto_next = f'<div class="next"><b>次にすること</b><span>下の {n_dec} 問に答える</span></div>' if n_dec else ''
     body = [auto_next if b == NEXT_SLOT else b for b in body]
     words = ' '.join([concl] + [t for t, _ in sections[1:]])
@@ -579,8 +684,9 @@ MERMAID = '''<script type="module">
 </script>'''
 
 
-COPY = """<script>
-  // コピーボタン: 要判断の返答 (data-copy) と、コードブロックの中身。クリップボードが使えない枠では選択して execCommand に戻る
+SHEET_JS = """<script>
+  // シートの仕掛け: コピー (要判断の返答・まとめての返答・対応案の依頼・コード) と、印刷時の畳みの展開。
+  // クリップボードが使えない枠では選択して execCommand に戻る
   (function () {
     function copy(text, btn) {
       var done = function () { var t = btn.textContent; btn.textContent = 'コピーした'; setTimeout(function () { btn.textContent = t; }, 1400); };
@@ -596,50 +702,250 @@ COPY = """<script>
       code.parentNode.appendChild(b);
       b.addEventListener('click', function () {
         var text = code.classList && code.parentNode.classList.contains('diff')
-          ? Array.prototype.map.call(code.querySelectorAll('div:not(.d-note)'), function (d) { return d.textContent; }).join('\\n')
+          ? Array.prototype.map.call(code.querySelectorAll('div:not(.d-note)'), function (d) { return (d.querySelector('.tx') || d).textContent; }).join('\\n')
           : code.textContent;
         copy(text, b);
       });
     });
     document.querySelectorAll('button[data-copy]').forEach(function (b) {
-      b.addEventListener('click', function () { copy(b.getAttribute('data-copy'), b); });
+      b.addEventListener('click', function () {
+        copy(b.getAttribute('data-copy'), b);
+        var choice = b.closest('.choice');
+        if (!choice) return;  // 選んだ案として印を付け、まとめての返答に使う
+        choice.parentNode.querySelectorAll('.choice').forEach(function (c) { c.classList.remove('picked'); });
+        choice.classList.add('picked');
+      });
+    });
+    document.querySelectorAll('.reply-all-btn').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var lines = [];
+        document.querySelectorAll('section.decision').forEach(function (sec) {
+          var c = sec.querySelector('.choice.picked') || sec.querySelector('.choice.rec');
+          if (c) lines.push((lines.length + 1) + '. 「' + c.getAttribute('data-q') + '」は「' + c.getAttribute('data-name') + '」');
+        });
+        copy('要判断への返答:\\n' + lines.join('\\n') + '\\nこの内容で進めて', b);
+      });
+    });
+    document.querySelectorAll('tr[data-act]').forEach(function (tr) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'copy act-copy'; b.textContent = '依頼をコピー';
+      b.addEventListener('click', function () { copy(tr.getAttribute('data-act'), b); });
+      tr.lastElementChild.appendChild(b);
+    });
+    // 印刷・PDF では畳みをすべて開き、印刷が済んだら元に戻す。印刷前の通知が続いても、最初の状態だけを覚える
+    var closed = null;
+    window.addEventListener('beforeprint', function () {
+      if (closed) return;
+      closed = Array.prototype.filter.call(document.querySelectorAll('details'), function (d) { return !d.open; });
+      closed.forEach(function (d) { d.open = true; });
+    });
+    window.addEventListener('afterprint', function () {
+      (closed || []).forEach(function (d) { d.open = false; });
+      closed = null;
     });
   })();
 </script>"""
 
 
-def wrap(body, concl, toc, layout, meta):
-    parts = [f'<div class="meta">{html.escape(meta)}</div>', body]
-    if layout == 'detail' and len(toc) >= TOC_MIN:
-        links = ''.join(f'<li><a href="#{sid}">{inline(t)}</a></li>' for sid, t in toc)
-        # 目次は見出しのすぐ下 (h1 の直後のまとまりの後) ではなく、本文の最初の節の前に置く
-        first = body.find('<div class="block"')
-        nav = f'<nav class="toc"><b>目次</b><ol>{links}</ol></nav>\n'
-        parts[1] = body[:first] + nav + body[first:] if first >= 0 else body + nav
+def slug(name):
+    return re.sub(r'[^A-Za-z0-9-]+', '-', name or 'report').strip('-') or 'report'
+
+
+def sheet_id(concl, name=None, kept=None):
+    """同じレポートの版を見分ける名前。前回との差分と、保存先の一覧で版をまとめるのに使う。
+
+    --name を最優先にする。保存先の連番は作り直すたびに変わるので、--name が無いときだけ使う。
+    """
+    if name:
+        return slug(name)
+    if kept:
+        return kept
+    return hashlib.sha1(concl.encode('utf-8')).hexdigest()[:10]
+
+
+def report_data(ctx, layout, kind, sid):
+    """ページに埋める機械向けの要約。保存先の一覧 (write_index) と、同じ --name の次回の差分 (load_previous) が読む。"""
+    data = {'id': sid, 'state': ctx.get('state', ''), 'concl': ctx.get('concl', ''), 'kind': kind, 'layout': layout,
+            'created': datetime.datetime.now().isoformat(timespec='minutes'), 'decisions': ctx.get('decisions', 0),
+            'items': ctx.get('items', [])}
+    # 「<」をすべて \\u003c にする。本文の </script> や <!-- で script 要素が途中で閉じたり続いたりしないように
+    text = json.dumps(data, ensure_ascii=False).replace('<', '\\u003c')
+    return f'<script type="application/json" id="report-data">{text}</script>\n'
+
+
+def jump_bar(ctx, layout):
+    """詳細の形で、要判断と優先の項目の数を上に留めて出し、押すと最初のものへ飛べるようにする。"""
+    if layout != 'detail':
+        return ''
+    links = []
+    if ctx.get('decisions'):
+        links.append(f'<a href="#{ctx.get("first_dec", "")}">要判断 {ctx["decisions"]}</a>')
+    prio = [i for i, it in enumerate(ctx.get('items', []), 1) if it['label'] == '優先']
+    if prio:
+        links.append(f'<a href="#item-{prio[0]}">優先 {len(prio)}</a>')
+    return f'<nav class="jump">{" ".join(links)}</nav>\n' if links else ''
+
+
+def wrap(body, concl, toc, layout, meta, ctx=None, kind='investigation', sid=None):
+    ctx = ctx or {}
+    # 目次は出さない。節の行き来は上に留めた要判断・優先の帯 (jump_bar) で足りる
+    parts = [jump_bar(ctx, layout) + f'<div class="meta">{html.escape(meta)}</div>', body]
     page = TEMPLATE.read_text(encoding='utf-8')
     tab = concl if len(concl) <= 40 else concl[:39] + '…'
     return (page.replace('{{LAYOUT}}', ' detail' if layout == 'detail' else '')
                 .replace('{{TAB_TITLE}}', html.escape(tab))
                 .replace('{{BODY}}', '\n'.join(parts))
-                .replace('{{SCRIPTS}}', (MERMAID if 'class="mermaid"' in body else '')
-                         + (COPY if ('data-copy=' in body or '<code>' in body and '<pre' in body) else '')))
+                .replace('{{SCRIPTS}}', report_data(ctx, layout, kind, sid or sheet_id(concl))
+                         + (MERMAID if 'class="mermaid"' in body else '') + SHEET_JS))
 
 
-def build(src: str, meta: str, layout=None):
+def build(src: str, meta: str, layout=None, prev=None):
     """本文から HTML を作る。layout を省くと choose_layout() で決める。"""
-    body, concl, toc, _ = render_body(src)
-    return wrap(body, concl, toc, layout or choose_layout(body), meta)
+    ctx = {}
+    body, concl, toc, words = render_body(src, prev, ctx)
+    return wrap(body, concl, toc, layout or choose_layout(body), meta, ctx, infer_kind(words))
 
 
 def repo_name():
     return repo_root().name
 
 
+def git_head():
+    """'ブランチ@短い SHA'。Git の外や detached では取れる分だけ返す。"""
+    def run(*args):
+        try:
+            r = subprocess.run(['git', *args], capture_output=True, text=True, timeout=5)
+            return r.stdout.strip() if r.returncode == 0 else ''
+        except (OSError, subprocess.SubprocessError):
+            return ''
+    branch, sha = run('rev-parse', '--abbrev-ref', 'HEAD'), run('rev-parse', '--short', 'HEAD')
+    return f'{branch}@{sha}' if branch and sha else sha
+
+
 def default_meta(layout, kind, doc_id=None):
-    date = datetime.date.today().isoformat()
-    if layout == 'detail' or doc_id:
-        return ' · '.join(p for p in ('REPORT', KINDS[kind][0], doc_id, date, repo_name()) if p)
-    return f'REPORT · {date} · {repo_name()}'
+    """タイトル上の小さな行。いつ・どのリポジトリのどの版を見て書いたかを後から分かるようにする。"""
+    when = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+    head = (KINDS[kind][0], doc_id) if layout == 'detail' or doc_id else ()
+    return ' · '.join(p for p in ('REPORT', *head, when, repo_name(), git_head()) if p)
+
+
+# ---- 前回のシートと保存先の一覧 ---------------------------------------------------
+
+DATA_RE = re.compile(r'<script type="application/json" id="report-data">(.*?)</script>', re.DOTALL)
+
+
+def read_data(path: Path):
+    """保存したページの report-data を読む。無い (古いページ)・壊れている・形が違うときは None。
+
+    返す辞書は、文字列の欄 (id・state・concl・kind・created) と、key が文字列の項目だけを持つ。
+    """
+    try:
+        m = DATA_RE.search(path.read_text(encoding='utf-8'))
+        raw = json.loads(m.group(1).replace('<\\/', '</')) if m else None
+    except (OSError, ValueError):
+        return None
+    if not isinstance(raw, dict):
+        return None
+    data = {k: raw[k] for k in ('id', 'state', 'concl', 'kind', 'created', 'layout') if isinstance(raw.get(k), str)}
+    items = raw.get('items') if isinstance(raw.get('items'), list) else []
+    data['items'] = [{k: it[k] for k in ('key', 'label', 'name', 'act') if isinstance(it.get(k), str)}
+                     for it in items if isinstance(it, dict) and isinstance(it.get('key'), str)]
+    return data
+
+
+def load_previous(out=None, name=None, base=None):
+    """同じ出力先 (--out) か同じ --name で前に作ったシートの項目の鍵。前回が無ければ None (差分の札を出さない)。
+
+    --name のときは scratch の写しと保存先 (base) の同じ id の版を合わせ、書いた時刻が最も新しいものを前回とする。
+    Orca の外の --save や詳細は scratch に写しを置かないので、保存先も探す。
+    """
+    cands = []
+    if out and Path(out).is_file():
+        cands = [Path(out)]
+    elif name:
+        scratch = Path(os.environ.get('ORCA_CHAT_SCRATCH_DIR') or Path(tempfile.gettempdir()) / 'report-sheets')
+        s = slug(name)
+        if scratch.is_dir():
+            cands = [p for p in scratch.glob(f'{s}-*.html') if re.fullmatch(re.escape(s) + r'-[0-9a-f]{4}\.html', p.name)]
+        if base and Path(base).is_dir():
+            cands += [p for p in Path(base).rglob('*.html')
+                      if p.name != 'index.html' and (read_data(p) or {}).get('id') == s]
+        cands.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    for p in cands:
+        data = read_data(p)
+        if data is not None:
+            return [it['key'] for it in data['items']]
+    return None
+
+
+INDEX_JS = """<script>
+  // 絞り込み: 種別・状態・語
+  (function () {
+    var q = document.getElementById('f-text'), k = document.getElementById('f-kind'), s = document.getElementById('f-state');
+    function apply() {
+      var text = q.value.trim().toLowerCase();
+      document.querySelectorAll('tr[data-kind]').forEach(function (tr) {
+        var ok = (!k.value || tr.getAttribute('data-kind') === k.value) && (!s.value || tr.getAttribute('data-state') === s.value)
+          && (!text || tr.textContent.toLowerCase().indexOf(text) >= 0);
+        tr.style.display = ok ? '' : 'none';
+      });
+    }
+    [q, k, s].forEach(function (el) { el.addEventListener('input', apply); });
+  })();
+</script>"""
+
+
+def write_index(base: Path):
+    """保存先の直下に index.html を作り直す。残したレポートの一覧と、要対応・未完了のレポートに残る優先の項目を載せる。
+
+    同じ id の版が複数あれば、優先の項目は最新の版からだけ集める (古い版は一覧の表には残す)。
+    """
+    rows, open_items, latest = [], [], set()
+    pages = []
+    for p in base.rglob('*.html'):
+        if p.name == 'index.html':
+            continue
+        data = read_data(p)
+        if data is None:  # report-data の無い古いページはタイトルだけ拾う
+            m = re.search(r'<title>(.*?)</title>', p.read_text(encoding='utf-8', errors='replace'), re.DOTALL)
+            data = {'concl': html.unescape(m.group(1)) if m else p.stem, 'kind': p.parent.name if p.parent != base else '',
+                    'items': []}
+        data.setdefault('created', datetime.datetime.fromtimestamp(p.stat().st_mtime).isoformat(timespec='minutes'))
+        pages.append((p, data))
+    for p, data in sorted(pages, key=lambda x: x[1]['created'], reverse=True):
+        href = html.escape(urllib.parse.quote(p.relative_to(base).as_posix()))
+        state = re.sub(r'\s*\d+\s*件$', '', data.get('state', ''))
+        kind = data.get('kind', '')
+        concl = html.escape(data.get('concl', p.stem))
+        rows.append(f'<tr data-kind="{html.escape(kind)}" data-state="{html.escape(state)}">'
+                    f'<td>{html.escape(data["created"].replace("T", " "))}</td><td>{html.escape(KINDS.get(kind, (kind,))[0])}</td>'
+                    f'<td>{html.escape(data.get("state", ""))}</td><td><a href="{href}">{concl}</a></td></tr>')
+        sid = data.get('id')
+        if sid and sid in latest:
+            continue
+        if sid:
+            latest.add(sid)
+        if state in ('要対応', '未完了'):
+            for it in data['items']:
+                if it.get('label') == '優先':
+                    open_items.append(f'<tr><th scope="row">{html.escape(it.get("name", ""))}</th>'
+                                      f'<td>{html.escape(it.get("act", ""))}</td><td><a href="{href}">{concl}</a></td></tr>')
+    kinds = ''.join(f'<option value="{k}">{v[0]}</option>' for k, v in KINDS.items())
+    states = ''.join(f'<option>{s}</option>' for s in STATES)
+    body = [f'<div class="meta">REPORTS · {html.escape(str(base))}</div>',
+            f'<h1>保存したレポート {len(rows)} 件</h1>']
+    if open_items:
+        body.append('<h2>要対応・未完了のレポートに残る優先の項目</h2><table class="items"><thead><tr>'
+                    '<th>項目</th><th>対応案</th><th>レポート</th></tr></thead><tbody>' + ''.join(open_items) + '</tbody></table>')
+    body.append('<h2>一覧</h2><div class="filters"><input id="f-text" type="search" placeholder="語で絞る">'
+                f'<select id="f-kind"><option value="">すべての種別</option>{kinds}</select>'
+                f'<select id="f-state"><option value="">すべての状態</option>{states}</select></div>'
+                '<table class="index"><thead><tr><th>作成</th><th>種別</th><th>状態</th><th>結論</th></tr></thead><tbody>'
+                + ''.join(rows) + '</tbody></table>')
+    page = (TEMPLATE.read_text(encoding='utf-8').replace('{{LAYOUT}}', ' index').replace('{{TAB_TITLE}}', '保存したレポート')
+            .replace('{{BODY}}', '\n'.join(body)).replace('{{SCRIPTS}}', INDEX_JS))
+    out = base / 'index.html'
+    out.write_text(page, encoding='utf-8')
+    return out
 
 
 def say(msg):
@@ -662,24 +968,39 @@ def main():
     except (OSError, UnicodeDecodeError) as e:
         say(f'new-sheet: 本文を読めない — {e}')
         sys.exit(2)
+    base = Path(os.path.expanduser(read_config()['base_dir']))
+    prev = load_previous(a.out, a.name, base)
+    ctx = {}
     try:
-        body, concl, toc, words = render_body(src)
+        body, concl, toc, words = render_body(src, prev, ctx)
     except InputError as e:
         say(f'new-sheet: 書式の誤り — {e}\n  書式は references/sheet-input.md')
         sys.exit(2)
     layout, kind = choose_layout(body), infer_kind(words)
     paths = plan_paths(layout, kind, a.out, a.name, a.save)
     kept = paths[0] if (layout == 'detail' or a.save) and not a.out else None
+    sid = sheet_id(concl, a.name, kept.relative_to(base).with_suffix('').as_posix() if kept else None)
     meta = a.meta or default_meta(layout, kind, kept.stem if kept else None)
-    page = wrap(body, concl, toc, layout, meta)
+    page = wrap(body, concl, toc, layout, meta, ctx, kind, sid)
+    # 書く前に検査する。NG のシートは保存先にも一覧にも残さない (scratch と --out には直す材料として書く)
+    errors, warns, _, _ = CHECK.check_sheet(page)
+    if errors and kept:
+        paths = paths[1:] or [scratch_path(a.name)]
+        kept = None
     for p in paths:
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(page, encoding='utf-8')
+    index = write_index(base) if kept else None
 
-    errors, warns, _, _ = CHECK.check_sheet(page)
     shape = f'形: {"詳細" if layout == "detail" else "シート"}' + (f' / 種別: {kind}' if kept else '')
+    if errors and (layout == 'detail' or a.save) and not a.out:
+        shape += ' / NG のため保存先と一覧には書いていない'
+    if prev is not None:
+        shape += f' / 前回との差分: 新 {sum(1 for it in ctx.get("items", []) if it["key"] not in prev)} 件'
     out = [f'new-sheet: {paths[0]}', f'  {shape}', f'  url  {paths[0].as_uri()}']
     out += [f'  写し {p}' for p in paths[1:]]
+    if index:
+        out.append(f'  一覧 {index}')
     orca = os.environ.get('ORCA_CHAT_SCRATCH_DIR')
     shown = next((p for p in paths if orca and p.parent == Path(orca).resolve()), None)
     if shown:

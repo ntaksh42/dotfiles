@@ -12,7 +12,7 @@
   - 報告シート (警告): 図の欠落、図がある場合の要点の印 (class="key") の欠落、タイトルの状態の語の欠落・ずれ、
     本文 800 字超、表のセル 60 字超、畳みが本文より長い、
     表のセルの埋め草 (「特になし」「引き続き注視」など、することの無い対応案)
-  - 詳細 (<!-- report-sheet detail -->): 結論・「次:」・埋め草だけを見る。字数・箇条書き・図の目安は当てない
+  - 詳細 (<!-- report-sheet detail -->): 字数・箇条書きの目安は当てない。図は求め、優先の指摘が 2 件以上なら図も 2 枚以上を求める
 
 終了コード 0 = 出してよい / 1 = 直してから出す。標準ライブラリのみ (python3.8+)。
 """
@@ -51,10 +51,32 @@ def prose_length(live: str):
     return sum(visible_len(t) for _, t in parts) + concl_rest + gl, concl_len
 
 
+def copied_figure(live: str, row_names):
+    """図の文字が「## 項目」の名前をほぼそのまま並べただけなら、例を 2 つ返す。そうでなければ ''。
+
+    名前が 3 つ以上あり、その 6 割以上 (かつ 2 つ以上) が SVG の <text> にそのまま出てくるとき書き写しとみなす。
+    Mermaid の図は描画前に文字を読めないので見ない。
+    """
+    names = {n for n in row_names if n}
+    if len(names) < 3:
+        return ''
+    texts = set()
+    for svg in re.findall(r'<svg\b.*?</svg>', live, flags=re.DOTALL):
+        texts |= {htmllib.unescape(re.sub(r'<[^>]+>', '', t)).strip()
+                  for t in re.findall(r'<text\b[^>]*>(.*?)</text>', svg, flags=re.DOTALL)}
+    hit = sorted(n for n in names if n in texts)
+    return '、'.join(hit[:2]) if len(hit) >= max(2, 0.6 * len(names)) else ''
+
+
+INLINE_SCRIPT = re.compile(r'<script\b(?![^>]*\bsrc=)[^>]*>.*?</script>', re.DOTALL)
+
+
 def check_sheet(html: str):
-    live = re.sub(r'<!--.*?-->', '', html, flags=re.DOTALL)
+    # 中身を持つ script (生成器の JS と、本文の文字を含む report-data) は検査しない。src 付きの script は外部参照の検査に残す
+    html_wo_scripts = INLINE_SCRIPT.sub('', html)
+    live = re.sub(r'<!--.*?-->', '', html_wo_scripts, flags=re.DOTALL)
     errors, warns = [], []
-    n_todo = len(re.findall(r'TODO', html))
+    n_todo = len(re.findall(r'TODO', html_wo_scripts))
     if n_todo:
         errors.append(f'TODO が {n_todo} 箇所残っている (雛形のコメントを埋めるか削る)')
     if re.search(r'class=["\'][^"\']*\bqcard\b', live) or re.search(r'<input[^>]*type=["\']radio', live):
@@ -62,18 +84,26 @@ def check_sheet(html: str):
     for m in re.finditer(r'<(?:script|link|img)[^>]*(?:src|href)=["\'](?!https:|data:|file:|#|mailto:|//)([^"\']+)["\']', live):
         warns.append(f'相対 URL の外部参照: {m.group(1)} (data URI か https 絶対 URL にする)')
     is_report = bool(re.search(r'<!-- report-sheet( detail)? -->', html))
-    # 詳細 (本文 800 字超で new-sheet.py が選ぶ形) には、シートの字数・箇条書き・図の目安を当てない
+    # 詳細 (本文 800 字超で new-sheet.py が選ぶ形) には、シートの字数・箇条書きの目安を当てない
     is_detail = '<!-- report-sheet detail -->' in html
     if not is_report and 'review-sheet-format: v6' not in html:
         warns.append('<!-- review-sheet-format: v6 --> が無い (どの規約で書いたシートかの目印)')
     total, concl = prose_length(live)
     if is_report:
         n_decisions = len(re.findall(r'<section class=["\']decision["\']', live))
-        n_rows = len(re.findall(r'<tr><th scope=["\']row["\']', live))
+        row_names = [htmllib.unescape(re.sub(r'<span class=["\']tag[^>]*>.*?</span>|<[^>]+>', '', t)).strip()
+                     for t in re.findall(r'<tr\b[^>]*><th scope=["\']row["\']>(.*?)</th>', live, flags=re.DOTALL)]
+        n_rows = len(row_names)
+        copied = copied_figure(live, row_names)
+        if copied:
+            warns.append(f'図の箱の語が項目の名前の書き写し ({copied}) — 図にはタイトルの結論 (何が起きるか) を描く')
+        n_svg = len(re.findall(r'<svg\b', live))
+        n_priority = len(re.findall(r'<span class=["\']tag priority["\']>', live))
+        # 詳細でも図は求める。長い報告ほど、最初に図で要点を掴めるようにする
+        if is_detail and n_priority >= 2 and n_svg < 2:
+            warns.append(f'優先の指摘が {n_priority} 件あるのに図が {n_svg} 枚 — 重い指摘には 1 件ずつ「画面と実際」の図を自由な節に置く')
         # 要判断が主役で項目が 3 行以下のシートは描く形が無いことが多いので、図を求めない
-        if is_detail:
-            pass
-        elif '<svg' not in live and 'class="mermaid"' in live:
+        if '<svg' not in live and 'class="mermaid"' in live:
             pass  # Mermaid の図は描画前に印を付けられないので、要点の印を求めない
         elif '<svg' not in live and not (n_decisions and n_rows <= 3):
             warns.append('図が無い — 既定で 1 枚置く。省くのは内容に形 (前後・流れ・構成・量・状態の並び) が無いときだけ')

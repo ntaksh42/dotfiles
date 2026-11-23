@@ -14,7 +14,8 @@
   --ag-green:#15803D;--ag-green-bg:rgba(22,163,74,.12)}
 @media (prefers-color-scheme:dark){:root{--ag-ink:var(--foreground,#E6E8EB);--ag-muted:var(--muted-foreground,#9AA4AE);--ag-line:var(--border,#343A40);--ag-paper:var(--background,#16181B);--ag-dim:var(--muted,#22262A);--ag-link:var(--primary,#6EA0FF);--ag-red:#F87171;--ag-amber:#FBBF24;--ag-green:#4ADE80}}
 *{box-sizing:border-box}
-body{background:var(--ag-paper);color:var(--ag-ink);font-family:'IBM Plex Sans JP','Hiragino Kaku Gothic ProN','Yu Gothic UI','Meiryo',sans-serif;font-size:15px;line-height:1.75;margin:0;padding:12px 20px 28px}
+/* Segoe UI を和文フォントより先に置く: Yu Gothic と Meiryo はバックスラッシュを ¥ で描くため、英数字だけ Segoe UI に任せる */
+body{background:var(--ag-paper);color:var(--ag-ink);font-family:'IBM Plex Sans JP','Segoe UI','Hiragino Kaku Gothic ProN','Yu Gothic UI','Meiryo',sans-serif;font-size:15px;line-height:1.75;margin:0;padding:12px 20px 28px}
 main{max-width:1000px;margin:0 auto}
 a{color:var(--ag-link)}
 code{font-family:'IBM Plex Mono',Consolas,Menlo,monospace;font-size:.9em}
@@ -88,9 +89,6 @@ pre.mermaid:not([data-processed]){background:var(--ag-dim);white-space:pre;font-
 .bar-track{background:var(--ag-dim);border:1px solid var(--ag-line);border-radius:999px;height:10px;overflow:hidden}
 .bar-fill{background:var(--ag-muted);height:100%}
 .bar-value{font-family:'IBM Plex Mono',Consolas,monospace;font-size:13px;text-align:right}
-.toc{background:var(--ag-dim);border-radius:8px;padding:8px 16px;margin:16px 0 0;font-size:14px}
-.toc b{font-size:11.5px;color:var(--ag-muted)}
-.toc ol{margin:2px 0 0;padding-left:1.4em;columns:2 260px}
 /* ---- 読んだ後に動くための仕掛け: 根拠のリンク、返答とコードのコピー、差分 ---- */
 a.src{text-decoration:none}
 a.src code{color:var(--ag-link);border-bottom:1px dotted var(--ag-link)}
@@ -102,14 +100,46 @@ button.copy:hover{color:var(--ag-ink);border-color:var(--ag-muted)}
 pre{position:relative}
 pre .code-copy{position:absolute;top:6px;right:6px;opacity:.55}
 pre:hover .code-copy{opacity:1}
+pre.diff{font-size:13.5px;line-height:1.65}
 pre.diff>code{display:block}
-pre.diff>code>div{white-space:pre;padding:0 6px;margin:0 -6px}
+pre.diff>code>div{white-space:pre;padding:0 6px;margin:0 -6px;border-left:3px solid transparent}
+pre.diff .ln{display:none}
+pre.diff.numbered>code>div:not(.d-note):not(.d-hunk){display:grid;grid-template-columns:3.4em 1fr}
+pre.diff.numbered .ln{display:block;text-align:right;padding-right:1em;color:var(--ag-muted);opacity:.7;user-select:none}
 .d-add{background:var(--ag-green-bg);color:var(--ag-green)}
 .d-del{background:var(--ag-red-bg);color:var(--ag-red)}
-.d-hunk{color:var(--ag-muted)}
-.d-note{white-space:normal !important;font-family:'IBM Plex Sans JP','Yu Gothic UI',sans-serif;font-size:13px;color:var(--ag-ink);background:var(--ag-amber-bg);border-left:3px solid var(--ag-amber-dot);padding:3px 10px !important;margin:2px -6px 4px !important}
-/* 詳細の目次: 本文の左に余白がある広い画面では固定して、読みながら節を移れるようにする */
-@media (min-width:1480px){.toc{position:fixed;top:16px;left:16px;width:210px;max-height:calc(100vh - 32px);overflow:auto;margin:0}.toc ol{columns:auto;padding-left:1.2em}}
+.d-hunk{color:var(--ag-muted);margin-top:6px !important}
+.d-hunk:first-child{margin-top:0 !important}
+/* 注記が指す行: 札の色で塗り、左に太い線を引く。注記はその行のすぐ下に、同じ色の線でつないで出す */
+.d-target{background:var(--ag-amber-bg);border-left-color:var(--ag-amber-dot) !important;font-weight:700}
+.d-target.priority{background:var(--ag-red-bg);border-left-color:var(--ag-red) !important}
+.d-target .ln{opacity:1 !important;color:var(--ag-ink) !important}
+.d-note{white-space:normal !important;font-family:'IBM Plex Sans JP','Segoe UI','Hiragino Kaku Gothic ProN','Yu Gothic UI',sans-serif;font-size:13.5px;line-height:1.6;color:var(--ag-ink);background:var(--ag-paper);border-left:3px solid var(--ag-amber-dot) !important;padding:5px 12px !important;margin:0 -6px 8px !important;border-radius:0 0 6px 0}
+.d-note.priority{border-left-color:var(--ag-red) !important}
+pre.diff.numbered .d-note{padding-left:calc(3.4em + 6px) !important}
+.d-note code{font-family:'IBM Plex Mono',Consolas,monospace}
+.choice.picked{outline:2px solid var(--ag-amber-dot);outline-offset:2px;border-radius:4px}
+.reply-all{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:4px 0 12px;font-size:12.5px;color:var(--ag-muted)}
+.reply-all button{border-color:var(--ag-amber-dot);color:var(--ag-amber);font-weight:700}
+th .tag{margin-right:4px}
+/* 対応案の依頼のコピー (SHEET_JS が足す) */
+button.act-copy{margin-top:4px}
+details.gone ul{margin:6px 0 0;padding-left:1.4em;font-size:13.5px;color:var(--ag-muted)}
+/* 詳細: 要判断と優先の数を上に留める */
+.jump{position:sticky;top:0;z-index:2;display:flex;gap:8px;justify-content:flex-end;padding:4px 0;background:var(--ag-paper)}
+.jump a{font-size:12px;font-weight:700;padding:1px 10px;border-radius:999px;text-decoration:none;background:var(--ag-amber-bg);color:var(--ag-amber)}
+.jump a[href^="#item"]{background:var(--ag-red-bg);color:var(--ag-red)}
+/* 保存先の一覧 (index.html) */
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0}
+.filters input,.filters select{font:inherit;font-size:13.5px;padding:3px 8px;border:1px solid var(--ag-line);border-radius:6px;background:var(--ag-paper);color:var(--ag-ink)}
+table.index td:first-child{white-space:nowrap;font-family:'IBM Plex Mono',Consolas,monospace;font-size:12.5px}
+/* 印刷・PDF: ボタンと留めた帯を隠し、行の途中で改ページしない (畳みは SHEET_JS が開く) */
+@media print{
+  body{padding:0;font-size:12.5px}
+  button.copy,.jump,.reply-all{display:none !important}
+  tr,pre,.decision,.figure,svg{break-inside:avoid}
+  a{color:inherit}
+}
 /* 狭い画面: 項目の表を行ごとに縦へ積む */
 @media (max-width:600px){
   body{padding:10px 14px 24px}

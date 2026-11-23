@@ -59,7 +59,7 @@ class NewSheetTest(unittest.TestCase):
 
     def test_two_columns_without_action(self):
         page = ns.build('# 対応不要 | 済んだ\n\n## 項目: 関数 / 役割\n- mkcd: 作って移動\n', 'R')
-        self.assertNotIn('対応案', page)
+        self.assertNotIn('<th>対応案</th>', page)
         self.assertIn('<th>関数</th>', page)
 
     def test_no_next_box_without_next_line(self):
@@ -177,18 +177,21 @@ class NewSheetTest(unittest.TestCase):
         self.assertIn('<!-- report-sheet -->', appendix)
 
     def test_detail_skips_sheet_limits_but_keeps_title_limit(self):
-        src = '# 要対応 | x\n' + ''.join(f'- 点{i}\n' for i in range(7)) + '## 背景\n' + 'あ' * 900 + '\n'
+        fig = '```svg\n<svg viewBox="0 0 9 9"><g class="key"><rect/></g></svg>\n```\n'
+        src = '# 要対応 | x\n' + fig + ''.join(f'- 点{i}\n' for i in range(7)) + '## 背景\n' + 'あ' * 900 + '\n'
         errors, warns, _, _ = checker.check_sheet(ns.build(src, 'R'))
         self.assertEqual((errors, warns), ([], []))
+        # 詳細でも図は求める
+        _, warns, _, _ = checker.check_sheet(ns.build(src.replace(fig, ''), 'R'))
+        self.assertTrue(any('図が無い' in w for w in warns), warns)
         long_title = ns.build('# 要対応 | ' + 'あ' * 61 + '\n## 背景\n' + 'い' * 900 + '\n', 'R')
         self.assertTrue(any('結論' in e for e in checker.check_sheet(long_title)[0]))
 
-    def test_detail_has_toc_from_five_sections(self):
+    def test_detail_has_no_toc(self):
         body = ''.join(f'## 節{i}\n' + 'あ' * 200 + '\n' for i in range(5))
         page = ns.build('# 対応不要 | x\n' + body, 'R')
-        self.assertIn('<nav class="toc">', page)
-        self.assertIn('<a href="#sec-1">節0</a>', page)
-        self.assertNotIn('class="toc"', ns.build('# 対応不要 | x\n## 節\nあ\n', 'R'))
+        self.assertIn('<!-- report-sheet detail -->', page)
+        self.assertNotIn('<nav class="toc">', page)
 
     def test_long_table_folds(self):
         rows = ''.join(f'| r{i} | v |\n' for i in range(18))
@@ -263,10 +266,191 @@ class NewSheetTest(unittest.TestCase):
 
     def test_diff_fence(self):
         page = ns.build('# 対応不要 | x\n## 差分\n```diff\n@@ -1 +1 @@\n-old\n+new\n>> [優先] ここが危ない\n ctx\n```\n', 'R')
-        for cls in ('d-hunk', 'd-del', 'd-add', 'd-ctx', 'd-note'):
+        for cls in ('d-hunk', 'd-del', 'd-ctx', 'd-target priority d-add', 'd-note priority'):
             self.assertIn(f'class="{cls}"', page)
         self.assertIn('<span class="tag priority">優先</span> ここが危ない', page)
+        self.assertIn('<pre class="diff numbered">', page)
+        self.assertIn('<span class="ln">1</span><span class="tx">-old</span>', page)
+        self.assertIn('<span class="ln">2</span><span class="tx"> ctx</span>', page)
+
+    def test_diff_fence_with_path_line_header(self):
+        src = '# 対応不要 | x\n## 箇所\n```diff\n@@ scripts/new-sheet.py:10 @@\n a\n b\n>> [推測] ここ\n```\n'
+        with mock.patch.object(ns, 'repo_root', return_value=ROOT):
+            page = ns.build(src, 'R')
+        self.assertRegex(page, r'<div class="d-hunk">@@ <a class="src" href="vscode://file/[^"]*new-sheet\.py:10"')
+        self.assertIn('<div class="d-target guess d-ctx"><span class="ln">11</span>', page)
+        plain = ns.build('# 対応不要 | x\n## 箇所\n```diff\n@@ どこか @@\n a\n```\n', 'R')
+        self.assertIn('<pre class="diff">', plain)  # 行が分からない見出しでは番号を出さない
         self.assertIn(r".join('\n')", page)  # JS の文字列の中で改行文字にならない
+
+    # ---- 開く・判断する・残す ----
+
+    def test_default_meta_has_time_and_head(self):
+        with mock.patch.object(ns, 'git_head', return_value='main@abc1234'), \
+                mock.patch.object(ns, 'repo_name', return_value='repo'):
+            meta = ns.default_meta('sheet', 'bug')
+            self.assertRegex(meta, r'^REPORT · \d{4}-\d\d-\d\d \d\d:\d\d · repo · main@abc1234$')
+            self.assertIn('不具合 · bug001', ns.default_meta('detail', 'bug', 'bug001'))
+
+    def test_report_data_and_action_row(self):
+        src = '# 要対応 | x\n## 項目\n- [優先] 表: 誤検出\n  根拠: a.mjs:3\n  対応: **先に**除く\n- 他: ok\n'
+        page = ns.build(src, 'R')
+        data = ns.DATA_RE.search(page).group(1)
+        self.assertIn('"state": "要対応"', data)
+        self.assertIn('"key": "表"', data)
+        self.assertIn('data-act="「表」を対応して: 先に除く (根拠: a.mjs:3)"', page)
+        self.assertEqual(page.count('data-act='), 1)
+        self.assertIn('@media print', page)
+        self.assertIn('beforeprint', page)
+        self.assertNotIn('localStorage', page)  # 済みのチェックは外した
+        self.assertNotIn('type = \'checkbox\'', page)
+
+    def test_item_keys_unique_by_name(self):
+        src = '# 対応不要 | x\n## 項目\n- 解析: 入力が空だと落ちる\n- 解析: 入力が空だと落ちる別件\n'
+        ctx = {}
+        ns.render_body(src, None, ctx)
+        self.assertEqual([it['key'] for it in ctx['items']], ['解析', '解析#2'])
+
+    def test_diff_against_previous(self):
+        src = '# 対応不要 | x\n## 項目\n- 残る: 書き直した\n- 足した: 新しい\n'
+        page = ns.build(src, 'R', prev=['残る', '消えた'])
+        self.assertEqual(page.count('<span class="tag tag-blue">新</span>'), 1)  # 内容を書き直した行は新でない
+        self.assertIn('前回のシートにあって今回ない 1 件', page)
+        self.assertIn('<li>消えた</li>', page)
+        self.assertNotIn('tag-blue">新', ns.build(src, 'R'))  # 前回が無ければ札を出さない
+
+    def test_gone_rows_counted_once_per_page(self):
+        src = '# 対応不要 | x\n## 項目\n- A: 1\n## 項目: 名前 / 中身\n- B: 2\n'
+        page = ns.build(src, 'R', prev=['A', 'B', 'C'])
+        self.assertEqual(page.count('class="gone"'), 1)
+        self.assertIn('前回のシートにあって今回ない 1 件', page)
+        self.assertIn('<li>C</li>', page)
+        no_items = ns.build('# 対応不要 | x\n## 背景\nあ\n', 'R', prev=['A'])
+        self.assertIn('前回のシートにあって今回ない 1 件', no_items)
+
+    def test_load_previous_by_name(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {'ORCA_CHAT_SCRATCH_DIR': d}):
+            self.assertIsNone(ns.load_previous(name='t'))
+            (Path(d) / 't-ab12.html').write_text(ns.build('# 対応不要 | x\n## 項目\n- a: b\n', 'R'), encoding='utf-8')
+            (Path(d) / 'tx-ab12.html').write_text('x', encoding='utf-8')
+            self.assertEqual(ns.load_previous(name='t'), ['a'])
+
+    def test_load_previous_from_kept_reports(self):
+        # Orca の外の --save: scratch に写しが無くても、保存先から同じ id の最新の版を探す
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {'ORCA_CHAT_SCRATCH_DIR': str(Path(d) / 'none')}):
+            base = Path(d) / 'reports'
+            (base / 'bugs').mkdir(parents=True)
+            scratch = Path(d) / 'scratch'
+            scratch.mkdir()
+            files = [scratch / 'demo-ab12.html', base / 'bugs' / 'bug001.html', base / 'bugs' / 'bug002.html']
+            for n, (p, name) in enumerate(zip(files, ('scratch', 'old', 'new'))):
+                ctx = {}
+                body, concl, toc, _ = ns.render_body(f'# 対応不要 | x\n## 項目\n- {name}: b\n', None, ctx)
+                p.write_text(ns.wrap(body, concl, toc, 'sheet', 'R', ctx, 'bug', 'demo'), encoding='utf-8')
+                os.utime(p, (1_700_000_000 + n, 1_700_000_000 + n))
+            with mock.patch.dict(os.environ, {'ORCA_CHAT_SCRATCH_DIR': str(scratch)}):
+                # scratch の写しより、後に書いた保存先の版を前回とする
+                self.assertEqual(ns.load_previous(name='demo', base=base), ['new'])
+                self.assertIsNone(ns.load_previous(name='other', base=base))
+
+    def test_sheet_id_prefers_name(self):
+        self.assertEqual(ns.sheet_id('x', 'demo', 'bugs/bug002'), 'demo')
+        self.assertEqual(ns.sheet_id('x', None, 'bugs/bug002'), 'bugs/bug002')
+
+    def test_read_data_rejects_bad_shapes(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / 'a.html'
+            for raw in ('[1]', '{"items": [{"name": "no key"}, 3, {"key": "k", "label": 5}]}'):
+                p.write_text(f'<script type="application/json" id="report-data">{raw}</script>', encoding='utf-8')
+                data = ns.read_data(p)
+                if raw == '[1]':
+                    self.assertIsNone(data)
+                else:
+                    self.assertEqual(data['items'], [{'key': 'k'}])
+            (Path(d) / 'b.html').write_text('<script type="application/json" id="report-data">[1, 2]</script>', encoding='utf-8')
+            self.assertIn('保存したレポート 2 件', ns.write_index(Path(d)).read_text(encoding='utf-8'))
+
+    def test_embedded_data_does_not_trip_checker(self):
+        src = "# 対応不要 | `<input type='radio'>` と <!-- <script> と " + '<li>' * 6 + '\n'
+        page = ns.build(src, 'R')
+        self.assertNotIn('<input', ns.DATA_RE.search(page).group(1))
+        self.assertEqual(page.count('</script>'), 2)  # report-data と SHEET_JS だけ
+        errors, _, _, _ = checker.check_sheet(page)
+        self.assertEqual(errors, [])
+        self.assertIn('"concl": "`\\u003cinput', page)
+
+    def test_excerpt_numbers_every_line_and_no_newline_marker(self):
+        page = ns.build('# 対応不要 | x\n## 箇所\n```diff\n@@ f.py:10 @@\n-x = 1\n y\n```\n', 'R')
+        self.assertIn('<span class="ln">10</span><span class="tx">-x = 1</span>', page)
+        self.assertIn('<span class="ln">11</span><span class="tx"> y</span>', page)
+        uni = ns.build('# 対応不要 | x\n## 差分\n```diff\n@@ -1 +1 @@\n-a\n\\ No newline at end of file\n+b\n c\n```\n', 'R')
+        self.assertIn('<span class="ln">2</span><span class="tx"> c</span>', uni)
+
+    def test_decision_first_row_must_be_recommendation_by_kind(self):
+        with self.assertRaises(ns.InputError):
+            ns.build('# 要判断 1 件 | x\n## 要判断: A\n他案: rec を含む — p / q\n', 'R')
+
+    def test_reply_all_only_with_two_decisions(self):
+        one = '# 要判断 1 件 | x\n## 要判断: A\n推奨: a — r\n'
+        self.assertNotIn('reply-all-btn"', ns.build(one, 'R'))
+        two = one.replace('1 件', '2 件') + '## 要判断: B\n推奨: b — r\n他案: c — p / q\n'
+        page = ns.build(two, 'R')
+        self.assertEqual(page.count('class="copy reply-all-btn"'), 1)
+        self.assertIn('data-q="B" data-name="c"', page)
+
+    def test_jump_bar_only_in_detail(self):
+        src = '# 要判断 1 件 | x\n## 要判断: A\n推奨: a — r\n## 項目\n- [優先] p: q\n'
+        self.assertIn('<nav class="jump"><a href="#sec-1">要判断 1</a> <a href="#item-1">優先 1</a></nav>',
+                      ns.build(src, 'R', layout='detail'))
+        self.assertNotIn('<nav class="jump">', ns.build(src, 'R'))
+
+    def test_write_index(self):
+        with tempfile.TemporaryDirectory() as d:
+            base = Path(d)
+            (base / 'bugs').mkdir()
+            (base / 'bugs' / 'bug001.html').write_text(
+                ns.build('# 要対応 | 落ちる原因\n## 項目\n- [優先] 解析: 壊れる\n  対応: 直す\n- 他: ok\n', 'R'), encoding='utf-8')
+            (base / 'old #3%.html').write_text('<title>古い報告</title>', encoding='utf-8')
+            page = ns.write_index(base).read_text(encoding='utf-8')
+        self.assertIn('保存したレポート 2 件', page)
+        self.assertIn('href="bugs/bug001.html"', page)
+        self.assertIn('href="old%20%233%25.html"', page)
+        self.assertIn('古い報告', page)
+        self.assertIn('<th scope="row">解析</th><td>直す</td>', page)
+        self.assertNotIn('<th scope="row">他</th>', page)
+
+    def test_write_index_takes_open_items_from_latest_version(self):
+        with tempfile.TemporaryDirectory() as d:
+            base = Path(d)
+            for n, created in ((1, '2026-01-01T00:00'), (2, '2026-02-01T00:00')):
+                page = ns.wrap(*ns.render_body(f'# 要対応 | 版{n}\n## 項目\n- [優先] 甲{n}: 壊れる\n', None, ctx := {})[:3],
+                               'sheet', 'R', ctx, 'bug', 'demo')
+                page = page.replace(ns.DATA_RE.search(page).group(1).split('"created": "')[1].split('"')[0], created, 1)
+                (base / f'bug00{n}.html').write_text(page, encoding='utf-8')
+            index = ns.write_index(base).read_text(encoding='utf-8')
+        self.assertIn('<th scope="row">甲2</th>', index)
+        self.assertNotIn('<th scope="row">甲1</th>', index)
+        self.assertIn('版1', index)  # 古い版も一覧の表には残す
+
+    def test_checker_warns_figure_copying_items(self):
+        svg = ''.join(f'<text>{n}</text>' for n in ('alpha', 'beta', 'gamma'))
+        src = (f'# 対応不要 | x\n```svg\n<svg viewBox="0 0 9 9"><g class="key"><rect/></g>{svg}</svg>\n```\n'
+               '## 項目\n- alpha: 1\n- beta: 2\n- gamma: 3\n')
+        _, warns, _, _ = checker.check_sheet(ns.build(src, 'R'))
+        self.assertTrue(any('書き写し' in w for w in warns), warns)
+        # 3 つのうち 2 つ (6 割以上) でも警告する
+        _, warns, _, _ = checker.check_sheet(ns.build(src.replace('<text>gamma</text>', ''), 'R'))
+        self.assertTrue(any('書き写し' in w for w in warns), warns)
+        _, warns, _, _ = checker.check_sheet(ns.build(src.replace('<text>beta</text><text>gamma</text>', ''), 'R'))
+        self.assertFalse(any('書き写し' in w for w in warns), warns)
+
+    def test_checker_wants_figures_for_heavy_findings_in_detail(self):
+        fig = '```svg\n<svg viewBox="0 0 9 9"><g class="key"><rect/></g></svg>\n```\n'
+        src = '# 要対応 | x\n' + fig + '## 項目\n- [優先] a: b\n- [優先] c: d\n## 背景\n' + 'あ' * 900 + '\n'
+        _, warns, _, _ = checker.check_sheet(ns.build(src, 'R'))
+        self.assertTrue(any('図が 1 枚' in w for w in warns), warns)
+        _, warns, _, _ = checker.check_sheet(ns.build(src + '## 何が起きるか\n' + fig, 'R'))
+        self.assertFalse(any('図が 1 枚' in w for w in warns), warns)
 
 
 if __name__ == '__main__':

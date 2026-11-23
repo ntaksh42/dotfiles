@@ -1,0 +1,7 @@
+---
+type: llm
+focus: trace
+weight: 1
+---
+
+The result matches this description: 本文が 800 字を超える調査を new-sheet.py に渡し、生成器が詳細の形を選んで保存先へ残す。説明・表・コードを省いて短くしない。会話には結論 1 文と残した場所だけ書く。
