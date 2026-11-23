@@ -1,4 +1,4 @@
-# claude/hooks/reply-check.mjs を ~/.claude/hooks/ へ置き、~/.claude/settings.json の Stop hook に登録する。
+# claude/hooks/reply-check.mjs を ~/.claude/hooks/ へ置き、~/.claude/settings.json の Stop と UserPromptSubmit の hook に登録する。
 # 既存の hooks（Orca など他ツールが書いたもの）は残し、同じ hook が登録済みなら何もしない。
 # 使い方: pwsh -NoProfile -File tools/Install-ReplyCheckHook.ps1 [-ClaudeDir <path>]
 param(
@@ -36,19 +36,21 @@ $settings = if (Test-Path -LiteralPath $settingsFile) {
 if (-not $settings.PSObject.Properties['hooks']) {
     $settings | Add-Member -NotePropertyName hooks -NotePropertyValue ([pscustomobject]@{})
 }
-if (-not $settings.hooks.PSObject.Properties['Stop']) {
-    $settings.hooks | Add-Member -NotePropertyName Stop -NotePropertyValue @()
-}
-
-$registered = @($settings.hooks.Stop | ForEach-Object { $_.hooks } | Where-Object { $_.command -like '*reply-check.mjs*' })
-if ($registered.Count -gt 0) {
-    # 登録済みなら、コマンドだけ現在のパスに揃える
-    foreach ($h in $registered) { $h.command = $command }
-    Write-Host '登録済み: コマンドを更新'
-} else {
-    $entry = [pscustomobject]@{ hooks = @([pscustomobject]@{ type = 'command'; command = $command; timeout = 10 }) }
-    $settings.hooks.Stop = @($settings.hooks.Stop) + $entry
-    Write-Host '登録: Stop hook を追加'
+# Stop で長い返信を止め、UserPromptSubmit で毎ターン基準を差し込む（同じスクリプトが hook_event_name で分岐する）
+foreach ($event in 'Stop', 'UserPromptSubmit') {
+    if (-not $settings.hooks.PSObject.Properties[$event]) {
+        $settings.hooks | Add-Member -NotePropertyName $event -NotePropertyValue @()
+    }
+    $registered = @($settings.hooks.$event | ForEach-Object { $_.hooks } | Where-Object { $_.command -like '*reply-check.mjs*' })
+    if ($registered.Count -gt 0) {
+        # 登録済みなら、コマンドだけ現在のパスに揃える
+        foreach ($h in $registered) { $h.command = $command }
+        Write-Host "登録済み: $event のコマンドを更新"
+    } else {
+        $entry = [pscustomobject]@{ hooks = @([pscustomobject]@{ type = 'command'; command = $command; timeout = 10 }) }
+        $settings.hooks.$event = @($settings.hooks.$event) + $entry
+        Write-Host "登録: $event hook を追加"
+    }
 }
 
 if (Test-Path -LiteralPath $settingsFile) {
