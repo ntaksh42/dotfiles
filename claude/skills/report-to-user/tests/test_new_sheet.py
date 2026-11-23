@@ -464,6 +464,14 @@ class NewSheetTest(unittest.TestCase):
         _, warns, _, _ = checker.check_sheet(ns.build(src + '## 何が起きるか\n' + fig, 'R'))
         self.assertFalse(any('図が 1 枚' in w for w in warns), warns)
 
+    def test_checker_wants_one_figure_per_heavy_finding_in_short_sheet(self):
+        fig = '```svg\n<svg viewBox="0 0 9 9"><g class="key"><rect/></g></svg>\n```\n'
+        src = '# 要対応 | x\n' + fig + '## 項目\n- [優先] a: b\n- [優先] c: d\n- [優先] e: f\n'
+        _, warns, _, _ = checker.check_sheet(ns.build(src + '## 何が起きるか\n' + fig, 'R'))
+        self.assertTrue(any('図が 2 枚' in w for w in warns), warns)
+        _, warns, _, _ = checker.check_sheet(ns.build(src + '## 何が起きるか\n' + fig + fig, 'R'))
+        self.assertFalse(any('優先の指摘が' in w for w in warns), warns)
+
 
 if __name__ == '__main__':
     unittest.main()
