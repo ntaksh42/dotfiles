@@ -15,24 +15,32 @@
 @media (prefers-color-scheme:dark){:root{--ag-ink:var(--foreground,#E6E8EB);--ag-muted:var(--muted-foreground,#9AA4AE);--ag-line:var(--border,#343A40);--ag-paper:var(--background,#16181B);--ag-dim:var(--muted,#22262A);--ag-link:var(--primary,#6EA0FF);--ag-red:#F87171;--ag-amber:#FBBF24;--ag-green:#4ADE80}}
 *{box-sizing:border-box}
 /* Segoe UI を和文フォントより先に置く: Yu Gothic と Meiryo はバックスラッシュを ¥ で描くため、英数字だけ Segoe UI に任せる */
-body{background:var(--ag-paper);color:var(--ag-ink);font-family:'IBM Plex Sans JP','Segoe UI','Hiragino Kaku Gothic ProN','Yu Gothic UI','Meiryo',sans-serif;font-size:15px;line-height:1.75;margin:0;padding:12px 20px 28px}
-main{max-width:1000px;margin:0 auto}
+body{--st:var(--ag-line);background:var(--ag-paper);color:var(--ag-ink);font-family:'IBM Plex Sans JP','Segoe UI','Hiragino Kaku Gothic ProN','Yu Gothic UI','Meiryo',sans-serif;font-size:15px;line-height:1.8;margin:0;padding:20px 24px 32px;border-top:5px solid var(--st)}
+/* 状態の色をページ上端の帯に出す: 要判断は琥珀、要対応・未完了は赤、対応不要は灰。開いた瞬間に読み手がすることが分かる */
+body:has(h1 .state.ask){--st:var(--ag-amber-dot)}
+body:has(h1 .state.act){--st:var(--ag-red)}
+main{max-width:860px;margin:0 auto}
+:focus-visible{outline:2px solid var(--ag-link);outline-offset:2px}
 a{color:var(--ag-link)}
 code{font-family:'IBM Plex Mono',Consolas,Menlo,monospace;font-size:.9em}
 .meta{font-family:'IBM Plex Mono',Consolas,monospace;font-size:11.5px;color:var(--ag-muted);letter-spacing:.04em}
 .meta.foot{margin-top:28px;opacity:.8}
-h1{font-size:25px;line-height:1.4;margin:6px 0 12px;letter-spacing:.01em}
-.state{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;padding:2px 12px;border-radius:999px;margin-right:10px;vertical-align:3px;white-space:nowrap;background:var(--ag-dim);color:var(--ag-muted)}
-.state::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+h1{font-size:28px;line-height:1.45;font-weight:700;margin:10px 0 14px;letter-spacing:.005em;text-wrap:balance}
+/* 状態の語はタイトルの上に独立した行で置く。帯と同じ色で、文字でも状態を言う */
+.state{display:flex;width:fit-content;align-items:center;gap:7px;font-size:13px;font-weight:700;line-height:1;padding:6px 12px 6px 10px;border-radius:4px;margin:0 0 10px;white-space:nowrap;background:var(--ag-dim);color:var(--ag-muted);letter-spacing:.04em}
+.state::before{content:"";width:8px;height:8px;border-radius:2px;background:currentColor}
 .state.ask{background:var(--ag-amber-bg);color:var(--ag-amber)}
 .state.act{background:var(--ag-red-bg);color:var(--ag-red)}
-.sub{margin:0 0 8px;color:var(--ag-ink)}
-.next{display:flex;gap:12px;align-items:baseline;background:var(--ag-dim);border-radius:6px;padding:8px 14px;font-size:14px}
+.sub{margin:0 0 12px;color:var(--ag-muted);font-size:15.5px}
+.next{display:flex;gap:12px;align-items:baseline;border-left:3px solid var(--st);background:var(--ag-dim);border-radius:0 6px 6px 0;padding:8px 14px;font-size:14.5px}
 .next b{font-size:12px;color:var(--ag-muted);white-space:nowrap}
-.points{margin:12px 0 0;padding-left:1.4em;font-size:14.5px}
-.points li{margin:2px 0}
-h2{font-size:15px;color:var(--ag-ink);font-weight:700;margin:26px 0 8px}
+.points{margin:14px 0 0;padding:0;list-style:none;font-size:14.5px}
+.points li{margin:3px 0;padding-left:1.2em;position:relative}
+.points li::before{content:"";position:absolute;left:.15em;top:.78em;width:6px;height:6px;border-radius:1px;background:var(--ag-muted)}
+h2{font-size:17px;color:var(--ag-ink);font-weight:700;margin:32px 0 10px}
 svg{display:block;margin:14px 0 4px;max-width:100%;height:auto}
+/* 冒頭の図は地を敷いて「図」として区切る */
+main>svg{background:var(--ag-dim);border-radius:10px;margin:18px 0 6px}
 svg text{fill:var(--ag-ink);font-size:14px}
 svg .sub{fill:var(--ag-muted);font-size:12px}
 svg rect,svg line,svg path,svg circle{stroke:var(--ag-muted);fill:none;stroke-width:1.5}
@@ -41,8 +49,9 @@ svg .key rect,svg .key circle{fill:var(--ag-red-bg)}
 svg .key text{fill:var(--ag-red);font-weight:700}
 svg .bar{fill:var(--ag-muted);stroke:none}
 svg .key .bar{fill:var(--ag-red)}
-.decision{border:2px solid var(--ag-amber-dot);background:var(--ag-amber-bg);border-radius:8px;padding:10px 14px;margin:16px 0 8px}
-.decision h3{font-size:16px;margin:0 0 6px}
+.decision{border:1px solid var(--ag-amber-dot);border-left-width:5px;background:var(--ag-amber-bg);border-radius:4px 8px 8px 4px;padding:12px 16px 10px;margin:22px 0 8px}
+.decision h3{font-size:17px;margin:0 0 8px}
+.decision h3::before{content:"要判断";display:block;font-size:12px;font-weight:700;color:var(--ag-amber);margin-bottom:2px}
 .choice{display:grid;grid-template-columns:3.4em 1fr;gap:8px;margin:3px 0;font-size:14px}
 .choice>b{font-size:11.5px;text-align:center;border-radius:4px;height:20px;line-height:18px;margin-top:2px;border:1px solid var(--ag-amber-dot)}
 .choice.rec>b{background:var(--ag-amber-dot);color:#fff}
@@ -59,7 +68,7 @@ td p{margin:0}
 .tag.unverified{background:var(--ag-ink);color:var(--ag-paper)}
 details.rest table{margin-top:4px}
 .evidence-line{display:block;font-family:'IBM Plex Mono',Consolas,monospace;font-size:12px;color:var(--ag-muted);margin-top:3px}
-.warn{border-left:3px solid var(--ag-muted);padding:2px 12px;margin:4px 0;font-size:14px}
+.warn{border-left:3px solid var(--ag-muted);padding:2px 12px;margin:4px 0;font-size:14.5px}
 .warn ul{margin:0;padding-left:1.2em}
 details{border:1px solid var(--ag-line);border-radius:8px;padding:8px 14px;margin:20px 0 6px}
 summary{cursor:pointer;color:var(--ag-link);font-size:13.5px}
@@ -68,27 +77,30 @@ details pre{white-space:pre-wrap;font-family:'IBM Plex Mono',Consolas,monospace;
 /* ---- 項目: 札ごとのレーン (render_items が出す)。1 行の見出しだけを並べ、対応と根拠は開いたときに出す ---- */
 .lanes{margin:16px 0 4px}
 .lane{margin:0 0 16px;scroll-margin-top:12px}
-.lane-h{display:flex;align-items:center;gap:8px;font-size:13px;margin:0 0 6px}
+.lane-h{display:flex;align-items:center;gap:8px;font-size:13px;margin:0 0 2px}
+.lane-h::after{content:"";flex:1;height:1px;background:var(--ag-line)}
 .lane-n{color:var(--ag-muted);font-weight:600}
 .lane-h .tag{font-size:12px;padding:1px 9px;margin:0}
 .tag.plain{background:var(--ag-dim);color:var(--ag-muted)}
-.item{display:block;border:1px solid var(--ag-line);border-left:4px solid var(--ag-line);border-radius:8px;padding:8px 14px;margin:5px 0;background:var(--ag-paper);scroll-margin-top:12px}
-.item.priority{border-left-color:var(--ag-red)}
+.item{display:block;border:0;border-bottom:1px solid var(--ag-line);border-left:3px solid transparent;border-radius:0;padding:9px 12px;margin:0;background:transparent;scroll-margin-top:12px}
+.item:last-child{border-bottom:0}
+.item.priority{border-left-color:var(--ag-red);background:linear-gradient(90deg,var(--ag-red-bg),transparent 40%)}
+summary:focus-visible{outline:2px solid var(--ag-link);outline-offset:2px}
 .item summary,.item .item-head{display:block;list-style:none;cursor:pointer;position:relative;padding-right:4.5em;color:var(--ag-ink);font-size:inherit}
 .item .item-head{cursor:default;padding-right:0}
 .item summary::-webkit-details-marker{display:none}
 .item summary::after{content:"詳細 ▾";position:absolute;right:0;top:3px;font-size:12px;color:var(--ag-muted)}
 .item[open] summary::after{content:"閉じる ▴"}
-.item-name{display:block;font-size:15.5px;line-height:1.5}
+.item-name{display:inline;font-size:15.5px;line-height:1.6;margin-right:.7em}
 .item-name .tag{margin-right:6px;vertical-align:2px}
-.item-body{display:block;font-size:13.5px;color:var(--ag-muted);line-height:1.6}
-.item .more{margin-top:8px;padding-top:8px;border-top:1px dashed var(--ag-line);font-size:14px}
+.item-body{display:inline;font-size:14px;color:var(--ag-muted);line-height:1.6}
+.item .more{margin-top:6px;padding:2px 0 2px 12px;border-left:1px solid var(--ag-line);font-size:14px}
 .item-act{margin:0 0 4px}
 .item-act::before{content:"→ ";font-weight:700;color:var(--ag-muted)}
 .item.priority .item-act::before{color:var(--ag-red)}
 /* ---- 自由な節と詳細 (scripts/new-sheet.py の render_blocks が出す要素) ---- */
 .block{scroll-margin-top:12px}
-h2.sec{font-size:18px;color:var(--ag-ink);letter-spacing:0;margin:30px 0 8px;padding-left:10px;border-left:4px solid var(--ag-muted)}
+h2.sec{font-size:19px;color:var(--ag-ink);letter-spacing:0;margin:40px 0 12px;padding:0}
 .content p{margin:0 0 10px}
 .content h3{font-size:15.5px;margin:18px 0 6px}
 .content ul,.content ol{margin:0 0 10px;padding-left:1.5em}
