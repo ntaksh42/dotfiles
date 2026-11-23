@@ -44,7 +44,13 @@ try {
         $script:regValues["$LiteralPath|$Name"] = $Value
     }
     function Stop-Process { param($Name, [switch]$Force) $script:stopped += $Name }
-    function Reset-Fake { $script:regValues = @{}; $script:keys = @(); $script:writes = @(); $script:created = @(); $script:stopped = @(); $script:admin = $true }
+    # タスクバーの StuckRects3 は Windows が必ず持つ Binary 値で、設定は 8 バイト目だけを書き換える。偽のレジストリにも置いておく
+    $stuckRects = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StuckRects3'
+    function New-StuckRectsBlob { $b = [byte[]]::new(48); $b[8] = 3; $b }
+    function Reset-Fake {
+        $script:regValues = @{ "$stuckRects|Settings" = (New-StuckRectsBlob) }
+        $script:keys = @(); $script:writes = @(); $script:created = @(); $script:stopped = @(); $script:admin = $true
+    }
 
     # How many settings the catalog has: every one differs from an empty registry.
     Reset-Fake
@@ -112,13 +118,15 @@ try {
     Test-Case 'Missing keys are created before the value is written' {
         Reset-Fake
         Set-WindowsSettings -Group Privacy 6>$null
-        $script:created.Count -eq 1 -and $script:created[0] -like '*\AdvertisingInfo' -and $script:writes.Count -eq 1
+        $privacy = @($script:writes | Select-Object -ExpandProperty Path -Unique)
+        $script:created.Count -eq $privacy.Count -and ($script:created -like '*\AdvertisingInfo').Count -eq 1 -and
+        $script:writes.Count -eq 5
     }
     Test-Case 'Existing keys are not recreated' {
         Reset-Fake
         $script:keys = @('HKCU:\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo')
         Set-WindowsSettings -Group Privacy 6>$null
-        $script:created.Count -eq 0 -and $script:writes.Count -eq 1
+        ($script:created -like '*\AdvertisingInfo').Count -eq 0 -and $script:created.Count -gt 0 -and $script:writes.Count -eq 5
     }
     Test-Case 'Classic context menu is written as an empty String default value' {
         Reset-Fake
@@ -129,7 +137,20 @@ try {
     Test-Case 'Other settings are written as DWord' {
         Reset-Fake
         Set-WindowsSettings -NoRestartExplorer 6>$null
-        @($script:writes | Where-Object { $_.Name -ne '(default)' -and $_.Type -ne 'DWord' }).Count -eq 0
+        @($script:writes | Where-Object { $_.Name -notin '(default)', 'Settings' -and $_.Type -ne 'DWord' }).Count -eq 0
+    }
+    Test-Case 'Taskbar auto-hide rewrites only byte 8 of the StuckRects3 Binary value' {
+        Reset-Fake
+        $script:regValues["$stuckRects|Settings"][0] = 48
+        Set-WindowsSettings -Group Explorer -NoRestartExplorer 6>$null
+        $w = @($script:writes | Where-Object { $_.Name -eq 'Settings' })
+        $w.Count -eq 1 -and $w[0].Type -eq 'Binary' -and $w[0].Value[8] -eq 2 -and $w[0].Value[0] -eq 48 -and $w[0].Value.Length -eq 48
+    }
+    Test-Case 'A missing StuckRects3 value is skipped with a warning instead of failing' {
+        Reset-Fake
+        $script:regValues.Remove("$stuckRects|Settings")
+        $warnings = @(Set-WindowsSettings -Group Explorer -NoRestartExplorer 3>&1 6>$null | Where-Object { $_ -is [System.Management.Automation.WarningRecord] })
+        $warnings.Count -eq 1 -and @($script:writes | Where-Object { $_.Name -eq 'Settings' }).Count -eq 0 -and $script:writes.Count -gt 0
     }
     Test-Case 'An unknown -Group is rejected' {
         $threw = $false

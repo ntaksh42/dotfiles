@@ -40,7 +40,7 @@ jobs:
           node-version: '22'
 
       - name: settings hook tests
-        run: node --test claude/hooks/
+        run: node --test "claude/hooks/*.test.mjs"
 
       - name: Mod tests
         shell: pwsh
