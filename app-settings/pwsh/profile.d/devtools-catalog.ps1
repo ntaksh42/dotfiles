@@ -20,6 +20,8 @@ $script:DevTools = @(
     @{ Name = 'Waypoint'; Backend = 'script'; Id = 'https://raw.githubusercontent.com/ntaksh42/waypoint/main/installer/install.ps1'; Path = (Join-Path $env:LOCALAPPDATA 'Programs\waypoint\waypoint.exe'); Args = @{ Silent = $true }; RebootRequiredExitCode = 3010; Repo = 'ntaksh42/waypoint'; VersionSource = 'product' }
     # MSIX のため導入先のファイルではなくパッケージ名で判定する（AppxName）。
     @{ Name = 'Dockyard'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-Dockyard.ps1"; AppxName = 'Dockyard'; Repo = 'ntaksh42/dockyard'; VersionSource = 'appx' }
+    # 日本語入力。アプリ自身が自動更新するため、未導入のときだけ入れる（InstallOnly）。
+    @{ Name = 'Meltype'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-Meltype.ps1"; Path = (Join-Path $env:LOCALAPPDATA 'Programs\Meltype\Meltype.exe'); InstallOnly = $true }
     @{ Name = 'starship'; Backend = 'winget'; Id = 'Starship.Starship'; Cmd = 'starship' }
     @{ Name = 'zoxide'; Backend = 'winget'; Id = 'ajeetdsouza.zoxide'; Cmd = 'zoxide' }
     @{ Name = 'eza'; Backend = 'winget'; Id = 'eza-community.eza'; Cmd = 'eza' }
