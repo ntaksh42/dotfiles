@@ -1,5 +1,6 @@
 // 実行: node --test claude/hooks/reply-check.test.mjs
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { calledSkillThisTurn, decide, measure, remind } from './reply-check.mjs'
 
@@ -86,8 +87,20 @@ test('REPLY_CHECK=off で無効', () => {
 test('UserPromptSubmit では基準を差し込む', () => {
   const out = remind({ hook_event_name: 'UserPromptSubmit' })
   assert.equal(out.hookSpecificOutput.hookEventName, 'UserPromptSubmit')
+  assert.match(out.hookSpecificOutput.additionalContext, /3 行・200 字までを目安/)
   assert.match(out.hookSpecificOutput.additionalContext, /300 字/)
   assert.match(out.hookSpecificOutput.additionalContext, /report-to-user/)
+})
+
+test('会話の目安は共通ルール・choose-form.py・差し込み文で同じ値', () => {
+  const root = new URL('../../', import.meta.url)
+  const rules = readFileSync(new URL('claude/CLAUDE.global.md', root), 'utf8')
+  const form = readFileSync(new URL('claude/skills/report-to-user/scripts/choose-form.py', root), 'utf8')
+  const ctx = remind({ hook_event_name: 'UserPromptSubmit' }).hookSpecificOutput.additionalContext
+  const [, lines, chars] = ctx.match(/結論 1 文と (\d+) 行・(\d+) 字までを目安/)
+  assert.match(rules, new RegExp(`結論の 1 文と ${lines} 行・${chars} 字に収まる`))
+  assert.match(form, new RegExp(`^CHAT_LINES = ${lines}$`, 'm'))
+  assert.match(form, new RegExp(`^CHAT_CHARS = ${chars}$`, 'm'))
 })
 
 test('サブエージェントと REPLY_CHECK=off では差し込まない', () => {

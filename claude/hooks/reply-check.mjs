@@ -12,6 +12,10 @@ import { fileURLToPath } from 'node:url'
 const MAX_LINES = 5
 const MAX_BULLETS = 5
 const MAX_CHARS = 300
+// 会話の目安。上の上限より狭く取る (見積もりの誤差で止められないように)。共通ルール (claude/CLAUDE.global.md) と
+// report-to-user の choose-form.py の CHAT_LINES / CHAT_CHARS も同じ値にする
+const TARGET_LINES = 3
+const TARGET_CHARS = 200
 const SKILL_NAME = 'report-to-user'
 
 export function measure(message) {
@@ -72,7 +76,7 @@ export function remind(input) {
     hookSpecificOutput: {
       hookEventName: 'UserPromptSubmit',
       additionalContext:
-        `[reply-check] 会話に書く返信は、結論 1 文と 3 行・300 字までを目安にする（hook の上限は結論 + ${MAX_LINES} 行・${MAX_CHARS} 字、箇条書き ${MAX_BULLETS} 個、表は不可）。` +
+        `[reply-check] 会話に書く返信は、結論 1 文と ${TARGET_LINES} 行・${TARGET_CHARS} 字までを目安にする（hook の上限は結論 + ${MAX_LINES} 行・${MAX_CHARS} 字、箇条書き ${MAX_BULLETS} 個、表は不可）。` +
         `超えそうなら、返信を書く前に ${SKILL_NAME} を呼んでシートにする。一覧・比較・手順・コマンド集を求められたら最初からシートにする。`,
     },
   }

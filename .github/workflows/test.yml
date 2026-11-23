@@ -31,3 +31,19 @@ jobs:
         run: |
           pip install pytest
           python -m pytest -q claude/skills/jp-deslop/tests
+
+      - name: report-to-user tests
+        run: python -m pytest -q claude/skills/report-to-user/tests
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: settings hook tests
+        run: node --test claude/hooks/
+
+      - name: Mod tests
+        shell: pwsh
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          pwsh -NoProfile -File tools/Test-ClaudeMods.ps1
