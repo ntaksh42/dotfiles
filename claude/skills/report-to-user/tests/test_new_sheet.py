@@ -48,8 +48,8 @@ class NewSheetTest(unittest.TestCase):
         self.assertEqual(warns, [])
         self.assertIn('class="state ask"', page)
         self.assertIn('class="choice rec picked"', page)
-        self.assertIn('<th>対応案</th>', page)
-        self.assertIn('class="tag priority"', page)
+        self.assertIn('class="item-act"', page)
+        self.assertIn('class="item priority"', page)
 
     def test_escapes_html_outside_svg(self):
         page = ns.build(FULL, 'REPORT')
@@ -59,8 +59,8 @@ class NewSheetTest(unittest.TestCase):
 
     def test_two_columns_without_action(self):
         page = ns.build('# 対応不要 | 済んだ\n\n## 項目: 関数 / 役割\n- mkcd: 作って移動\n', 'R')
-        self.assertNotIn('<th>対応案</th>', page)
-        self.assertIn('<th>関数</th>', page)
+        self.assertNotIn('class="item-act"', page)
+        self.assertIn('<strong class="item-name">mkcd</strong>', page)
 
     def test_no_next_box_without_next_line(self):
         page = ns.build('# 対応不要 | 済んだ\n', 'R')
@@ -121,13 +121,20 @@ class NewSheetTest(unittest.TestCase):
         self.assertNotIn('>確認済み<', page)
         self.assertIn('class="tag unverified"', page)
 
-    def test_folds_rest_when_priority_and_many_rows(self):
-        rows = '- [優先] p: 直す\n' + ''.join(f'- r{i}: 軽い\n' for i in range(5))
+    def test_lanes_put_priority_first(self):
+        rows = '- [推測] g: 怪しい\n  対応: 確かめる\n' + ''.join(f'- r{i}: 軽い\n' for i in range(3)) + '- [優先] p: 直す\n  対応: 直す\n'
         page = ns.build('# 要対応 | x\n## 項目\n' + rows, 'R')
-        self.assertIn('<summary>ほかの 5 件</summary>', page)
-        self.assertLess(page.index('>p<'), page.index('<details'))
+        body = page.split('<main>')[1]
+        self.assertLess(body.index('>p<'), body.index('>r0<'))
+        self.assertLess(body.index('>r0<'), body.index('>g<'))
+        self.assertIn('class="item priority"', page)
+        self.assertRegex(page, r'<details class="item priority"[^>]* open>')
+        self.assertRegex(page, r'<details class="item guess"[^>]*>(?!.*open)')
+        self.assertNotIn('ほかの', page)
         few = ns.build('# 要対応 | x\n## 項目\n- [優先] p: 直す\n- r: 軽い\n', 'R')
-        self.assertNotIn('<details', few)
+        self.assertNotIn('class="counts"', few)
+        one = ns.build('# 対応不要 | x\n## 項目\n- a: b\n- c: d\n', 'R')
+        self.assertNotIn('class="lane-h"', one)
 
     def test_no_figure_warning_for_decision_sheet(self):
         page = ns.build('# 要判断 1 件 | x\n次: 選ぶ\n## 要判断: q\n推奨: a — 理由\n', 'R')

@@ -92,13 +92,13 @@ def check_sheet(html: str):
     if is_report:
         n_decisions = len(re.findall(r'<section class=["\']decision["\']', live))
         row_names = [htmllib.unescape(re.sub(r'<span class=["\']tag[^>]*>.*?</span>|<[^>]+>', '', t)).strip()
-                     for t in re.findall(r'<tr\b[^>]*><th scope=["\']row["\']>(.*?)</th>', live, flags=re.DOTALL)]
+                     for t in re.findall(r'<strong class=["\']item-name["\']>(.*?)</strong>', live, flags=re.DOTALL)]
         n_rows = len(row_names)
         copied = copied_figure(live, row_names)
         if copied:
             warns.append(f'図の箱の語が項目の名前の書き写し ({copied}) — 図にはタイトルの結論 (何が起きるか) を描く')
         n_svg = len(re.findall(r'<svg\b', live))
-        n_priority = len(re.findall(r'<span class=["\']tag priority["\']>', live))
+        n_priority = len(re.findall(r'class=["\']item priority["\']', live))
         # 詳細でも図は求める。長い報告ほど、最初に図で要点を掴めるようにする
         if is_detail and n_priority >= 2 and n_svg < 2:
             warns.append(f'優先の指摘が {n_priority} 件あるのに図が {n_svg} 枚 — 重い指摘には 1 件ずつ「画面と実際」の図を自由な節に置く')
@@ -118,19 +118,23 @@ def check_sheet(html: str):
             concl = visible_len(title.group(1)) - visible_len(state_text)
         if not is_detail and total > REPORT_PROSE_LIMIT:
             warns.append(f'本文の文章が {total} 字 (目安 {REPORT_PROSE_LIMIT} 字以内)。説明は図のラベルへ移すか、項目を絞る。判断や行動に要る項目は畳まない')
-        folded = sum(visible_len(t) for t in re.findall(r'<details\b[^>]*>(.*?)</details>', live, flags=re.DOTALL))
+        # 項目の行 (details.item) は見出しが常に見えていて、畳むのは対応と根拠だけなので数えない
+        folded = sum(visible_len(t) for t in re.findall(r'<details\b(?![^>]*class=["\']item\b)[^>]*>(.*?)</details>', live, flags=re.DOTALL))
         if not is_detail and folded > total:
             warns.append(f'畳みの中 ({folded} 字) が本文 ({total} 字) より長い。読み手が判断や行動に使う項目が <details> に入っていないか見直す')
         if concl > REPORT_CONCL_LIMIT:
             errors.append(f'結論 (タイトル) が {concl} 字 (上限 {REPORT_CONCL_LIMIT} 字・1 文)。補足は次の行へ移す')
-        body = re.sub(r'<(svg|details)\b.*?</\1>', '', live, flags=re.DOTALL)
+        body = re.sub(r'<svg\b.*?</svg>|<details\b(?![^>]*class=["\']item\b).*?</details>', '', live, flags=re.DOTALL)
         n_li = len(re.findall(r'<li\b', body))
         if not is_detail and n_li > REPORT_BULLET_LIMIT:
-            errors.append(f'箇条書きが {n_li} 個 (上限 {REPORT_BULLET_LIMIT} 個)。6 個以上は「## 項目」の表にする')
-        cells = re.findall(r'<td\b[^>]*>(.*?)</td>', re.sub(r'<(span|code) class=["\']evidence-line["\'].*?</\1>', '', body, flags=re.DOTALL), flags=re.DOTALL)
+            errors.append(f'箇条書きが {n_li} 個 (上限 {REPORT_BULLET_LIMIT} 個)。6 個以上は「## 項目」に並べる')
+        # 表のセルと、項目の内容・対応案 (どちらも 1 行で読める長さにする)
+        cells = [a or b for a, b in re.findall(
+            r'<td\b[^>]*>(.*?)</td>|<(?:span|p) class=["\']item-(?:body|act)["\']>(.*?)</(?:span|p)>',
+            re.sub(r'<(span|code) class=["\']evidence-line["\'].*?</\1>', '', body, flags=re.DOTALL), flags=re.DOTALL)]
         long_cells = [n for n in (visible_len(t) for t in cells) if n > REPORT_CELL_LIMIT]
         if long_cells and not is_detail:
-            warns.append(f'表のセル {len(long_cells)} 個が {REPORT_CELL_LIMIT} 字超 (最長 {max(long_cells)} 字)。文でなく句で書く')
+            warns.append(f'表のセル・項目の内容 {len(long_cells)} 個が {REPORT_CELL_LIMIT} 字超 (最長 {max(long_cells)} 字)。文でなく句で書く')
         fillers = [t for t in (htmllib.unescape(re.sub(r'<[^>]+>', '', c)).strip() for c in cells) if re.fullmatch(FILLER, t)]
         if fillers:
             warns.append(f'することの無い埋め草が {len(fillers)} 個 (例「{fillers[0]}」)。対応案のセルは空にし、全行で空なら列ごと削る')
