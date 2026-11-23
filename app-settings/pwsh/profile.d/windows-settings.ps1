@@ -80,6 +80,11 @@ function Set-WindowsSettings {
             Write-Warning "管理者権限が必要なためスキップ: $label"
             continue
         }
+        # Binary 値の 1 バイトだけを書き換える設定は、元の値が無いと残りのバイトを作れない
+        if ($null -ne $s.Byte -and -not $bytes) {
+            Write-Warning "既存の値が無いためスキップ: $label ($($s.Path)\$($s.Name))"
+            continue
+        }
 
         if ($s.Explorer) { $restartExplorer = $true }
         if ($PSCmdlet.ShouldProcess("$($s.Path)\$($s.Name)", "$from -> $($s.Value)")) {
