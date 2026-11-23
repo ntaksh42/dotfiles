@@ -32,7 +32,7 @@
 
 上から順に、毎回同じ場所に同じものを置く。人が探さずに答えられるようにするため。
 
-1. **キッカー** — `✎ REVIEW` と日付 (Mono、赤)
+1. **キッカー** — `✎ REVIEW` と日付 (タイトルの上の赤い札)
 2. **主張のタイトル** — 内容の要約ではなく言い切り。1 行に収まる長さ
 3. **結論ボックス** — 「結論:」で始まる 2 文以内・120 字以内
 4. **モックボタン** (動的論点がある時だけ) — `./review/mock/` に置いたモックへの `file://` リンク
@@ -84,7 +84,7 @@
   - **赤 `--red` #DC2626 は「提案・訂正・論点」の専任。** 情報整理だけのシートでも論点は赤にする。シートから赤が消えると、どこが論点かが一目で分からなくなる。飾りには使わない
   - **青 `--accent` #2563EB は導線の専任** (リンク・モックボタン・summary)
   - 残りは無彩色
-- **本文幅 1200px (画面が狭ければ全幅)、基本文字 15px。** A/B は 900px 未満で縦積み。見出しは h1 25px / h2 19px。高さは内容なり。縦に間延びする空 div や min-height の水増しを置かない
+- **本文幅 1200px (画面が狭ければ全幅)、基本文字 15px。** A/B は 900px 未満で縦積み。見出しは h1 28px / h2 19px。ページ上端に 5px の赤の帯を引き、キッカーはタイトルの上の札にする。高さは内容なり。縦に間延びする空 div や min-height の水増しを置かない
 - **self-contained 必須。** 相対 URL 禁止。画像は data URI か https 絶対 URL。外部 JS を読み込まない。モックへの `file://` リンクは「シートの外へ出る導線」なので合法。モックボタン `.btn` の `href` はシートと同じディレクトリを起点にした `file://` 絶対 URL
 - 冒頭コメント `<!-- review-sheet-format: v6 -->` を残す (どの規約で書いたシートかの目印)
 
@@ -99,13 +99,14 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
 :root{--ink:#212529;--muted:#64707C;--line:#DEE2E6;--paper:#FFFFFF;--paper-dim:#F6F8FA;--accent:#2563EB;--red:#DC2626}
-body{background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans JP','Hiragino Kaku Gothic ProN',sans-serif;font-size:15px;line-height:1.8;margin:0;border-top:3px solid var(--red);padding:14px 24px 20px}
+body{background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans JP','Hiragino Kaku Gothic ProN',sans-serif;font-size:15px;line-height:1.8;margin:0;border-top:5px solid var(--red);padding:20px 24px 40px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 main{max-width:1200px;margin:0 auto}
-.kicker{font-family:'IBM Plex Mono',Menlo,monospace;font-size:12.5px;letter-spacing:.08em;color:var(--red);font-weight:600}
-h1{font-size:25px;line-height:1.45;margin:8px 0 12px}
-h2{font-size:19px;line-height:1.45;margin:30px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.kicker{display:flex;width:fit-content;align-items:center;font-size:13px;font-weight:700;line-height:1;padding:6px 12px;border-radius:4px;margin:0 0 10px;background:color-mix(in srgb,var(--red) 10%,transparent);color:var(--red);letter-spacing:.04em;white-space:nowrap}
+h1{font-size:28px;line-height:1.45;font-weight:700;margin:10px 0 14px;text-wrap:balance}
+h2{font-size:19px;line-height:1.45;margin:0 0 10px}
 p{margin:8px 0}
-.concl{border:1px solid var(--line);border-left:3px solid var(--red);border-radius:10px;padding:14px 18px}
+.concl{border-left:3px solid var(--red);background:var(--paper-dim);border-radius:0 6px 6px 0;padding:10px 16px}
 .red{color:var(--red)}
 .m{color:var(--muted);font-size:12.5px;line-height:1.7}
 .mono{font-family:'IBM Plex Mono',Menlo,monospace;font-size:13.5px}
@@ -116,14 +117,14 @@ table{border-collapse:collapse;width:100%;font-size:13.5px;line-height:1.6;margi
 th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
 th{font-size:11.5px;letter-spacing:.06em;color:var(--muted);font-weight:500;white-space:nowrap;border-bottom:1.5px solid var(--ink)}
 td.n{font-family:'IBM Plex Mono',Menlo,monospace;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
-details{border:1px solid var(--line);border-radius:10px;padding:10px 16px;margin:10px 0}
+details{border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:10px 0}
 summary{cursor:pointer;color:var(--accent);font-weight:500;font-size:13.5px}
 /* 論点 (人が決める場所) */
 .pick{display:grid;grid-template-columns:3.4em 1fr;gap:8px;margin:10px 0 0;font-size:14px}
 .pick>b{font-size:11.5px;text-align:center;border-radius:4px;height:20px;line-height:20px;margin-top:3px;background:var(--red);color:#fff}
 .pick.alt>b{background:none;color:var(--muted);border:1px solid var(--line);line-height:18px}
 .pick.alt{color:var(--muted);margin-top:2px}
-.pt{border-left:3px solid var(--red);padding-left:14px;margin:18px 0}
+.pt{border-left:5px solid var(--red);padding-left:18px;margin:36px 0}
 .pt .no{font-family:'IBM Plex Mono',Menlo,monospace;font-weight:600;color:var(--red);margin-right:6px}
 /* overlay 注記 (赤を画像の上に乗せる部品 — 座標は画像に対する %) */
 .shotwrap{position:relative;line-height:0;margin:8px 0 4px}
@@ -153,7 +154,7 @@ summary{cursor:pointer;color:var(--accent);font-weight:500;font-size:13.5px}
 | 部品 | 役割 |
 |---|---|
 | `.kicker` | 冒頭の `✎ REVIEW — 日付` |
-| `.concl` | 結論ボックス (左に赤の縦線) |
+| `.concl` | 結論の帯 (左に赤の縦線、淡い灰の地) |
 | `.gl` | 用語欄 |
 | `.red` | 本文中の赤い注記 |
 | `.m` | 補足の小さい文字 (畳みの中身など) |
