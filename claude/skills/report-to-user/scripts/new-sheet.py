@@ -33,7 +33,6 @@ SKILL_DIR = Path(__file__).resolve().parent.parent
 TEMPLATE = SKILL_DIR / 'templates' / 'sheet.html'
 CHECKER = SKILL_DIR / 'assets' / 'check-sheet.py'
 CONFIG = SKILL_DIR / 'output-config.toml'
-FOLD_ROWS = 6        # 優先の行があり、項目がこの数以上なら、優先以外の行を畳む
 TABLE_FOLD = 15      # 自由な節の表は、データ行がこの数を超えたら残りを畳む
 STATES = {'要判断': 'ask', '要対応': 'act', '未完了': 'act', '対応不要': ''}
 
@@ -457,7 +456,7 @@ def render_items(title, lines, ctx=None):
         cols = [c.strip() for c in m.group(1).split('/')]
         if len(cols) != 2 or not all(cols):
             raise InputError(f'列名は「## 項目: <1 列目> / <2 列目>」の 2 つだけ (対応案の列は「対応:」から自動で付く): {title[:40]}')
-    rows, has_action = [], False
+    rows = []
     for item in bullets(lines):
         m = re.match(r'^(?:\[([^\]]+)\]\s*)?(.+?)\s*[:：]\s*(.+)$', item[0])
         if not m:
@@ -471,47 +470,51 @@ def render_items(title, lines, ctx=None):
             if e.group(1) == '根拠':
                 ev.append(e.group(2))
             else:
-                act, has_action = e.group(2), True
+                act = e.group(2)
         rows.append((label, name, body, ev, act))
     ctx = ctx if ctx is not None else {}
     prev = ctx.get('prev')
     if not rows:
         raise InputError('「## 項目」に項目が無い')
-    head = ''.join(f'<th>{html.escape(c)}</th>' for c in cols + (['対応案'] if has_action else []))
-    widths = ['20%', '44%', '36%'] if has_action else ['24%', '76%']
-
-    def table(part):
-        out = ['<table class="items"><colgroup>' + ''.join(f'<col style="width:{w}">' for w in widths) + '</colgroup>',
-               f'<thead><tr>{head}</tr></thead><tbody>']
-        for label, name, body, ev, act in part:
-            tag = ''
-            # 確認済みは既定の状態なので札を出さない。札は例外 (優先・推測・未検証など) の行だけに付く
-            if label and label != '確認済み':
-                kind = {'優先': ' priority', '推測': ' guess', '未検証': ' unverified'}.get(label, '')
-                tag = f'<span class="tag{kind}">{html.escape(label)}</span>'
+    # 表ではなく、札ごとのレーンに 1 行の見出しで並べる。対応と根拠は開いたときだけ出す (優先の行は最初から開く)
+    order = ['優先', '', '確認済み']
+    groups = {}
+    for r in rows:
+        groups.setdefault(r[0] or '', []).append(r)
+    labels = sorted(groups, key=lambda l: (order.index(l) if l in order else (len(order) + (l in ('推測', '未検証'))), l))
+    lane_names = {'': 'そのほか', '確認済み': 'そのほか'}  # 確認済みは既定の状態なので、その語を札にしない
+    out = ['<div class="lanes">']
+    for label in labels:
+        lane_id = f'lane-{len(ctx.get("lanes", [])) + 1}'
+        ctx.setdefault('lanes', []).append(lane_id)
+        kind = {'優先': 'priority', '推測': 'guess', '未検証': 'unverified'}.get(label, 'plain')
+        shown = lane_names.get(label, label)
+        # レーンが 1 つだけなら見出しは要らない
+        lane_h = (f'<h3 class="lane-h"><span class="tag {kind}">{html.escape(shown)}</span>'
+                  f'<span class="lane-n">{len(groups[label])} 件</span></h3>') if len(labels) > 1 else ''
+        out.append(f'<section class="lane lane-{kind}" id="{lane_id}">{lane_h}')
+        for label_, name, body, ev, act in groups[label]:
             key = item_key(name, ctx.setdefault('seen', {}))
-            if prev is not None and key not in prev:  # 同じ --name の前回のシートに無かった行
-                tag += '<span class="tag tag-blue">新</span>'
-            tag += '<br>' if tag else ''
+            new = '<span class="tag tag-blue">新</span>' if prev is not None and key not in prev else ''
             request = action_request(name, act, ev) if act else ''
-            ctx.setdefault('items', []).append({'key': key, 'label': label or '', 'name': plain(name),
+            ctx.setdefault('items', []).append({'key': key, 'label': label_ or '', 'name': plain(name),
                                                 'act': plain(act), 'request': request})
-            # 依頼のコピーは SHEET_JS が data-act から足す (静的な字数の検査に数えない)
             attrs = f' id="item-{len(ctx["items"])}"'
+            # 依頼のコピーは SHEET_JS が data-act から足す (静的な字数の検査に数えない)
             attrs += f' data-act="{html.escape(request)}"' if act else ''
-            evs = ''.join(f'<span class="evidence-line">{inline(mark_sources(e))}</span>' for e in ev)
-            cell = f'<td><p>{inline(body)}</p>{evs}</td>'
-            out.append(f'<tr{attrs}><th scope="row">{tag}{inline(name)}</th>{cell}'
-                       + (f'<td><p>{inline(act)}</p></td>' if has_action else '') + '</tr>')
-        out.append('</tbody></table>')
-        return '\n'.join(out)
-
-    first = [r for r in rows if r[0] == '優先']
-    rest = [r for r in rows if r[0] != '優先']
-    if first and rest and len(rows) >= FOLD_ROWS:
-        return (table(first) + f'\n<details class="rest"><summary>ほかの {len(rest)} 件</summary>\n'
-                + table(rest) + '\n</details>')
-    return table(first + rest)
+            cls = f'item {kind}'
+            head = (f'<strong class="item-name">{new}{inline(name)}</strong>'
+                    f'<span class="item-body">{inline(body)}</span>')
+            more = (f'<p class="item-act">{inline(act)}</p>' if act else '') + ''.join(
+                f'<span class="evidence-line">{inline(mark_sources(e))}</span>' for e in ev)
+            if more:
+                opened = ' open' if label_ == '優先' else ''
+                out.append(f'<details class="{cls}"{attrs}{opened}><summary>{head}</summary><div class="more">{more}</div></details>')
+            else:
+                out.append(f'<div class="{cls}"{attrs}><div class="item-head">{head}</div></div>')
+        out.append('</section>')
+    out.append('</div>')
+    return '\n'.join(out)
 
 
 def gone_html(prev, items):
@@ -559,7 +562,7 @@ def render_body(src: str, prev=None, ctx=None):
             part = f'<h2 class="sec">{inline(title)}</h2>\n<div class="content">\n{render_blocks(lines)}\n</div>'
         body.append(f'<div class="block" id="{sid}">\n{part}\n</div>')
         toc.append((sid, title))
-        if part.startswith('<table class="items"'):
+        if part.startswith('<div class="lanes"'):
             ctx['last_items'] = len(body) - 1
     gone = gone_html(prev, ctx.get('items', []))
     if gone and 'last_items' in ctx:  # 最後の項目の節の下に置く。項目の節が無ければ本文の最後に置く
@@ -724,10 +727,10 @@ SHEET_JS = """<script>
         copy('要判断への返答:\\n' + picks.map(function (p, i) { return (i + 1) + '. 「' + p[0] + '」は「' + p[1] + '」'; }).join('\\n') + '\\nこの内容で進めて', b);
       });
     });
-    document.querySelectorAll('tr[data-act]').forEach(function (tr) {
+    document.querySelectorAll('.item[data-act]').forEach(function (it) {
       var b = document.createElement('button'); b.type = 'button'; b.className = 'copy act-copy'; b.textContent = '依頼をコピー';
-      b.addEventListener('click', function () { copy(tr.getAttribute('data-act'), b); });
-      tr.lastElementChild.appendChild(b);
+      b.addEventListener('click', function () { copy(it.getAttribute('data-act'), b); });
+      (it.querySelector('.more') || it).appendChild(b);
     });
     // 印刷・PDF では畳みをすべて開き、印刷が済んだら元に戻す。印刷前の通知が続いても、最初の状態だけを覚える
     var closed = null;
