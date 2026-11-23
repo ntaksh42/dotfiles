@@ -36,7 +36,6 @@ CONFIG = SKILL_DIR / 'output-config.toml'
 FOLD_ROWS = 6        # 優先の行があり、項目がこの数以上なら、優先以外の行を畳む
 TABLE_FOLD = 15      # 自由な節の表は、データ行がこの数を超えたら残りを畳む
 STATES = {'要判断': 'ask', '要対応': 'act', '未完了': 'act', '対応不要': ''}
-NEXT_SLOT = '<!--next-slot-->'
 
 # 種別: (表示名, 既定のサブディレクトリ, 既定の接頭辞)。output-config.toml で上書きできる
 KINDS = {
@@ -396,9 +395,7 @@ def render_head(lines):
     if sub:
         parts.append(f'<p class="sub">{inline(" ".join(sub))}</p>')
     if nxt:
-        parts.append(f'<div class="next"><b>次にすること</b><span>{inline(nxt)}</span></div>')
-    else:
-        parts.append(NEXT_SLOT)  # 要判断があれば render_body() が「下の n 問に答える」を入れる
+        parts.append(f'<div class="next"><b>→</b><span>{inline(nxt)}</span></div>')
     parts += figs
     if pts:
         parts.append('<ul class="points">' + ''.join(f'<li>{inline(p)}</li>' for p in pts) + '</ul>')
@@ -412,19 +409,22 @@ def render_decision(title, lines):
         if m:
             cls = 'rec' if m.group(1) == '推奨' else 'alt'
             kinds.append(cls)
-            # 案の名前 (「 — 」の前) で返答の文を作り、ボタンでコピーさせる。答えは会話に貼って受ける
+            # 案の名前 (「 — 」の前) を返答の文に使う。案の行を押すと選ばれ、下の 1 つのボタンで返答をコピーする
             name = re.split(r'\s+[—–-]{1,2}\s+', m.group(2), maxsplit=1)[0].replace('`', '').replace('**', '').strip()
             question = re.sub(r'^要判断\s*[:：]\s*', '', title)
-            reply = f'要判断「{question}」は「{name}」で進めて'
-            btn = f'<button type="button" class="copy reply" data-copy="{html.escape(reply)}">この案で返答をコピー</button>'
-            # data-q / data-name は、複数の要判断の答えをまとめてコピーするボタン (SHEET_JS) が読む
-            rows.append(f'<div class="choice {cls}" data-q="{html.escape(question)}" data-name="{html.escape(name)}">'
-                        f'<b>{m.group(1)}</b><p>{inline(m.group(2))}</p>{btn}</div>')
+            picked = ' picked' if cls == 'rec' else ''  # 押す前は推奨が選ばれている
+            # data-q / data-name は、返答をコピーするボタン (SHEET_JS) が読む
+            rows.append(f'<div class="choice {cls}{picked}" role="radio" tabindex="0" aria-checked="{"true" if picked else "false"}"'
+                        f' data-q="{html.escape(question)}" data-name="{html.escape(name)}">'
+                        f'<b>{m.group(1)}</b><p>{inline(m.group(2))}</p></div>')
         elif line.strip():
             raise InputError(f'要判断の中は「推奨:」「他案:」の行だけ: {line.strip()[:40]}')
     if not kinds or kinds[0] != 'rec':
         raise InputError(f'要判断「{title}」の最初の行は「推奨:」にする')
-    return f'<section class="decision"><h3>{inline(title)}</h3>' + ''.join(rows) + '</section>'
+    # 見出しは問いだけにする。「要判断:」はタイトルの状態の語と琥珀の枠で伝わる
+    question = re.sub(r'^要判断\s*[:：]\s*', '', title)
+    return (f'<section class="decision" role="radiogroup" aria-label="{html.escape(plain(question))}"><h3>{inline(question)}</h3>'
+            + ''.join(rows) + '</section>')
 
 
 def plain(text: str) -> str:
@@ -544,9 +544,8 @@ def render_body(src: str, prev=None, ctx=None):
             part = render_decision(title, lines)
             ctx.setdefault('first_dec', sid)
             seen += 1
-            if n_dec >= 2 and seen == n_dec:  # 最後の要判断の下に、選んだ案をまとめて返すボタン
-                part += ('\n<div class="reply-all"><button type="button" class="copy reply-all-btn">選んだ案をまとめてコピー</button>'
-                         '<span>各問の「この案で返答をコピー」で選び直せる。選んでいない問いは推奨で返す</span></div>')
+            if seen == n_dec:  # 最後の要判断の下に、選んだ案で返答するボタンを 1 つだけ置く
+                part += '\n<div class="reply-all"><button type="button" class="copy reply-all-btn">返答をコピー</button></div>'
         elif re.match(r'^項目(\s*[:：]|$)', title):
             part = render_items(title, lines, ctx)
         elif title == '注意点':
@@ -569,8 +568,6 @@ def render_body(src: str, prev=None, ctx=None):
     elif gone:
         body.append(gone)
     ctx.update(decisions=n_dec, state=parse_title(sections[0][1])[1], concl=concl)
-    auto_next = f'<div class="next"><b>次にすること</b><span>下の {n_dec} 問に答える</span></div>' if n_dec else ''
-    body = [auto_next if b == NEXT_SLOT else b for b in body]
     words = ' '.join([concl] + [t for t, _ in sections[1:]])
     return '\n'.join(body), concl, toc, words
 
@@ -707,23 +704,24 @@ SHEET_JS = """<script>
         copy(text, b);
       });
     });
-    document.querySelectorAll('button[data-copy]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        copy(b.getAttribute('data-copy'), b);
-        var choice = b.closest('.choice');
-        if (!choice) return;  // 選んだ案として印を付け、まとめての返答に使う
-        choice.parentNode.querySelectorAll('.choice').forEach(function (c) { c.classList.remove('picked'); });
-        choice.classList.add('picked');
-      });
+    // 案の行を押す (Enter・Space でも) と、その問いの中で選んだ案が入れ替わる
+    function pick(choice) {
+      choice.parentNode.querySelectorAll('.choice').forEach(function (c) { c.classList.remove('picked'); c.setAttribute('aria-checked', 'false'); });
+      choice.classList.add('picked'); choice.setAttribute('aria-checked', 'true');
+    }
+    document.querySelectorAll('section.decision .choice').forEach(function (c) {
+      c.addEventListener('click', function (e) { if (!e.target.closest('a')) pick(c); });
+      c.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(c); } });
     });
     document.querySelectorAll('.reply-all-btn').forEach(function (b) {
       b.addEventListener('click', function () {
-        var lines = [];
+        var picks = [];
         document.querySelectorAll('section.decision').forEach(function (sec) {
           var c = sec.querySelector('.choice.picked') || sec.querySelector('.choice.rec');
-          if (c) lines.push((lines.length + 1) + '. 「' + c.getAttribute('data-q') + '」は「' + c.getAttribute('data-name') + '」');
+          if (c) picks.push([c.getAttribute('data-q'), c.getAttribute('data-name')]);
         });
-        copy('要判断への返答:\\n' + lines.join('\\n') + '\\nこの内容で進めて', b);
+        if (picks.length === 1) { copy('要判断「' + picks[0][0] + '」は「' + picks[0][1] + '」で進めて', b); return; }
+        copy('要判断への返答:\\n' + picks.map(function (p, i) { return (i + 1) + '. 「' + p[0] + '」は「' + p[1] + '」'; }).join('\\n') + '\\nこの内容で進めて', b);
       });
     });
     document.querySelectorAll('tr[data-act]').forEach(function (tr) {
@@ -788,7 +786,8 @@ def jump_bar(ctx, layout):
 def wrap(body, concl, toc, layout, meta, ctx=None, kind='investigation', sid=None):
     ctx = ctx or {}
     # 目次は出さない。節の行き来は上に留めた要判断・優先の帯 (jump_bar) で足りる
-    parts = [jump_bar(ctx, layout) + f'<div class="meta">{html.escape(meta)}</div>', body]
+    # 生成時刻と版は読み手が最初に見るものではないので、本文の後ろに置く
+    parts = [jump_bar(ctx, layout) + body, f'<div class="meta foot">{html.escape(meta)}</div>']
     page = TEMPLATE.read_text(encoding='utf-8')
     tab = concl if len(concl) <= 40 else concl[:39] + '…'
     return (page.replace('{{LAYOUT}}', ' detail' if layout == 'detail' else '')

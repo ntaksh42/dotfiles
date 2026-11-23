@@ -47,7 +47,7 @@ class NewSheetTest(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(warns, [])
         self.assertIn('class="state ask"', page)
-        self.assertIn('class="choice rec"', page)
+        self.assertIn('class="choice rec picked"', page)
         self.assertIn('<th>対応案</th>', page)
         self.assertIn('class="tag priority"', page)
 
@@ -136,12 +136,14 @@ class NewSheetTest(unittest.TestCase):
         plain = ns.build('# 対応不要 | x\n', 'R')
         self.assertTrue(any('図が無い' in w for w in checker.check_sheet(plain)[1]))
 
-    def test_next_is_filled_from_decisions(self):
+    def test_next_only_when_written(self):
+        # 要判断があっても「次」の行は足さない。タイトルの「要判断 n 件」で伝わる
         page = ns.build('# 要判断 2 件 | x\n## 要判断: a\n推奨: a — r\n## 要判断: b\n推奨: b — r\n', 'R')
-        self.assertIn('下の 2 問に答える', page)
+        self.assertNotIn('class="next"', page)
+        self.assertIn('<h3>a</h3>', page)
+        self.assertLess(page.index('reply-all-btn'), page.index('class="meta foot"'))
         page = ns.build('# 要判断 1 件 | x\n次: 先に再起動する\n## 要判断: a\n推奨: a — r\n', 'R')
         self.assertIn('先に再起動する', page)
-        self.assertNotIn('問に答える', page)
 
     def test_filler_next_is_ng(self):
         for nxt in ('特になし', '特になし。push 済み', 'なし', '引き続き注視'):
@@ -258,11 +260,13 @@ class NewSheetTest(unittest.TestCase):
         self.assertIn('<code>missing.py:3</code>', page)
         self.assertNotIn('missing.py:3"', page)
 
-    def test_decision_has_reply_copy_buttons(self):
+    def test_decision_rows_are_picked_not_copied(self):
         page = ns.build('# 要判断 1 件 | x\n## 要判断: 上限\n推奨: **5 行** — 理由\n他案: 8 行 — 利点 / 代償\n', 'R')
-        self.assertIn('data-copy="要判断「上限」は「5 行」で進めて"', page)
-        self.assertIn('data-copy="要判断「上限」は「8 行」で進めて"', page)
-        self.assertIn('button[data-copy]', page)
+        # 案ごとのコピーボタンは無く、案の行を押して選ぶ。押す前は推奨が選ばれている
+        self.assertNotIn('data-copy=', page)
+        self.assertIn('class="choice rec picked" role="radio" tabindex="0" aria-checked="true" data-q="上限" data-name="5 行"', page)
+        self.assertIn('class="choice alt" role="radio" tabindex="0" aria-checked="false" data-q="上限" data-name="8 行"', page)
+        self.assertIn('role="radiogroup"', page)
 
     def test_diff_fence(self):
         page = ns.build('# 対応不要 | x\n## 差分\n```diff\n@@ -1 +1 @@\n-old\n+new\n>> [優先] ここが危ない\n ctx\n```\n', 'R')
@@ -390,12 +394,13 @@ class NewSheetTest(unittest.TestCase):
         with self.assertRaises(ns.InputError):
             ns.build('# 要判断 1 件 | x\n## 要判断: A\n他案: rec を含む — p / q\n', 'R')
 
-    def test_reply_all_only_with_two_decisions(self):
+    def test_one_reply_button_below_last_decision(self):
         one = '# 要判断 1 件 | x\n## 要判断: A\n推奨: a — r\n'
-        self.assertNotIn('reply-all-btn"', ns.build(one, 'R'))
+        self.assertEqual(ns.build(one, 'R').count('class="copy reply-all-btn"'), 1)
         two = one.replace('1 件', '2 件') + '## 要判断: B\n推奨: b — r\n他案: c — p / q\n'
         page = ns.build(two, 'R')
         self.assertEqual(page.count('class="copy reply-all-btn"'), 1)
+        self.assertLess(page.index('data-q="B"'), page.index('reply-all-btn'))
         self.assertIn('data-q="B" data-name="c"', page)
 
     def test_jump_bar_only_in_detail(self):
