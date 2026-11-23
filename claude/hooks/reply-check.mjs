@@ -3,6 +3,7 @@
 // 判定は機械的な数え上げだけ: 空行を除いた行数から結論の 1 行目を除いて > 5、空白を除いた字数 > 300、Markdown の表、箇条書き 6 つ以上のどれか。
 // 行数だけだと、1 行に詰め込んだ長い箇条書きをすり抜けるので字数も見る。
 // 止めるのは 1 ターンに 1 回（stop_hook_active のとき・このターンで skill を呼んだとき・シートを出したときは通す）。
+// UserPromptSubmit にも登録し、毎ターンの入力時に基準を短く差し込む（書いてから止められる前に形を決めさせる）。
 // 環境変数 REPLY_CHECK=off で無効にできる。失敗したときは何もしない（hook で作業を止めない）。
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -63,6 +64,20 @@ export function calledSkillThisTurn(transcriptLines) {
   )
 }
 
+// UserPromptSubmit: 返信を書く前に基準を思い出させる文を additionalContext で返す
+export function remind(input) {
+  if (process.env.REPLY_CHECK === 'off') return undefined
+  if (input.agent_id !== undefined) return undefined
+  return {
+    hookSpecificOutput: {
+      hookEventName: 'UserPromptSubmit',
+      additionalContext:
+        `[reply-check] 会話に書く返信は、結論 1 文と 3 行・300 字までを目安にする（hook の上限は結論 + ${MAX_LINES} 行・${MAX_CHARS} 字、箇条書き ${MAX_BULLETS} 個、表は不可）。` +
+        `超えそうなら、返信を書く前に ${SKILL_NAME} を呼んでシートにする。一覧・比較・手順・コマンド集を求められたら最初からシートにする。`,
+    },
+  }
+}
+
 export function decide(input, transcriptText) {
   if (process.env.REPLY_CHECK === 'off') return undefined
   if (input.stop_hook_active || input.agent_id !== undefined) return undefined
@@ -86,6 +101,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   process.stdin.on('end', () => {
     try {
       const input = JSON.parse(raw || '{}')
+      if (input.hook_event_name === 'UserPromptSubmit') {
+        const reminder = remind(input)
+        if (reminder) process.stdout.write(JSON.stringify(reminder))
+        return
+      }
       let transcript
       try {
         transcript = input.transcript_path ? readFileSync(input.transcript_path, 'utf8') : undefined

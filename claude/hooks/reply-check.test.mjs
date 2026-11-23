@@ -1,7 +1,7 @@
 // 実行: node --test claude/hooks/reply-check.test.mjs
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { calledSkillThisTurn, decide, measure } from './reply-check.mjs'
+import { calledSkillThisTurn, decide, measure, remind } from './reply-check.mjs'
 
 const user = text => JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text }] } })
 const skillCall = name => JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', name: 'Skill', input: { skill: name } }] } })
@@ -78,6 +78,23 @@ test('REPLY_CHECK=off で無効', () => {
   process.env.REPLY_CHECK = 'off'
   try {
     assert.equal(decide({ last_assistant_message: long }, ''), undefined)
+  } finally {
+    delete process.env.REPLY_CHECK
+  }
+})
+
+test('UserPromptSubmit では基準を差し込む', () => {
+  const out = remind({ hook_event_name: 'UserPromptSubmit' })
+  assert.equal(out.hookSpecificOutput.hookEventName, 'UserPromptSubmit')
+  assert.match(out.hookSpecificOutput.additionalContext, /300 字/)
+  assert.match(out.hookSpecificOutput.additionalContext, /report-to-user/)
+})
+
+test('サブエージェントと REPLY_CHECK=off では差し込まない', () => {
+  assert.equal(remind({ agent_id: 'a' }), undefined)
+  process.env.REPLY_CHECK = 'off'
+  try {
+    assert.equal(remind({}), undefined)
   } finally {
     delete process.env.REPLY_CHECK
   }
