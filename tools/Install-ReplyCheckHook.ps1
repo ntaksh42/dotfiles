@@ -1,4 +1,4 @@
-# claude/hooks/reply-check.mjs を ~/.claude/hooks/ へ置き、~/.claude/settings.json の Stop と UserPromptSubmit の hook に登録する。
+# claude/hooks/reply-check.mjs を ~/.claude/hooks/ へ置き、~/.claude/settings.json の Stop・UserPromptSubmit・PostToolUse の hook に登録する。
 # 既存の hooks（Orca など他ツールが書いたもの）は残し、同じ hook が登録済みなら何もしない。
 # 使い方: pwsh -NoProfile -File tools/Install-ReplyCheckHook.ps1 [-ClaudeDir <path>]
 param(
@@ -36,18 +36,29 @@ $settings = if (Test-Path -LiteralPath $settingsFile) {
 if (-not $settings.PSObject.Properties['hooks']) {
     $settings | Add-Member -NotePropertyName hooks -NotePropertyValue ([pscustomobject]@{})
 }
-# Stop で長い返信を止め、UserPromptSubmit で毎ターン基準を差し込む（同じスクリプトが hook_event_name で分岐する）
-foreach ($event in 'Stop', 'UserPromptSubmit') {
+# Stop で長い返信を止め、UserPromptSubmit で毎ターン基準を差し込み、PostToolUse でコミット・push・PR 作成の直後にも差し込む
+# （同じスクリプトが hook_event_name で分岐する）。値は matcher（$null なら付けない）
+$events = [ordered]@{
+    Stop             = $null
+    UserPromptSubmit = $null
+    PostToolUse      = 'Bash|PowerShell|mcp__.*__(create|update)_pull_request'
+}
+foreach ($event in $events.Keys) {
+    $matcher = $events[$event]
     if (-not $settings.hooks.PSObject.Properties[$event]) {
         $settings.hooks | Add-Member -NotePropertyName $event -NotePropertyValue @()
     }
-    $registered = @($settings.hooks.$event | ForEach-Object { $_.hooks } | Where-Object { $_.command -like '*reply-check.mjs*' })
-    if ($registered.Count -gt 0) {
-        # 登録済みなら、コマンドだけ現在のパスに揃える
-        foreach ($h in $registered) { $h.command = $command }
+    $entries = @($settings.hooks.$event | Where-Object { @($_.hooks | Where-Object { $_.command -like '*reply-check.mjs*' }).Count -gt 0 })
+    if ($entries.Count -gt 0) {
+        # 登録済みなら、コマンドと matcher だけ現在の値に揃える
+        foreach ($e in $entries) {
+            foreach ($h in @($e.hooks | Where-Object { $_.command -like '*reply-check.mjs*' })) { $h.command = $command }
+            if ($matcher) { $e | Add-Member -NotePropertyName matcher -NotePropertyValue $matcher -Force }
+        }
         Write-Host "登録済み: $event のコマンドを更新"
     } else {
         $entry = [pscustomobject]@{ hooks = @([pscustomobject]@{ type = 'command'; command = $command; timeout = 10 }) }
+        if ($matcher) { $entry | Add-Member -NotePropertyName matcher -NotePropertyValue $matcher }
         $settings.hooks.$event = @($settings.hooks.$event) + $entry
         Write-Host "登録: $event hook を追加"
     }

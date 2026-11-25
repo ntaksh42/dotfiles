@@ -8,7 +8,7 @@
   --question   ユーザーの問いの文。一覧・比較・手順などを求める語があり、答えが 2 項目以上 (または未見積もり) ならシートにする
   --kind       answer (既定) / work / review / list / compare / steps / commands / ui / manuscript / report
   --items      会話に並べる予定の項目・指摘・変更点の数
-  --chars      結論の 1 文を除いた本文のおよその字数 (空白とコードブロックを除く)
+  --chars      結論の 1 文を除いた本文のおよその字数 (空白・コードブロック・URL を除く)
   --lines      結論の 1 文を除いた本文のおよその行数
   --decisions  決めてもらう問いの数
 

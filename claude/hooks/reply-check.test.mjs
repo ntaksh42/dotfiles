@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import { calledSkillThisTurn, decide, measure, remind } from './reply-check.mjs'
+import { calledSkillThisTurn, decide, isWrapUp, measure, remind, remindAtWrapUp } from './reply-check.mjs'
 
 const user = text => JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text }] } })
 const skillCall = name => JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', name: 'Skill', input: { skill: name } }] } })
@@ -111,4 +111,30 @@ test('サブエージェントと REPLY_CHECK=off では差し込まない', () 
   } finally {
     delete process.env.REPLY_CHECK
   }
+})
+
+test('URL・リンク先・Markdown の記号は字数に入れない', () => {
+  assert.equal(measure('PR: https://github.com/o/r/pull/1').chars, 3)
+  assert.equal(measure('[PR #1](https://github.com/o/r/pull/1) を出した').chars, 8)
+  assert.equal(measure('**原因**は `a.mjs` です').chars, 10)
+  assert.equal(measure('- あ\n1. い\n## う\n> え').chars, 4)
+  // 字数で止まるのは本文が長いときだけ (URL が長くても止めない)
+  const withUrl = `${'あ'.repeat(250)} https://example.com/${'x'.repeat(200)}`
+  assert.equal(decide({ last_assistant_message: withUrl }, ''), undefined)
+})
+
+test('コミット・push・PR 作成の直後に基準を差し込む', () => {
+  assert.equal(isWrapUp('Bash', { command: 'git commit -m "x"' }), true)
+  assert.equal(isWrapUp('Bash', { command: 'git -C repo push -u origin b' }), true)
+  assert.equal(isWrapUp('PowerShell', { command: 'gh pr create --fill' }), true)
+  assert.equal(isWrapUp('mcp__github__create_pull_request', {}), true)
+  assert.equal(isWrapUp('Bash', { command: 'git status' }), false)
+  assert.equal(isWrapUp('Bash', { command: 'node --test' }), false)
+  assert.equal(isWrapUp('Edit', { command: 'git commit' }), false)
+  const out = remindAtWrapUp({ hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_input: { command: 'git push' } })
+  assert.equal(out.hookSpecificOutput.hookEventName, 'PostToolUse')
+  assert.match(out.hookSpecificOutput.additionalContext, /3 行・200 字までを目安/)
+  assert.match(out.hookSpecificOutput.additionalContext, /変更したファイルの一覧/)
+  assert.equal(remindAtWrapUp({ tool_name: 'Bash', tool_input: { command: 'ls' } }), undefined)
+  assert.equal(remindAtWrapUp({ agent_id: 'a', tool_name: 'Bash', tool_input: { command: 'git push' } }), undefined)
 })
