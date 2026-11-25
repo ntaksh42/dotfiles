@@ -19,11 +19,17 @@ const MAX_CHARS = 400
 // report-to-user の choose-form.py の CHAT_LINES / CHAT_CHARS も同じ値にする
 const TARGET_LINES = 3
 const TARGET_CHARS = 200
+// モデルは書きながら字数を数えられないので、目安は文の数で伝え、合格する返信の実例を添える
+const TARGET_SENTENCES = 2
+const EXAMPLE = '原因は、候補を検索順に並べて 8 件で切っていることです。メンション履歴を上位に混ぜれば直ります。実装しますか？'
 const SKILL_NAME = 'report-to-user'
 // 作業の区切り (この後に報告を書くことが多い) とみなすコマンド
 const WRAP_UP_COMMAND = /\bgit\s+(?:-[Cc]\s+\S+\s+|-\S+\s+)*(?:commit|push)\b|\bgh\s+pr\s+(?:create|edit)\b/
 const GUIDE =
-  `会話に書く返信は、結論 1 文と ${TARGET_LINES} 行・${TARGET_CHARS} 字までを目安にする（hook の上限は結論 + ${MAX_LINES} 行・${MAX_CHARS} 字、箇条書き ${MAX_BULLETS} 個、表は不可）。` +
+  `会話に書く返信は、結論 1 文と補足 ${TARGET_SENTENCES} 文までにする。字数は数えず、文の数で守る。` +
+  'ファイルパス・行番号は会話に書かない（要るならシートに書く）。' +
+  `例:「${EXAMPLE}」` +
+  `（結論 1 文と ${TARGET_LINES} 行・${TARGET_CHARS} 字までを目安にする。hook の上限は結論 + ${MAX_LINES} 行・${MAX_CHARS} 字、箇条書き ${MAX_BULLETS} 個、表は不可）。` +
   '変更したファイルの一覧・実行したコマンド・経緯は書かない（差分・PR・ログにある）。検証は件数と結果だけ書く。' +
   `それでも超えそうなら、返信を書く前に ${SKILL_NAME} を呼んでシートにする。`
 

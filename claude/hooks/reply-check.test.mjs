@@ -92,6 +92,15 @@ test('UserPromptSubmit では基準を差し込む', () => {
   assert.match(out.hookSpecificOutput.additionalContext, /report-to-user/)
 })
 
+test('差し込み文は文の数で目安を伝え、hook を通る実例を添える', () => {
+  const ctx = remind({ hook_event_name: 'UserPromptSubmit' }).hookSpecificOutput.additionalContext
+  assert.match(ctx, /結論 1 文と補足 2 文まで/)
+  assert.match(ctx, /ファイルパス・行番号は会話に書かない/)
+  const [, example] = ctx.match(/例:「(.+?)」/)
+  assert.equal(decide({ last_assistant_message: example }, ''), undefined)
+  assert.ok(measure(example).chars <= 200)
+})
+
 test('会話の目安は共通ルール・choose-form.py・差し込み文で同じ値', () => {
   const root = new URL('../../', import.meta.url)
   const rules = readFileSync(new URL('claude/CLAUDE.global.md', root), 'utf8')
