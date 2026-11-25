@@ -32,6 +32,7 @@ from pathlib import Path
 SKILL_DIR = Path(__file__).resolve().parent.parent
 TEMPLATE = SKILL_DIR / 'templates' / 'sheet.html'
 CHECKER = SKILL_DIR / 'assets' / 'check-sheet.py'
+FIGURES = SKILL_DIR / 'scripts' / 'figures.py'
 CONFIG = SKILL_DIR / 'output-config.toml'
 TABLE_FOLD = 15      # 自由な節の表は、データ行がこの数を超えたら残りを畳む
 STATES = {'要判断': 'ask', '要対応': 'act', '未完了': 'act', '対応不要': ''}
@@ -57,6 +58,16 @@ KIND_RULES = [
 
 class InputError(Exception):
     pass
+
+
+def load_module(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+FIG = load_module('sheet_figures', FIGURES)
 
 
 # ---- 行内記法 ---------------------------------------------------------------
@@ -136,6 +147,12 @@ def clean_svg(svg: str) -> str:
 
 
 def fence_html(lang: str, code: str, figure_wrap=True) -> str:
+    if lang in FIG.RENDER:
+        try:
+            svg = FIG.RENDER[lang](code)
+        except ValueError as e:
+            raise InputError(str(e)) from None
+        return f'<div class="figure">{svg}</div>' if figure_wrap else svg
     if lang == 'svg':
         svg = clean_svg(code)
         return f'<div class="figure">{svg}</div>' if figure_wrap else svg

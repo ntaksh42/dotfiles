@@ -1,6 +1,7 @@
 """new-sheet.py の単体テスト。python -m unittest claude/skills/report-to-user/tests/test_new_sheet.py"""
 import importlib.util
 import os
+import re
 import tempfile
 import unittest
 from unittest import mock
@@ -215,6 +216,46 @@ class NewSheetTest(unittest.TestCase):
         self.assertNotIn('<script>x', page.split('</main>')[0])
         self.assertNotIn('javascript:', page)
         self.assertIn('<a href="https://example.com">良い</a>', page)
+
+    def test_flow_fence_draws_svg_with_key_and_connector(self):
+        src = ('# 要対応 | x\n```flow\n# 失敗したとき\n画面: 押す -> 「保存しました」 -> !一覧に出る\n'
+               '実際: 押す -> 書き込みに失敗 -> !一覧に無い\n```\n')
+        page = ns.build(src, 'R')
+        fig = page.split('<svg', 1)[1].split('</svg>', 1)[0]
+        self.assertEqual(fig.count('<rect'), 6)
+        self.assertEqual(fig.count('<path'), 4)            # 矢印は 1 段に 2 本
+        self.assertIn('stroke-dasharray', fig)              # 要点どうしを縦の点線で結ぶ
+        self.assertEqual(fig.count('<g class="key">'), 3)  # 要点の箱 2 つと点線
+        self.assertIn('>失敗したとき<', fig)
+        self.assertIn('>画面<', fig)
+
+    def test_flow_wraps_long_text_and_keeps_closing_paren(self):
+        line = ' -> '.join(['とても長い説明の箱 (理由を書く)'] * 4)
+        page = ns.build('# 対応不要 | x\n```flow\n' + line + '\n```\n', 'R')
+        self.assertIn('<tspan', page)
+        self.assertNotIn('>)</tspan>', page)
+
+    def test_bars_fence_scales_to_max_and_marks_key(self):
+        page = ns.build('# 対応不要 | x\n```bars\n今 | 158 回\n!案 | 79 回\n```\n', 'R')
+        widths = [int(w) for w in re.findall(r'class="bar" x="\d+" y="\d+" width="(\d+)"', page)]
+        self.assertEqual(len(widths), 2)
+        self.assertAlmostEqual(widths[1] / widths[0], 0.5, delta=0.02)
+        self.assertIn('<g class="key"><text', page)
+        self.assertIn('>79 回<', page)
+
+    def test_bad_figure_fence_is_input_error(self):
+        for src in ('```flow\n\n```', '```bars\n値が無い\n```', '```bars\nラベル | なし\n```'):
+            with self.assertRaises(ns.InputError, msg=src):
+                ns.build('# 対応不要 | x\n' + src + '\n', 'R')
+
+    def test_checker_warns_boxes_only_figure(self):
+        row = '<g><rect x="{}" y="10" width="80" height="40"/><text>a</text></g>'
+        svg = '<svg viewBox="0 0 960 80">' + ''.join(row.format(x) for x in (10, 110, 210))
+        svg += '<g class="key"><rect x="310" y="10"/></g></svg>'
+        _, warns, _, _ = checker.check_sheet(ns.build('# 対応不要 | x\n```svg\n' + svg + '\n```\n', 'R'))
+        self.assertTrue(any('箱を並べただけ' in w for w in warns), warns)
+        _, warns, _, _ = checker.check_sheet(ns.build('# 対応不要 | x\n```flow\na -> b -> !c\n```\n', 'R'))
+        self.assertFalse(any('箱を並べただけ' in w for w in warns), warns)
 
     def test_mermaid_adds_script_only_when_used(self):
         page = ns.build('# 対応不要 | x\n## 図\n```mermaid\nflowchart LR\n A-->B\n```\n', 'R')

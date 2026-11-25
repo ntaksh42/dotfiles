@@ -12,7 +12,8 @@
   - 報告シート (警告): 図の欠落、図がある場合の要点の印 (class="key") の欠落、タイトルの状態の語の欠落・ずれ、
     本文 800 字超、表のセル 60 字超、畳みが本文より長い、
     表のセルの埋め草 (「特になし」「引き続き注視」など、することの無い対応案)
-  - 報告シートと詳細の両方 (警告): 優先の指摘が 2 件以上なら、図をその件数以上求める
+  - 報告シートと詳細の両方 (警告): 優先の指摘が 2 件以上なら、図をその件数以上求める。
+    矢印・線・棒が無く、箱を並べただけの図 (表と同じ内容になりやすい)
   - 詳細 (<!-- report-sheet detail -->): 字数・箇条書きの目安は当てない。図は求める
 
 終了コード 0 = 出してよい / 1 = 直してから出す。標準ライブラリのみ (python3.8+)。
@@ -69,6 +70,26 @@ def copied_figure(live: str, row_names):
     return '、'.join(hit[:2]) if len(hit) >= max(2, 0.6 * len(names)) else ''
 
 
+def boxes_only(live: str) -> int:
+    """矢印・線・棒が無く、箱を並べただけの SVG の数。同じ大きさの升が縦横に並ぶ図は状態の格子として数えない。"""
+    def pos(attr, name):
+        m = re.search(rf'\b{name}=["\']?(-?[\d.]+)', attr)
+        return m.group(1) if m else None
+    n = 0
+    for svg in re.findall(r'<svg\b.*?</svg>', live, flags=re.DOTALL):
+        if re.search(r'<(line|path|polyline|polygon)\b|class=["\'][^"\']*\bbar\b', svg):
+            continue
+        rects = re.findall(r'<rect\b([^>]*)>', svg)
+        if len(rects) < 3:
+            continue
+        # 同じ大きさの升が縦横に並ぶ図は、状態の格子として通す
+        same_size = len({(pos(r, 'width'), pos(r, 'height')) for r in rects}) == 1
+        if same_size and len({pos(r, 'x') for r in rects}) >= 2 and len({pos(r, 'y') for r in rects}) >= 2:
+            continue
+        n += 1
+    return n
+
+
 INLINE_SCRIPT = re.compile(r'<script\b(?![^>]*\bsrc=)[^>]*>.*?</script>', re.DOTALL)
 
 
@@ -99,6 +120,9 @@ def check_sheet(html: str):
         if copied:
             warns.append(f'図の箱の語が項目の名前の書き写し ({copied}) — 図にはタイトルの結論 (何が起きるか) を描く')
         n_svg = len(re.findall(r'<svg\b', live))
+        n_boxes = boxes_only(live)
+        if n_boxes:
+            warns.append(f'矢印も棒も無く箱を並べただけの図が {n_boxes} 枚 — 流れなら flow の記法で矢印を付け、量なら bars にする。表と同じ内容なら省く')
         n_priority = len(re.findall(r'class=["\']item priority["\']', live))
         # シートでも詳細でも、重い指摘には 1 件ずつ図を求める (冒頭の図が 1 件を兼ねてよい)
         if n_priority >= 2 and n_svg < n_priority:
