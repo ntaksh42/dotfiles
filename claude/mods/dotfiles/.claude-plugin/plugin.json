@@ -1,7 +1,7 @@
 {
   "name": "dotfiles",
-  "version": "0.12.3",
-  "description": "Skills (drawio-diagram, jp-deslop, request-user-check, cmd-history, harness), the mods (auto-session-title, ado-link-bar, toast-notify, cmdHistory), and settings-hook fallbacks (scripts/lite-hook.mjs, statusline/pr-line.mjs) for environments where mods are refused.",
+  "version": "0.13.0",
+  "description": "Skills (drawio-diagram, jp-deslop, request-user-check, cmd-history, harness), the mods (auto-session-title, ado-link-bar, toast-notify, cmdHistory), and settings-hook fallbacks (scripts/lite-hook.mjs, statusline/pr-line.mjs) for environments where mods are refused, and scripts/report-guard.mjs to keep request-user-check in use.",
   "types": "./types/index.d.ts",
   "userConfig": {
     "linkBarEnabled": {

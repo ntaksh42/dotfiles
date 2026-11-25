@@ -9,6 +9,10 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/lite-hook.mjs\" prompt"
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/report-guard.mjs\" prompt"
           }
         ]
       }
@@ -19,6 +23,10 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/lite-hook.mjs\" stop"
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/report-guard.mjs\" stop"
           }
         ]
       }

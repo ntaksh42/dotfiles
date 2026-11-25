@@ -23,6 +23,9 @@ jobs:
         shell: pwsh
         run: pwsh -NoProfile -File app-settings/codex-statusline/tests/Test-Statusline.ps1
 
+      - name: report-guard tests
+        run: node --test claude/mods/dotfiles/scripts/tests/report-guard.test.mjs
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

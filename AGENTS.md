@@ -26,6 +26,7 @@ tools/               汎用PowerShellユーティリティ
 - スキルは `claude/mods/dotfiles/skills/<name>/SKILL.md`。plugin 内なのでスキル名は `dotfiles:<name>` になる
 - Mod（TypeScript の hooks module）は `hooks/<mod>/register.ts(x)` に置き、`hooks/register.ts` から呼ぶ。エンジンは同じイベントの matcher 無しフックを plugin につき 1 つしか許さないので、イベントが重なる Mod は `hooks/register.ts` でネストして束ねる
 - 組織の管理設定（`allowManagedModsOnly` 等）で mod が拒否される環境向けに、mod を使わない代替を同じ plugin に置く: toast-notify と auto-session-title は `scripts/lite-hook.mjs`（`hooks.json` の settings hook）、ado-pr-status は ccstatusline が呼ぶ `statusline/pr-line.mjs` の自己更新、cmdHistory は `skills/cmd-history`。mod が動くセッションでは mod が環境変数 `DOTFILES_MOD_TOAST` / `DOTFILES_MOD_TITLE` を設定し、`lite-hook.mjs` はそれを見て何もしない（二重通知を避ける）。通知の送信は `scripts/toast-send.ps1` を mod と共有する
+- `scripts/report-guard.mjs`（`hooks.json` の settings hook。mod の有無に関係なく動く）が request-user-check の使用を促す。UserPromptSubmit で毎回注意書きを足し、Stop ではこのターンで request-user-check を呼ばずに空行を除き 10 行を超える返答を出したときに 1 回だけ差し戻す（`claude -p` などの無人実行では差し戻さない）。テストは `node --test claude/mods/dotfiles/scripts/tests/report-guard.test.mjs`
 - Mod の設定（userConfig）は `plugin.json` に Mod 名の接頭辞（`toast*`、`linkBar*`）を付けて置く
 - hook は `claude/mods/dotfiles/hooks/hooks.json` に登録し、スクリプトは `${CLAUDE_PLUGIN_ROOT}` で参照する
 - スキルからスクリプト等を参照するときは `~/.claude/skills/...` と決め打ちせず、SKILL.md のあるディレクトリからの相対で書く
