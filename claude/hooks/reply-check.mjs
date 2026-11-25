@@ -2,8 +2,11 @@
 // plugin や mod に依存しない単体スクリプト。~/.claude/settings.json の Stop に登録して使う（tools/Install-ReplyCheckHook.ps1）。
 // 判定は機械的な数え上げだけ: 空行を除いた行数から結論の 1 行目を除いて > 5、空白を除いた字数 > 300、Markdown の表、箇条書き 6 つ以上のどれか。
 // 行数だけだと、1 行に詰め込んだ長い箇条書きをすり抜けるので字数も見る。
+// 字数には URL・リンク先と Markdown の記号を入れない（読み手が読む文の長さではないので、数えると短い返信まで止める）。
 // 止めるのは 1 ターンに 1 回（stop_hook_active のとき・このターンで skill を呼んだとき・シートを出したときは通す）。
 // UserPromptSubmit にも登録し、毎ターンの入力時に基準を短く差し込む（書いてから止められる前に形を決めさせる）。
+// 長い作業ではターン冒頭の差し込みが返信を書く時点まで届かないので、PostToolUse でコミット・push・PR 作成の直後
+// （作業の報告を書く直前）にも同じ基準を差し込む。
 // 環境変数 REPLY_CHECK=off で無効にできる。失敗したときは何もしない（hook で作業を止めない）。
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -17,13 +20,27 @@ const MAX_CHARS = 300
 const TARGET_LINES = 3
 const TARGET_CHARS = 200
 const SKILL_NAME = 'report-to-user'
+// 作業の区切り (この後に報告を書くことが多い) とみなすコマンド
+const WRAP_UP_COMMAND = /\bgit\s+(?:-[Cc]\s+\S+\s+|-\S+\s+)*(?:commit|push)\b|\bgh\s+pr\s+(?:create|edit)\b/
+const GUIDE =
+  `会話に書く返信は、結論 1 文と ${TARGET_LINES} 行・${TARGET_CHARS} 字までを目安にする（hook の上限は結論 + ${MAX_LINES} 行・${MAX_CHARS} 字、箇条書き ${MAX_BULLETS} 個、表は不可）。` +
+  '変更したファイルの一覧・実行したコマンド・経緯は書かない（差分・PR・ログにある）。検証は件数と結果だけ書く。' +
+  `それでも超えそうなら、返信を書く前に ${SKILL_NAME} を呼んでシートにする。`
 
 export function measure(message) {
   const text = String(message ?? '').replace(/```[\s\S]*?```/g, '')
   const lines = text.split('\n').filter(l => l.trim() !== '')
   const table = lines.some(l => /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/.test(l) && l.includes('|'))
-  const bullets = lines.filter(l => /^\s*([-*•]|\d+[.)])\s+\S/.test(l)).length
-  const chars = text.replace(/\s/g, '').length
+  const bullet = /^\s*([-*•]|\d+[.)])\s+(?=\S)/
+  const bullets = lines.filter(l => bullet.test(l)).length
+  // 字数は読み手が読む文だけを数える: リンク先・URL・行頭の記号 (箇条書き・見出し・引用)・強調やコードの記号は除く
+  const prose = lines
+    .map(l => l.replace(bullet, '').replace(/^\s*(#{1,6}|>)\s*/, ''))
+    .join('\n')
+    .replace(/\]\(<?[^)\s]*>?\)/g, ']')
+    .replace(/<?https?:\/\/[^\s<>)\]]+>?/g, '')
+    .replace(/[`*[\]]/g, '')
+  const chars = prose.replace(/\s/g, '').length
   return { lines: lines.length, chars, table, bullets }
 }
 
@@ -75,9 +92,26 @@ export function remind(input) {
   return {
     hookSpecificOutput: {
       hookEventName: 'UserPromptSubmit',
-      additionalContext:
-        `[reply-check] 会話に書く返信は、結論 1 文と ${TARGET_LINES} 行・${TARGET_CHARS} 字までを目安にする（hook の上限は結論 + ${MAX_LINES} 行・${MAX_CHARS} 字、箇条書き ${MAX_BULLETS} 個、表は不可）。` +
-        `超えそうなら、返信を書く前に ${SKILL_NAME} を呼んでシートにする。一覧・比較・手順・コマンド集を求められたら最初からシートにする。`,
+      additionalContext: `[reply-check] ${GUIDE}一覧・比較・手順・コマンド集を求められたら最初からシートにする。`,
+    },
+  }
+}
+
+// PostToolUse: コミット・push・PR 作成の直後 (作業の報告を書く直前) に同じ基準を差し込む
+export function isWrapUp(toolName, toolInput) {
+  const name = String(toolName ?? '')
+  if (/^mcp__.*__(create_pull_request|update_pull_request)$/.test(name)) return true
+  return /^(Bash|PowerShell)$/.test(name) && WRAP_UP_COMMAND.test(String(toolInput?.command ?? ''))
+}
+
+export function remindAtWrapUp(input) {
+  if (process.env.REPLY_CHECK === 'off') return undefined
+  if (input.agent_id !== undefined) return undefined
+  if (!isWrapUp(input.tool_name, input.tool_input)) return undefined
+  return {
+    hookSpecificOutput: {
+      hookEventName: 'PostToolUse',
+      additionalContext: `[reply-check] この後に報告を書くなら: ${GUIDE}`,
     },
   }
 }
@@ -107,6 +141,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       const input = JSON.parse(raw || '{}')
       if (input.hook_event_name === 'UserPromptSubmit') {
         const reminder = remind(input)
+        if (reminder) process.stdout.write(JSON.stringify(reminder))
+        return
+      }
+      if (input.hook_event_name === 'PostToolUse') {
+        const reminder = remindAtWrapUp(input)
         if (reminder) process.stdout.write(JSON.stringify(reminder))
         return
       }
