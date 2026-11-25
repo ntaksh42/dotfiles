@@ -9,22 +9,22 @@ const skillCall = name => JSON.stringify({ type: 'assistant', message: { role: '
 const meta = text => JSON.stringify({ type: 'user', isMeta: true, message: { role: 'user', content: [{ type: 'text', text }] } })
 const toolResult = () => JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', content: 'ok' }] } })
 
-const long = Array.from({ length: 8 }, (_, i) => `行${i + 1}`).join('\n')
+const long = Array.from({ length: 9 }, (_, i) => `行${i + 1}`).join('\n')
 
 test('短い返信は通す', () => {
   assert.equal(decide({ last_assistant_message: '結論です。\n続きです。' }, ''), undefined)
 })
 
-test('結論 + 6 行は止める、結論 + 5 行は通す', () => {
+test('結論 + 8 行は止める、結論 + 7 行は通す', () => {
   assert.equal(decide({ last_assistant_message: long }, '').decision, 'block')
-  assert.equal(decide({ last_assistant_message: '結論\na\nb\nc\nd\ne\nf' }, '').decision, 'block')
-  assert.equal(decide({ last_assistant_message: '結論\na\nb\nc\nd\ne' }, ''), undefined)
+  assert.equal(decide({ last_assistant_message: '結論\na\nb\nc\nd\ne\nf\ng\nh' }, '').decision, 'block')
+  assert.equal(decide({ last_assistant_message: '結論\na\nb\nc\nd\ne\nf\ng' }, ''), undefined)
 })
 
-test('空白を除いて 300 字を超えたら止める、300 字は通す', () => {
-  assert.equal(decide({ last_assistant_message: 'あ'.repeat(301) }, '').decision, 'block')
-  assert.equal(decide({ last_assistant_message: `- ${'あ'.repeat(150)}\n- ${'い'.repeat(148)}` }, ''), undefined)
-  assert.equal(measure('a b\n\n```\n' + 'x'.repeat(400) + '\n```').chars, 2)
+test('空白を除いて 400 字を超えたら止める、400 字は通す', () => {
+  assert.equal(decide({ last_assistant_message: 'あ'.repeat(401) }, '').decision, 'block')
+  assert.equal(decide({ last_assistant_message: `- ${'あ'.repeat(200)}\n- ${'い'.repeat(198)}` }, ''), undefined)
+  assert.equal(measure('a b\n\n```\n' + 'x'.repeat(500) + '\n```').chars, 2)
 })
 
 test('表は短くても止める', () => {
@@ -88,7 +88,7 @@ test('UserPromptSubmit では基準を差し込む', () => {
   const out = remind({ hook_event_name: 'UserPromptSubmit' })
   assert.equal(out.hookSpecificOutput.hookEventName, 'UserPromptSubmit')
   assert.match(out.hookSpecificOutput.additionalContext, /3 行・200 字までを目安/)
-  assert.match(out.hookSpecificOutput.additionalContext, /300 字/)
+  assert.match(out.hookSpecificOutput.additionalContext, /400 字/)
   assert.match(out.hookSpecificOutput.additionalContext, /report-to-user/)
 })
 

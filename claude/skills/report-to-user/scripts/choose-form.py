@@ -20,7 +20,7 @@ import argparse
 import re
 import sys
 
-# hook (reply-check.mjs) の上限は 5 行・300 字・5 項目。見積もりの誤差で差し戻されないよう、会話はこれより狭く取る
+# hook (reply-check.mjs) の上限は 7 行・400 字・5 項目。見積もりの誤差で差し戻されないよう、会話はこれより狭く取る
 CHAT_LINES = 3
 CHAT_CHARS = 200
 CHAT_ITEMS = 3
