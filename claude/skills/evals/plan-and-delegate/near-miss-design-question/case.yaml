@@ -1,0 +1,15 @@
+schema_version: "1.1"
+name: plan-and-delegate-near-miss-design-question
+tags: [plan-and-delegate, near-miss]
+execution:
+  prompt: >-
+    通知を減らしたいです。通知をまとめて送る案と、種類ごとにオフにする案なら、どちらから考えるのがよさそうですか？
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-not-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?plan-and-delegate"'
+    min: 0
+    max: 0

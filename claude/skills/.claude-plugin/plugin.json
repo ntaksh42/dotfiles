@@ -1,0 +1,12 @@
+{
+  "name": "dotfiles-skills-eval",
+  "description": "Local evaluation of the standalone dotfiles skills.",
+  "skills": [
+    "./harness",
+    "./jp-deslop",
+    "./plan-and-delegate",
+    "./report-to-user",
+    "./root-cause-debug",
+    "./verify-before-done"
+  ]
+}

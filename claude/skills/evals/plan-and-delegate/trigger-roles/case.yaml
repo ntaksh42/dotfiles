@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: plan-and-delegate-trigger-roles
+tags: [plan-and-delegate, should-trigger]
+execution:
+  prompt: >-
+    通知の個別ミュートと一括解除を追加します。設定には通知 ID を保存し、一括解除で全 ID を消します。設定、一覧、操作テストの担当を分け、サブエージェントで実装と査読を進めてください。
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?plan-and-delegate"'
+    min: 1

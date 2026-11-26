@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: root-cause-debug-trigger-unexpected-duplicate
+tags: [root-cause-debug, should-trigger]
+execution:
+  prompt: >-
+    保存ボタンを一度しか押していないのに、同じデータが二件できます。何が二重に実行されているか調べて直してください。
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?root-cause-debug"'
+    min: 1

@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: report-to-user-trigger-many-findings
+tags: [report-to-user, should-trigger]
+execution:
+  prompt: >-
+    この調査メモにある 8 件の不具合を、影響を受ける人と再現する条件が分かるようにまとめてください。どこから直すか決めたいです。
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?report-to-user"'
+    min: 1

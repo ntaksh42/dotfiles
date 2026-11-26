@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: harness-trigger-missing-skill
+tags: [harness, should-trigger]
+execution:
+  prompt: >-
+    Claude Code で使えている自作スキルが Codex の一覧に出ません。両方がどこからスキルを読んでいるか調べて、違いを教えてください。
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?harness"'
+    min: 1

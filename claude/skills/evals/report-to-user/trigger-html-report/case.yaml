@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: report-to-user-trigger-html-report
+tags: [report-to-user, should-trigger]
+execution:
+  prompt: >-
+    今回のリリース確認の結果を HTML にまとめてください。ビルドは成功、検索は Windows と macOS で確認済み、CSV 出力は macOS が未確認です。
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?report-to-user"'
+    min: 1

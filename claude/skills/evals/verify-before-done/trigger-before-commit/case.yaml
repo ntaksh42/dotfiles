@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: verify-before-done-trigger-before-commit
+tags: [verify-before-done, should-trigger]
+execution:
+  prompt: >-
+    検索欄の修正は済んでいます。今の差分を確かめて、実際にテストが通ったらコミットしてください。
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?verify-before-done"'
+    min: 1

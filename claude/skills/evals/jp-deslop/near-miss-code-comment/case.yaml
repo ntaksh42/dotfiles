@@ -1,0 +1,15 @@
+schema_version: "1.1"
+name: jp-deslop-near-miss-code-comment
+tags: [jp-deslop, near-miss]
+execution:
+  prompt: >-
+    timeoutMs が 0 の場合は待ち時間の制限を設けないことを、TypeScript のコードコメント 1 行で書いてください。
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-not-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?jp-deslop"'
+    min: 0
+    max: 0

@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: jp-deslop-trigger-natural-prose
+tags: [jp-deslop, should-trigger]
+execution:
+  prompt: >-
+    リリース告知のこの一文を自然な日本語に直して。「入力の手戻りを静かに減らすために、保存前に必須項目をチェックする仕組みを追加しました。」
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?jp-deslop"'
+    min: 1

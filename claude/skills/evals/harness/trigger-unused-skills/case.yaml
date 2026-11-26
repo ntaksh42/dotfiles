@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: harness-trigger-unused-skills
+tags: [harness, should-trigger]
+execution:
+  prompt: >-
+    Claude Code にスキルを入れすぎました。最近使っていないものと、一覧に出すだけでコンテキストを多く使うものを調べてください。
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?harness"'
+    min: 1

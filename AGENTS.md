@@ -24,7 +24,7 @@ tools/               汎用PowerShellユーティリティ
 
 ### skills・hooks の仕組み
 
-- Mod だけが `claude/mods/dotfiles` plugin。導入は `Install-DevTools` が行う。GitHub の main の ZIP を展開したフォルダをマーケットプレイスとして登録し、`claude plugin install` する。手元のクローンは使わないので、変更は push してから導入する
+- 配布する plugin は `claude/mods/dotfiles`。導入は `Install-DevTools` が行う。GitHub の main の ZIP を展開したフォルダをマーケットプレイスとして登録し、`claude plugin install` する。手元のクローンは使わないので、変更は push してから導入する
 - スキルは `claude/skills/<name>/SKILL.md`。plugin ではないのでスキル名に接頭辞は付かない。`tools/Install-DotfilesSkills.ps1` が `~/.claude/skills/` へ写す（Install-DevTools の 'dotfiles skills'。配置した `claude/skills` の Git ツリー SHA を `~/.claude/skills/.dotfiles-skills-tree` に記録し、GitHub の main と比べて更新を判定する）
 - hook は `claude/hooks/` に置き、スクリプトを `~/.claude/hooks/` へ写して `~/.claude/settings.json` に登録する（`tools/Install-ReplyCheckHook.ps1`、`tools/Install-LiteHooks.ps1`）
 - Mod（TypeScript の hooks module）は `hooks/<mod>/register.ts(x)` に置き、`hooks/register.ts` から呼ぶ。エンジンは同じイベントの matcher 無しフックを plugin につき 1 つしか許さないので、イベントが重なる Mod は `hooks/register.ts` でネストして束ねる
@@ -81,6 +81,12 @@ Test-DotfilesDeployment
 
 # claude/mods/ の全 mod に claude plugin validate / test をかける（失敗があれば終了コード 1）
 pwsh -File tools/Test-ClaudeMods.ps1
+
+# スキルの発火を確かめる。claude/skills のマニフェストは eval 用で、配布には使わない
+# ケースは claude/skills/evals/<skill>/<case>/case.yaml に置く
+# --case で 1 件、--tag <skill> でスキルごとに選ぶ。--ablation none で Skill の呼び出しを採点する
+claude plugin validate claude/skills
+claude plugin eval claude/skills --case jp-deslop-trigger-shorter-prose --ablation none --runs 1 --no-publish
 
 # Windows 設定（レジストリ）の適用。pwsh プロファイル経由のコマンド（app-settings/pwsh/profile.d/windows-settings.ps1）
 # HKLM 項目は管理者権限が必要
