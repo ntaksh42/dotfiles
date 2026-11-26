@@ -62,6 +62,10 @@ pwsh -NoProfile -File tools/Install-JpDeslopHook.ps1
 # Install-DevTools の 'verify-check hook' でも入る。単体テストは node --test claude/hooks/verify-check.test.mjs
 pwsh -NoProfile -File tools/Install-VerifyCheckHook.ps1
 
+# compaction 後の SessionStart で Git の状態と、そのセッションで呼び出した skill の名前を文脈に追加する。
+# Install-DevTools の 'compact-reinject hook' でも入る。単体テストは node --test claude/hooks/compact-reinject.test.mjs
+pwsh -NoProfile -File tools/Install-CompactReinjectHook.ps1
+
 # app-settings/ の設定ファイルを実環境へ配置する（pwsh プロファイル経由。GitHub の main から取得）
 # 配置対象は app-settings/pwsh/profile.d/devtools-catalog.ps1 のカタログで定義する。プロファイル自体は Update-Profile
 Install-DevTools

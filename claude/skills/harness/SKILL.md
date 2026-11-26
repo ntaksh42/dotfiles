@@ -49,11 +49,13 @@ doctor が拾わない、参照切れと重複も確かめる。
 - plugin のスキルと同名のスキルが `~/.claude/skills` や `~/.agents/skills` にも置かれていないか
 - `~/.claude/skills` と `~/.agents/skills` の同名スキルの中身が一致しているか
 
+skill ごとのコンテキスト消費と使用回数は `claude -p "/skill-doctor"` と `claude -p "/context"` で取れる（Git Bash では `MSYS_NO_PATHCONV=1` を付ける）。使っていない skill を整理するよう頼まれたら、`references/skill-prune.md` の手順で進める。
+
 ## 2. セッション内でしか動かない公式コマンドを案内する
 
 次は組み込みコマンドでスキルからは実行できない。ユーザーに実行を頼み、結果を貼ってもらうか、要点を聞く。
 
-- Claude Code: `/doctor`（修正つき点検）、`/doctor prompt-audit`（古い指示・矛盾する指示）、`/skill-doctor`（スキルごとのコンテキスト消費と未使用スキル）
+- Claude Code: `/doctor`（修正つき点検）、`/doctor prompt-audit`（古い指示・矛盾する指示）
 - Codex: `/status`、`/debug-config`（実効設定と出どころ）
 
 `check` の時点では依頼だけ添え、結果を待たずに 3 へ進んでよい。
@@ -79,6 +81,7 @@ doctor が拾わない、参照切れと重複も確かめる。
 
 | 直すもの | 使う公式手段 |
 |---|---|
+| 使っていない skill を一覧から外す | `skillOverrides`（`references/skill-prune.md`） |
 | Claude の settings / hooks / 権限 | `update-config` スキル。恒久化するなら `settings.template.json` か `claude/hooks/` の hook に反映する |
 | skill の新規作成・改善 | Claude: `skill-creator`。Codex: `$skill-creator` |
 | Claude の資産を Codex へ移す | Codex の `migrate-to-codex` スキル（`$skill-installer` で導入）。Claude 側のファイルは触らない |

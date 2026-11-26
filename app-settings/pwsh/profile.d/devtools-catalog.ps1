@@ -67,5 +67,6 @@ $script:DevTools = @(
     @{ Name = 'reply-check hook'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-ReplyCheckHook.ps1"; Path = (Join-Path $env:USERPROFILE '.claude\hooks\reply-check.mjs'); RemoteFiles = @('claude/hooks/reply-check.mjs') }
     @{ Name = 'jp-deslop hook'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-JpDeslopHook.ps1"; Path = (Join-Path $env:USERPROFILE '.claude\hooks\jp-deslop-check.mjs'); RemoteFiles = @('claude/hooks/jp-deslop-check.mjs') }
     @{ Name = 'verify-check hook'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-VerifyCheckHook.ps1"; Path = (Join-Path $env:USERPROFILE '.claude\hooks\verify-check.mjs'); RemoteFiles = @('claude/hooks/verify-check.mjs') }
+    @{ Name = 'compact-reinject hook'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-CompactReinjectHook.ps1"; Path = (Join-Path $env:USERPROFILE '.claude\hooks\compact-reinject.mjs'); RemoteFiles = @('claude/hooks/compact-reinject.mjs') }
 )
 

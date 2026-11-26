@@ -1,5 +1,5 @@
 # claude/hooks/jp-deslop-check.mjs を ~/.claude/hooks/ へ置き、~/.claude/settings.json の PreToolUse hook に登録する。
-# 既存の hooks（Orca など他ツールが書いたもの）は残し、同じ hook が登録済みならコマンドと matcher だけを揃える。
+# 既存の hooks は残し、jp-deslop-check.mjs の登録を exec form に揃える。
 # 使い方: pwsh -NoProfile -File tools/Install-JpDeslopHook.ps1 [-ClaudeDir <path>]
 param(
     [string]$ClaudeDir = (Join-Path $env:USERPROFILE '.claude')
@@ -26,7 +26,8 @@ if (Test-Path -LiteralPath $source) {
 }
 Write-Host "配置: $target"
 
-$command = 'node "{0}"' -f ($target -replace '\\', '/')
+$hookPath = $target -replace '\\', '/'
+$hook = [pscustomobject]@{ type = 'command'; command = 'node'; args = @($hookPath); timeout = 10; onFailure = 'continue' }
 
 $settings = if (Test-Path -LiteralPath $settingsFile) {
     Get-Content -LiteralPath $settingsFile -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -37,26 +38,26 @@ $settings = if (Test-Path -LiteralPath $settingsFile) {
 if (-not $settings.PSObject.Properties['hooks']) {
     $settings | Add-Member -NotePropertyName hooks -NotePropertyValue ([pscustomobject]@{})
 }
-if (-not $settings.hooks.PSObject.Properties['PreToolUse']) {
-    $settings.hooks | Add-Member -NotePropertyName PreToolUse -NotePropertyValue @()
+$event = 'PreToolUse'
+if (-not $settings.hooks.PSObject.Properties[$event]) {
+    $settings.hooks | Add-Member -NotePropertyName $event -NotePropertyValue @()
 }
 
-$groups = @($settings.hooks.PreToolUse | Where-Object { @($_.hooks | Where-Object { $_.command -like '*jp-deslop-check.mjs*' }).Count -gt 0 })
-if ($groups.Count -gt 0) {
-    # 登録済みなら、コマンドと matcher だけ現在の値に揃える
-    foreach ($g in $groups) {
-        foreach ($h in @($g.hooks | Where-Object { $_.command -like '*jp-deslop-check.mjs*' })) { $h.command = $command }
-        if ($g.PSObject.Properties['matcher']) { $g.matcher = $matcher } else { $g | Add-Member -NotePropertyName matcher -NotePropertyValue $matcher }
-    }
-    Write-Host '登録済み: コマンドを更新'
-} else {
-    $entry = [pscustomobject]@{ matcher = $matcher; hooks = @([pscustomobject]@{ type = 'command'; command = $command; timeout = 10 }) }
-    $settings.hooks.PreToolUse = @($settings.hooks.PreToolUse) + $entry
-    Write-Host '登録: PreToolUse hook を追加'
-}
+$kept = @(foreach ($entry in $settings.hooks.$event) {
+    $others = @($entry.hooks | Where-Object {
+        $shellForm = $_.command -match '^node\s+"(?:[^"]*[\\/])?jp-deslop-check\.mjs"(?:\s|$)'
+        $execForm = $_.command -eq 'node' -and @($_.args)[0] -match '(?:^|[\\/])jp-deslop-check\.mjs$'
+        -not ($_.type -eq 'command' -and ($shellForm -or $execForm))
+    })
+    if ($others.Count -eq 0 -and $entry.hooks.Count -gt 0) { continue }
+    $entry.hooks = $others
+    $entry
+})
+$entry = [pscustomobject]@{ matcher = $matcher; hooks = @($hook) }
+$settings.hooks.$event = $kept + $entry
 
 if (Test-Path -LiteralPath $settingsFile) {
-    $backup = "$settingsFile.backup.$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+    $backup = "$settingsFile.backup.$(Get-Date -Format 'yyyyMMdd-HHmmss.fffffff')"
     Copy-Item -LiteralPath $settingsFile -Destination $backup
     Write-Host "バックアップ: $backup"
 }
