@@ -57,12 +57,12 @@ $script:DevTools = @(
     @{ Name = 'Claude CLAUDE.md'; Backend = 'remote-config'; RepoPath = 'claude/CLAUDE.global.md'; Dest = (Join-Path $env:USERPROFILE '.claude\CLAUDE.md') }
     @{ Name = 'Codex AGENTS.md'; Backend = 'remote-config'; RepoPath = 'claude/CLAUDE.global.md'; Dest = (Join-Path $(if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE '.codex' }) 'AGENTS.md') }
     @{ Name = 'dotfiles (mod)'; Backend = 'claude-plugin'; Id = 'dotfiles@dotfiles-mods'; Marketplace = 'dotfiles-mods'; MarketplaceSource = 'ntaksh42/dotfiles'; RequiredCommand = 'claude'; Replaces = @('auto-session-title@dotfiles-mods', 'ado-pr-status@dotfiles-mods', 'ado-link-bar@dotfiles-mods', 'toast-notify@dotfiles-mods') }
-    # 返信チェックの Stop hook。plugin に依存せず ~/.claude/settings.json に登録する（会社で plugin が制限されても動くように）。
-    # 導入済み判定は hook ファイルの有無、更新は RemoteFiles（GitHub の main の hook との比較）で行う。
+    # 管理対象のキーだけを ~/.claude/settings.json にマージする。
+    @{ Name = 'claude settings'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-ClaudeSettings.ps1"; Path = (Join-Path $env:USERPROFILE '.claude\settings.json'); RemoteInputs = @('claude/settings.template.json') }
     # 自作のスキル。~/.claude/skills へ置く。インストーラが配置した claude/skills の Git ツリー SHA を Path に記録し、
     # 更新は RemoteTree（GitHub の main の同じフォルダの SHA との比較）で判定する。どのスキルのどのファイルが変わっても更新される。
     @{ Name = 'dotfiles skills'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-DotfilesSkills.ps1"; Path = (Join-Path $env:USERPROFILE '.claude\skills\.dotfiles-skills-tree'); RemoteTree = 'claude/skills' }
-    # toast 通知とセッション名の settings hook。plugin の Mod が動くセッションでは何もしない。
+    # 設定に登録する hook。配置したファイルとインストーラを GitHub の main と比べて更新する。
     @{ Name = 'lite hooks'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-LiteHooks.ps1"; Path = (Join-Path $env:USERPROFILE '.claude\hooks\lite-hook.mjs'); RemoteFiles = @('claude/hooks/lite-hook.mjs') }
     @{ Name = 'reply-check hook'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-ReplyCheckHook.ps1"; Path = (Join-Path $env:USERPROFILE '.claude\hooks\reply-check.mjs'); RemoteFiles = @('claude/hooks/reply-check.mjs') }
     @{ Name = 'jp-deslop hook'; Backend = 'script'; Id = "$script:DotfilesRawBase/tools/Install-JpDeslopHook.ps1"; Path = (Join-Path $env:USERPROFILE '.claude\hooks\jp-deslop-check.mjs'); RemoteFiles = @('claude/hooks/jp-deslop-check.mjs') }

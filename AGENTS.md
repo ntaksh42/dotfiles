@@ -26,7 +26,7 @@ tools/               汎用PowerShellユーティリティ
 
 - Mod だけが `claude/mods/dotfiles` plugin。導入は `Install-DevTools` が行う。GitHub の main の ZIP を展開したフォルダをマーケットプレイスとして登録し、`claude plugin install` する。手元のクローンは使わないので、変更は push してから導入する
 - スキルは `claude/skills/<name>/SKILL.md`。plugin ではないのでスキル名に接頭辞は付かない。`tools/Install-DotfilesSkills.ps1` が `~/.claude/skills/` へ写す（Install-DevTools の 'dotfiles skills'。配置した `claude/skills` の Git ツリー SHA を `~/.claude/skills/.dotfiles-skills-tree` に記録し、GitHub の main と比べて更新を判定する）
-- hook は `claude/hooks/` に置き、スクリプトを `~/.claude/hooks/` へ写して `~/.claude/settings.json` に登録する（`tools/Install-ReplyCheckHook.ps1`、`tools/Install-LiteHooks.ps1`）
+- hook は `claude/hooks/` に置き、スクリプトを `~/.claude/hooks/` へ写して `~/.claude/settings.json` に登録する（`tools/Install-ReplyCheckHook.ps1`、`tools/Install-LiteHooks.ps1`）。Orca の Claude プロファイルには、Orca が起動準備時に既定の設定から変更されたキーを同期する
 - Mod（TypeScript の hooks module）は `hooks/<mod>/register.ts(x)` に置き、`hooks/register.ts` から呼ぶ。エンジンは同じイベントの matcher 無しフックを plugin につき 1 つしか許さないので、イベントが重なる Mod は `hooks/register.ts` でネストして束ねる
 - 組織の管理設定（`allowManagedModsOnly` 等）で mod が拒否される環境向けに、mod を使わない代替を同じ plugin に置く: toast-notify と auto-session-title は `claude/hooks/lite-hook.mjs`（settings hook）、ado-pr-status は ccstatusline が呼ぶ `statusline/pr-line.mjs` の自己更新。mod が動くセッションでは mod が環境変数 `DOTFILES_MOD_TOAST` / `DOTFILES_MOD_TITLE` を設定し、`lite-hook.mjs` はそれを見て何もしない（二重通知を避ける）。通知の送信は plugin の `scripts/toast-send.ps1` を mod と共有する（`Install-LiteHooks.ps1` が `~/.claude/hooks/` へ写す）
 - Mod の設定（userConfig）は `plugin.json` に Mod 名の接頭辞（`toast*`、`linkBar*`）を付けて置く
@@ -35,7 +35,8 @@ tools/               汎用PowerShellユーティリティ
 ### settings.template.json
 
 - プレースホルダ: `{{MARKETPLACE_DIR}}` → `%LOCALAPPDATA%\dotfiles\marketplaces\dotfiles-mods`（dotfiles-mods マーケットプレイスの登録先。`Install-DevTools` が GitHub の main の ZIP をここへ展開する）
-- インストーラがプレースホルダを実際のパスに置換して `~/.claude/settings.json` を生成
+- `claude/install.ps1` はプレースホルダを実際のパスに置換して `~/.claude/settings.json` を生成する
+- `Install-DevTools` の `claude settings` は `outputStyle`、`skillListingBudgetFraction`、`skillOverrides`、`autoMode.environment` を既存の設定にマージする。単体で差分を見るには `pwsh -NoProfile -File tools/Install-ClaudeSettings.ps1 -Check` を使う
 
 ## コマンド
 
@@ -68,6 +69,7 @@ pwsh -NoProfile -File tools/Install-CompactReinjectHook.ps1
 
 # app-settings/ の設定ファイルを実環境へ配置する（pwsh プロファイル経由。GitHub の main から取得）
 # 配置対象は app-settings/pwsh/profile.d/devtools-catalog.ps1 のカタログで定義する。プロファイル自体は Update-Profile
+# この変更より前のプロファイルを導入済みの端末では、先に Update-Profile で新しいカタログと更新判定を読み込む
 Install-DevTools
 
 # 配置済みのプロファイル・共通ルール・plugin が GitHub の main と一致するか確かめる（pwsh プロファイル経由）
@@ -88,6 +90,7 @@ Set-WindowsSettings           # 適用（Explorer 系は explorer.exe を再起�
 - スキルはサブディレクトリ形式（`SKILL.md` + `references/`）を使用する
 - plugin の中身を変えたら `plugin.json` の `version` を上げる
 - devtools カタログの winget / msstore 項目は `Upgradable = $true` を付けたものだけ `Install-DevTools` が更新する（既定は未導入時のインストールのみ）。更新で落とされると困るアプリには `ProcessName`（同名の別プロセスがあるなら `ProcessPath` も）を付け、起動中は更新を見送らせる
+- devtools カタログの `RemoteFiles` は配置したファイルと比較し、`RemoteInputs` はテンプレートなどマージに使うファイルを指定する。どちらもインストーラの変更を検出し、実行に成功したときにハッシュを記録する
 - PowerShellスクリプトは `$ErrorActionPreference = "Stop"` を使用
 - settings.template.json のパスは JSON 文字列としての `\\` エスケープを使用（`\\\\` は過剰）
 
