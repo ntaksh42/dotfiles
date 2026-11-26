@@ -1,0 +1,15 @@
+schema_version: "1.1"
+name: harness-near-miss-react-hook
+tags: [harness, near-miss]
+execution:
+  prompt: >-
+    React の useEffect が画面を開くたびに二回走ります。このコードの呼び出し方に原因があるか見てください。
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-not-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?harness"'
+    min: 0
+    max: 0

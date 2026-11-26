@@ -57,6 +57,7 @@ try {
         }
     }
     foreach ($skill in Get-ChildItem -LiteralPath $source -Directory) {
+        if (-not (Test-Path -LiteralPath (Join-Path $skill.FullName 'SKILL.md') -PathType Leaf)) { continue }
         $dest = Join-Path $SkillsDir $skill.Name
         if (Test-Path -LiteralPath $dest) { Remove-Item -LiteralPath $dest -Recurse -Force }
         Copy-Item -LiteralPath $skill.FullName -Destination $dest -Recurse

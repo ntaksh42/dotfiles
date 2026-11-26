@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: verify-before-done-trigger-worker-complete
+tags: [verify-before-done, should-trigger]
+execution:
+  prompt: >-
+    実装担当から、CSV の列順を仕様どおりに直してテストも通ったと連絡が来ました。こちらでも差分を見て、次のタスクへ進めるか判断してください。
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?verify-before-done"'
+    min: 1

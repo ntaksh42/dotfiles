@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: root-cause-debug-trigger-build-regression
+tags: [root-cause-debug, should-trigger]
+execution:
+  prompt: >-
+    依存ライブラリを更新したら Windows だけビルドが落ちます。更新前後で何が変わったかを調べて、失敗の原因を絞ってください。
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?root-cause-debug"'
+    min: 1

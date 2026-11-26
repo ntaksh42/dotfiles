@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: verify-before-done-trigger-before-handoff
+tags: [verify-before-done, should-trigger]
+execution:
+  prompt: >-
+    Windows で起きていた保存エラーの修正が入っています。元の操作で再現しないことを確認してから、直ったと報告してください。
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?verify-before-done"'
+    min: 1

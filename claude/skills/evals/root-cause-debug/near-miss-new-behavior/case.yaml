@@ -1,0 +1,15 @@
+schema_version: "1.1"
+name: root-cause-debug-near-miss-new-behavior
+tags: [root-cause-debug, near-miss]
+execution:
+  prompt: >-
+    検索結果が 0 件のときに「結果が見つかりません」と出してください。今は空の一覧を表示する仕様です。
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-not-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?root-cause-debug"'
+    min: 0
+    max: 0

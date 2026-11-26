@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: plan-and-delegate-trigger-export-plan
+tags: [plan-and-delegate, should-trigger]
+execution:
+  prompt: >-
+    一覧の CSV ダウンロードは、現在の絞り込みに合う全件を UTF-8 で出力し、列は ID と件名にします。API、画面、動作確認のタスクに分けて、実装前の計画書にしてください。
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?plan-and-delegate"'
+    min: 1
