@@ -29,6 +29,16 @@
         "type": "separator"
       },
       {
+        "id": "59cdd836-ab9b-40c9-a56b-e747f47fbb96",
+        "type": "custom-command",
+        "commandPath": "node -e \"const ratio = JSON.parse(require('node:fs').readFileSync(0, 'utf8')).prompt_cache?.hit_ratio; if (Number.isFinite(ratio)) console.log('Cache Hit: ' + Math.round(ratio * 100) + '%')\"",
+        "color": "green"
+      },
+      {
+        "id": "f12e2562-a8ed-4274-9b77-fa978b4c8078",
+        "type": "separator"
+      },
+      {
         "id": "f65c9f4c-737f-43f7-9e25-1d0bc513004f",
         "type": "claude-account-email",
         "color": "yellow"
