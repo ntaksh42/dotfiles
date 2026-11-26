@@ -53,7 +53,7 @@ try {
         'pip'           = 'Id', 'Cmd'
         'npm'           = 'Id', 'Cmd', 'RequiredCommand'
         'psmodule'      = 'Id'
-        'script'        = 'Id', 'Path', 'Args', 'RebootRequiredExitCode', 'RequiredCommand', 'Repo', 'VersionSource', 'InstallOnly', 'RemoteFiles', 'RemoteTree', 'AppxName', 'ProcessName'
+        'script'        = 'Id', 'Path', 'Args', 'RebootRequiredExitCode', 'RequiredCommand', 'Repo', 'VersionSource', 'InstallOnly', 'RemoteFiles', 'RemoteInputs', 'RemoteTree', 'AppxName', 'ProcessName'
         'remote-config' = 'RepoPath', 'Dest', 'StripCommentLines'
         'claude-plugin' = 'Id', 'Marketplace', 'MarketplaceSource', 'RequiredCommand', 'Replaces'
     }
@@ -584,7 +584,12 @@ try {
         $dir = New-Scratch
         foreach ($k in $Local.Keys) { [IO.File]::WriteAllText((Join-Path $dir $k), $Local[$k], [Text.UTF8Encoding]::new($false)) }
         foreach ($k in $Remote.Keys) { $script:web["$script:DotfilesRawBase/tools/$k"] = $Remote[$k] }
-        @{ Name = 'rf'; Path = (Join-Path $dir 'main.ps1'); RemoteFiles = $Files }
+        $tool = @{ Name = 'rf'; Id = "$script:DotfilesRawBase/tools/install.ps1"; Path = (Join-Path $dir 'main.ps1'); RemoteFiles = $Files }
+        $script:web[$tool.Id] = 'current installer'
+        $marker = Get-DevToolScriptMarkerPath $tool
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $marker) | Out-Null
+        [IO.File]::WriteAllText($marker, (Get-DevToolTextHash $script:web[$tool.Id]))
+        $tool
     }
     Test-Case 'Remote files up to date: true when every file matches' {
         $t = New-RemoteFilesFixture @{ 'a.ps1' = 'A'; 'b.ps1' = 'B' } @{ 'a.ps1' = 'A'; 'b.ps1' = 'B' }
@@ -593,7 +598,7 @@ try {
     Test-Case 'Remote files up to date: fetches each file from DotfilesRawBase/<relative path>' {
         $t = New-RemoteFilesFixture @{ 'a.ps1' = 'A'; 'b.ps1' = 'B' } @{ 'a.ps1' = 'A'; 'b.ps1' = 'B' }
         $null = Test-DevToolRemoteFilesUpToDate $t
-        ($script:webCalls -join '|') -ceq "$script:DotfilesRawBase/tools/a.ps1|$script:DotfilesRawBase/tools/b.ps1"
+        ($script:webCalls -join '|') -ceq "$script:DotfilesRawBase/tools/a.ps1|$script:DotfilesRawBase/tools/b.ps1|$($t.Id)"
     }
     Test-Case 'Remote files up to date: line endings and trailing newline differences are ignored' {
         $t = New-RemoteFilesFixture @{ 'a.ps1' = "x`r`ny`r`n"; 'b.ps1' = 'B' } @{ 'a.ps1' = "x`ny"; 'b.ps1' = "B`n" }
@@ -623,6 +628,35 @@ try {
     Test-Case 'Remote files up to date: null (not false) when a later download fails after an earlier mismatch' {
         $t = New-RemoteFilesFixture @{ 'a.ps1' = 'old'; 'b.ps1' = 'B' } @{ 'a.ps1' = 'new' }
         $null -eq (Test-DevToolRemoteFilesUpToDate $t)
+    }
+    Test-Case 'Remote files: current hooks still require an update when the installer or its marker is outdated' {
+        $t = New-RemoteFilesFixture @{ 'hook.mjs' = 'latest hook' } @{ 'hook.mjs' = 'latest hook' } @('tools/hook.mjs')
+        $settings = Join-Path (Split-Path -Parent $t.Path) 'settings.json'
+        Set-Content -LiteralPath $settings -Value '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"node \"C:/tmp/hook.mjs\""}]}]}}'
+        $marker = Get-DevToolScriptMarkerPath $t
+        [IO.File]::WriteAllText($marker, (Get-DevToolTextHash 'older installer'))
+        $stale = Test-DevToolRemoteFilesUpToDate $t
+        [IO.File]::WriteAllText($marker, (Get-DevToolTextHash $script:web[$t.Id]))
+        $current = Test-DevToolRemoteFilesUpToDate $t
+        Remove-Item -LiteralPath $marker
+        $missing = Test-DevToolRemoteFilesUpToDate $t
+        Write-Host "  Shell-form hook with current .mjs: older installer=$stale; current installer=$current; missing marker=$missing"
+        $stale -eq $false -and $current -eq $true -and $missing -eq $false
+    }
+    Test-Case 'Remote inputs: a changed or unavailable template is detected without comparing its text to settings.json' {
+        $t = New-RemoteFilesFixture @{} @{}
+        $t.Remove('RemoteFiles')
+        $t.RemoteInputs = @('claude/settings.template.json')
+        $source = "$script:DotfilesRawBase/claude/settings.template.json"
+        $script:web[$source] = 'current template'
+        $marker = Get-DevToolScriptMarkerPath $t
+        [IO.File]::AppendAllText($marker, "`n$(Get-DevToolTextHash $script:web[$source])")
+        $current = Test-DevToolRemoteFilesUpToDate $t
+        $script:web[$source] = 'new template'
+        $stale = Test-DevToolRemoteFilesUpToDate $t
+        $script:web.Remove($source)
+        $offline = Test-DevToolRemoteFilesUpToDate $t
+        $current -eq $true -and $stale -eq $false -and $null -eq $offline
     }
 
     # =====================================================================================
