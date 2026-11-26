@@ -62,6 +62,9 @@ pwsh -NoProfile -File tools/Install-JpDeslopHook.ps1
 # Install-DevTools の 'verify-check hook' でも入る。単体テストは node --test claude/hooks/verify-check.test.mjs
 pwsh -NoProfile -File tools/Install-VerifyCheckHook.ps1
 
+# Codex CLI に返信、検証、日本語の文章を書く前のチェックを登録する。新規登録時と変更時は /hooks で承認する。
+pwsh -NoProfile -File tools/Install-CodexHooks.ps1
+
 # compaction 後の SessionStart で Git の状態と、そのセッションで呼び出した skill の名前を文脈に追加する。
 # Install-DevTools の 'compact-reinject hook' でも入る。単体テストは node --test claude/hooks/compact-reinject.test.mjs
 pwsh -NoProfile -File tools/Install-CompactReinjectHook.ps1
