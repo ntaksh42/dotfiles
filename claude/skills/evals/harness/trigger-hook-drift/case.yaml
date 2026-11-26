@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: harness-trigger-hook-drift
+tags: [harness, should-trigger]
+execution:
+  prompt: >-
+    この PC だけ Codex で終了時の hook が動きません。設定の読み込み元と、hook が実行できる状態かを点検してください。
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?harness"'
+    min: 1

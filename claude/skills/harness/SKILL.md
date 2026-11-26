@@ -49,11 +49,26 @@ doctor が拾わない、参照切れと重複も確かめる。
 - plugin のスキルと同名のスキルが `~/.claude/skills` や `~/.agents/skills` にも置かれていないか
 - `~/.claude/skills` と `~/.agents/skills` の同名スキルの中身が一致しているか
 
+skill ごとのコンテキスト消費と使用回数は `claude -p "/skill-doctor"` と `claude -p "/context"` で取れる（Git Bash では `MSYS_NO_PATHCONV=1` を付ける）。使っていない skill を整理するよう頼まれたら、`references/skill-prune.md` の手順で進める。
+
+### Codex の旧設定と上書き
+
+`codex --version` を控える。ユーザー設定は `CODEX_HOME` の `config.toml` を見る。未設定なら `~/.codex/config.toml` を見る。該当箇所のファイルと行、影響、修正先を報告する。
+
+| 点検する項目 | 確かめること |
+|---|---|
+| `[profiles.*]` | 0.134.0 以降、`--profile` はこのテーブルを読まない。プロファイル名ごとの `<name>.config.toml` への移行を案内する。[公式設定ガイド](https://learn.chatgpt.com/docs/config-file/config-advanced#profiles) |
+| `approval_policy = "untrusted"` | 0.149.0 以降は明示すると設定エラーになる。既存の承認要件を確かめてから移行を案内する。[0.149.0 リリース](https://github.com/openai/codex/releases/tag/rust-v0.149.0)・[設定リファレンス](https://learn.chatgpt.com/docs/config-file/config-reference) |
+| `features.codex_hooks` | 非推奨の別名。現行のキーは `features.hooks`。[公式 hook ガイド](https://learn.chatgpt.com/docs/hooks#turn-hooks-off) |
+| `features.multi_agent` | 明示設定は 0.168.0 から警告される。サブエージェントの有効・無効を設定する現行のキーは `agents.enabled`。[0.168.0 リリース](https://github.com/openai/codex/releases/tag/rust-v0.168.0#chores) |
+| `AGENTS.override.md` | Codex のホームに空でないファイルがあると、同じ場所の `AGENTS.md` より優先される。残っていれば、意図した上書きかを確認する。[指示ファイルの優先順](https://learn.chatgpt.com/docs/agent-configuration/agents-md#how-codex-discovers-guidance) |
+| `codex exec` で動かない hook | 管理対象外の hook は、現在の定義が承認されるまで実行されない。対象の作業ディレクトリで Codex を開き、`/hooks` で出どころと承認状態を確認してもらう。結果がなければ未確認とする。[hook の承認](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks)・[exec のオプション](https://learn.chatgpt.com/docs/cli/reference#codex-exec) |
+
 ## 2. セッション内でしか動かない公式コマンドを案内する
 
 次は組み込みコマンドでスキルからは実行できない。ユーザーに実行を頼み、結果を貼ってもらうか、要点を聞く。
 
-- Claude Code: `/doctor`（修正つき点検）、`/doctor prompt-audit`（古い指示・矛盾する指示）、`/skill-doctor`（スキルごとのコンテキスト消費と未使用スキル）
+- Claude Code: `/doctor`（修正つき点検）、`/doctor prompt-audit`（古い指示・矛盾する指示）
 - Codex: `/status`、`/debug-config`（実効設定と出どころ）
 
 `check` の時点では依頼だけ添え、結果を待たずに 3 へ進んでよい。
@@ -79,6 +94,7 @@ doctor が拾わない、参照切れと重複も確かめる。
 
 | 直すもの | 使う公式手段 |
 |---|---|
+| 使っていない skill を一覧から外す | `skillOverrides`（`references/skill-prune.md`） |
 | Claude の settings / hooks / 権限 | `update-config` スキル。恒久化するなら `settings.template.json` か `claude/hooks/` の hook に反映する |
 | skill の新規作成・改善 | Claude: `skill-creator`。Codex: `$skill-creator` |
 | Claude の資産を Codex へ移す | Codex の `migrate-to-codex` スキル（`$skill-installer` で導入）。Claude 側のファイルは触らない |

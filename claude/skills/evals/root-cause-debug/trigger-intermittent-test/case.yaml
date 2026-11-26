@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: root-cause-debug-trigger-intermittent-test
+tags: [root-cause-debug, should-trigger]
+execution:
+  prompt: >-
+    ローカルでは通るテストが、CI で時々タイムアウトします。待ち時間を増やす前に、どこで止まるのか調べてください。
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?root-cause-debug"'
+    min: 1

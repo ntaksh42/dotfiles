@@ -57,21 +57,25 @@ foreach ($name in $events.Keys) {
     $existing = if ($settings.hooks.PSObject.Properties[$name]) { @($settings.hooks.$name) } else { @() }
     # lite-hook.mjs を指す hook を除き（空になったエントリごと）、他の hook は残す
     $kept = @(foreach ($entry in $existing) {
-        $others = @($entry.hooks | Where-Object { $_.command -notlike '*lite-hook.mjs*' })
+        $others = @($entry.hooks | Where-Object {
+            $shellForm = $_.command -match '^node\s+"(?:[^"]*[\\/])?lite-hook\.mjs"(?:\s|$)'
+            $execForm = $_.command -eq 'node' -and @($_.args)[0] -match '(?:^|[\\/])lite-hook\.mjs$'
+            -not ($_.type -eq 'command' -and ($shellForm -or $execForm))
+        })
         if ($others.Count -eq 0) { continue }
         $entry.hooks = $others
         $entry
     })
     $entry = [ordered]@{}
     if ($spec.Matcher) { $entry.matcher = $spec.Matcher }
-    $entry.hooks = @([pscustomobject]@{ type = 'command'; command = ('node "{0}" {1}' -f $script, $spec.Mode) })
+    $entry.hooks = @([pscustomobject]@{ type = 'command'; command = 'node'; args = @($script, $spec.Mode); timeout = 10; onFailure = 'continue' })
     $value = @($kept) + [pscustomobject]$entry
     if ($settings.hooks.PSObject.Properties[$name]) { $settings.hooks.$name = $value }
     else { $settings.hooks | Add-Member -NotePropertyName $name -NotePropertyValue $value }
 }
 
 if (Test-Path -LiteralPath $settingsFile) {
-    $backup = "$settingsFile.backup.$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+    $backup = "$settingsFile.backup.$(Get-Date -Format 'yyyyMMdd-HHmmss.fffffff')"
     Copy-Item -LiteralPath $settingsFile -Destination $backup
     Write-Host "バックアップ: $backup"
 }

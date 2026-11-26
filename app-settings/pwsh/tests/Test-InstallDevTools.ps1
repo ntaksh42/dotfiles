@@ -1008,7 +1008,11 @@ if ($h.Throw) { throw $h.Throw }
         $script:installedNames = @('Rf'); $script:remoteUpToDate['Rf'] = $false
         $script:DevTools = @((New-ScriptTool 'Rf' @{ RemoteFiles = @('a/x.ps1') }))
         Invoke-Install -Yes
-        $script:downloads.Count -eq 1 -and (Get-Row 'Rf').Action -ceq 'Updating'
+        $marker = Get-DevToolScriptMarkerPath $script:DevTools[0]
+        $hash = Get-DevToolTextHash $script:installerBody
+        $script:downloads.Count -eq 1 -and (Get-Row 'Rf').Action -ceq 'Updating' -and
+        -not (Test-Path -LiteralPath $script:downloads[0].OutFile) -and
+        (Read-DevToolLocalText $marker) -ceq $hash
     }
     Test-Case 'Update: RemoteFiles tool whose files are current is skipped' {
         Reset-Fake

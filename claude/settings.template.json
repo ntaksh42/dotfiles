@@ -1,6 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "model": "opus",
+  "outputStyle": "Concise",
   "permissions": {
     "defaultMode": "auto",
     "allow": [
@@ -119,6 +120,31 @@
         "path": "{{MARKETPLACE_DIR}}"
       }
     }
+  },
+  "autoMode": {
+    "environment": [
+      "$defaults",
+      "**Source control**: github.com/ntaksh42 and all repos under it. Pushes and PRs there are the user's own work."
+    ]
+  },
+  "skillListingBudgetFraction": 0.03,
+  "skillOverrides": {
+    "crit": "user-invocable-only",
+    "harness": "name-only",
+    "agent-desktop": "name-only",
+    "anthropic-skills:algorithmic-art": "user-invocable-only",
+    "anthropic-skills:theme-factory": "user-invocable-only",
+    "anthropic-skills:import-memory": "user-invocable-only",
+    "anthropic-skills:morning": "user-invocable-only",
+    "anthropic-skills:built-in-browser": "user-invocable-only",
+    "anthropic-skills:computer-use": "user-invocable-only",
+    "anthropic-skills:google-workspace": "name-only",
+    "anthropic-skills:mcp-builder": "name-only",
+    "anthropic-skills:skill-creator": "name-only",
+    "anthropic-skills:docx": "name-only",
+    "anthropic-skills:pptx": "name-only",
+    "anthropic-skills:xlsx": "name-only",
+    "anthropic-skills:pdf": "name-only"
   },
   "language": "Japanese",
   "alwaysThinkingEnabled": true

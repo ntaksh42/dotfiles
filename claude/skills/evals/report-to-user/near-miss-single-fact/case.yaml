@@ -1,0 +1,15 @@
+schema_version: "1.1"
+name: report-to-user-near-miss-single-fact
+tags: [report-to-user, near-miss]
+execution:
+  prompt: >-
+    PowerShell で今いるディレクトリを表示するコマンド名だけ教えてください。
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-not-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?report-to-user"'
+    min: 0
+    max: 0

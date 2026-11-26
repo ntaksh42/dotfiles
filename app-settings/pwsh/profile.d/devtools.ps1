@@ -57,10 +57,14 @@ function Test-DevToolVersionCurrent {
 }
 
 # 改行コード・BOM・末尾の改行の違いを無視してテキストを比較する。
+function ConvertTo-DevToolComparableText {
+    param([AllowNull()][string]$Text)
+    return ($Text.TrimStart([char]0xFEFF) -replace "`r`n", "`n").TrimEnd("`n")
+}
+
 function Test-DevToolTextEqual {
     param([AllowNull()][string]$Left, [AllowNull()][string]$Right)
-    $normalize = { param($s) if ($null -eq $s) { return $null }; ($s.TrimStart([char]0xFEFF) -replace "`r`n", "`n").TrimEnd("`n") }
-    return ((& $normalize $Left) -ceq (& $normalize $Right))
+    return ((ConvertTo-DevToolComparableText $Left) -ceq (ConvertTo-DevToolComparableText $Right))
 }
 
 # ローカルファイルを UTF-8 として読む（Windows PowerShell の Get-Content は BOM なし
@@ -105,16 +109,45 @@ function Get-DevToolInstalledVersion {
     return $null
 }
 
-# 配布元の2ファイルが両方ともローカルと一致するか確認する。通信失敗時は $null。
+function Get-DevToolScriptMarkerPath {
+    param([Parameter(Mandatory)]$Tool)
+    $name = $Tool.Name -replace '[^A-Za-z0-9._-]', '-'
+    return Join-Path $env:LOCALAPPDATA "dotfiles\devtools\$name.installer"
+}
+
+function Get-DevToolTextHash {
+    param([string]$Text)
+    $bytes = [Text.Encoding]::UTF8.GetBytes((ConvertTo-DevToolComparableText $Text))
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return [BitConverter]::ToString($sha.ComputeHash($bytes)).Replace('-', '') }
+    finally { $sha.Dispose() }
+}
+
+# RemoteInputs はインストーラがマージ等に使うファイル。配置先とは比較せず、配布元の変更を調べる。
+function Get-DevToolRemoteInputHashes {
+    param([Parameter(Mandatory)]$Tool)
+    foreach ($relativePath in $Tool.RemoteInputs) {
+        Get-DevToolTextHash (Invoke-WebRequest -Uri "$script:DotfilesRawBase/$relativePath" -UseBasicParsing -ErrorAction Stop).Content
+    }
+}
+
+# 配置したファイルと、前回の実行で使ったインストーラ・入力ファイルを照合する。通信失敗時は $null。
 function Test-DevToolRemoteFilesUpToDate {
     param([Parameter(Mandatory)]$Tool)
     $upToDate = $true
     try {
         foreach ($relativePath in $Tool.RemoteFiles) {
-            $remote = (Invoke-WebRequest -Uri "$script:DotfilesRawBase/$relativePath" -UseBasicParsing).Content
+            $remote = (Invoke-WebRequest -Uri "$script:DotfilesRawBase/$relativePath" -UseBasicParsing -ErrorAction Stop).Content
             $localPath = Join-Path (Split-Path -Parent $Tool.Path) (Split-Path -Leaf $relativePath)
             if (-not (Test-Path -LiteralPath $localPath -PathType Leaf) -or
                 -not (Test-DevToolTextEqual (Read-DevToolLocalText $localPath) $remote)) { $upToDate = $false }
+        }
+        if ($Tool.RemoteFiles -or $Tool.ContainsKey('RemoteInputs')) {
+            $installer = (Invoke-WebRequest -Uri $Tool.Id -UseBasicParsing -ErrorAction Stop).Content
+            $hashes = @(Get-DevToolTextHash $installer; Get-DevToolRemoteInputHashes $Tool)
+            $marker = Get-DevToolScriptMarkerPath $Tool
+            if (-not (Test-Path -LiteralPath $marker -PathType Leaf) -or
+                -not (Test-DevToolTextEqual (Read-DevToolLocalText $marker) ($hashes -join "`n"))) { $upToDate = $false }
         }
     }
     catch { return $null }
@@ -543,7 +576,7 @@ function Install-DevTools {
                 $latestVersions[$tool.Name] = $latest
                 if (Test-DevToolVersionCurrent (Get-DevToolInstalledVersion $tool) $latest) { continue }
             }
-            elseif ($tool.RemoteFiles) {
+            elseif ($tool.RemoteFiles -or $tool.ContainsKey('RemoteInputs')) {
                 $upToDate = Test-DevToolRemoteFilesUpToDate $tool
                 if ($null -eq $upToDate) {
                     Write-Warning "$($tool.Name): remote files could not be checked; skipping update."
@@ -713,11 +746,16 @@ function Install-DevTools {
                 }
                 'script' {
                     $installerName = $t.Name -replace '[^A-Za-z0-9._-]', '-'
+                    $trackInstaller = $t.RemoteFiles -or $t.ContainsKey('RemoteInputs')
+                    if ($trackInstaller) { $installerName += "-$([guid]::NewGuid().ToString('N'))" }
                     $installerPath = Join-Path $env:TEMP "$installerName-install.ps1"
-                    Invoke-WebRequest -Uri $t.Id -OutFile $installerPath
-                    # Splat as a hashtable: an array of '-Flag' strings is passed
-                    # positionally, so switches never bind by name.
                     try {
+                        Invoke-WebRequest -Uri $t.Id -OutFile $installerPath
+                        if ($trackInstaller) {
+                            $hashes = @(Get-DevToolTextHash (Read-DevToolLocalText $installerPath); Get-DevToolRemoteInputHashes $t)
+                        }
+                        # Splat as a hashtable: an array of '-Flag' strings is passed
+                        # positionally, so switches never bind by name.
                         if ($t.Args) {
                             $installerArgs = $t.Args.Clone()
                             if ($t.Name -eq 'Windows-Operation-Cli') {
@@ -740,8 +778,18 @@ function Install-DevTools {
                             throw
                         }
                     }
+                    finally {
+                        if ($trackInstaller -and (Test-Path -LiteralPath $installerPath -PathType Leaf)) {
+                            Remove-Item -LiteralPath $installerPath
+                        }
+                    }
                     if ($t.RequiredCommand -and -not (Get-Command $t.RequiredCommand -ErrorAction Ignore)) {
                         throw "$($t.Name) requires '$($t.RequiredCommand)' to register its MCP server."
+                    }
+                    if ($trackInstaller) {
+                        $marker = Get-DevToolScriptMarkerPath $t
+                        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $marker) | Out-Null
+                        Set-Content -LiteralPath $marker -Value ($hashes -join "`n") -NoNewline -Encoding UTF8
                     }
                 }
                 'remote-config' {

@@ -1,0 +1,15 @@
+schema_version: "1.1"
+name: plan-and-delegate-near-miss-small-edit
+tags: [plan-and-delegate, near-miss]
+execution:
+  prompt: >-
+    検索ボックスのプレースホルダーを「キーワードで検索」に変えてください。対象は SearchBox.tsx の 1 箇所です。
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-not-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?plan-and-delegate"'
+    min: 0
+    max: 0

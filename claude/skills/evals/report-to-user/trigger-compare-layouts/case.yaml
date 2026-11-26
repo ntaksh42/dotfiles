@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: report-to-user-trigger-compare-layouts
+tags: [report-to-user, should-trigger]
+execution:
+  prompt: >-
+    検索結果に絞り込み条件を付けます。左のパネルに出す案と、一覧の上に置く案を、実装する前に画面で並べて見せてください。
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?report-to-user"'
+    min: 1

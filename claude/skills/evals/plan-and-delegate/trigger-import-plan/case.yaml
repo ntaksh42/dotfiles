@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: plan-and-delegate-trigger-import-plan
+tags: [plan-and-delegate, should-trigger]
+execution:
+  prompt: >-
+    CSV を取り込む機能の計画書を書いてください。ヘッダーは name と email の 2 列、空欄の行はエラー一覧に出し、有効な行だけ保存します。パーサー、保存処理、画面の順に、担当者に渡せる単位で分けてください。
+  allowed_tools: [Read, Grep, Glob, Skill]
+  disallowed_tools: [Bash, PowerShell]
+graders:
+  - name: skill-called
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?plan-and-delegate"'
+    min: 1

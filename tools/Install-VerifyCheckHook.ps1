@@ -1,5 +1,5 @@
 # claude/hooks/verify-check.mjs を ~/.claude/hooks/ へ置き、~/.claude/settings.json の Stop hook に登録する。
-# 既存の hooks（Orca など他ツールが書いたもの）は残し、同じ hook が登録済みならコマンドだけを揃える。
+# 既存の hooks は残し、verify-check.mjs の登録を exec form に揃える。
 # 使い方: pwsh -NoProfile -File tools/Install-VerifyCheckHook.ps1 [-ClaudeDir <path>]
 param(
     [string]$ClaudeDir = (Join-Path $env:USERPROFILE '.claude')
@@ -25,7 +25,8 @@ if (Test-Path -LiteralPath $source) {
 }
 Write-Host "配置: $target"
 
-$command = 'node "{0}"' -f ($target -replace '\\', '/')
+$hookPath = $target -replace '\\', '/'
+$hook = [pscustomobject]@{ type = 'command'; command = 'node'; args = @($hookPath); timeout = 10; onFailure = 'continue' }
 
 $settings = if (Test-Path -LiteralPath $settingsFile) {
     Get-Content -LiteralPath $settingsFile -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -36,23 +37,26 @@ $settings = if (Test-Path -LiteralPath $settingsFile) {
 if (-not $settings.PSObject.Properties['hooks']) {
     $settings | Add-Member -NotePropertyName hooks -NotePropertyValue ([pscustomobject]@{})
 }
-if (-not $settings.hooks.PSObject.Properties['Stop']) {
-    $settings.hooks | Add-Member -NotePropertyName Stop -NotePropertyValue @()
+$event = 'Stop'
+if (-not $settings.hooks.PSObject.Properties[$event]) {
+    $settings.hooks | Add-Member -NotePropertyName $event -NotePropertyValue @()
 }
 
-$registered = @($settings.hooks.Stop | ForEach-Object { $_.hooks } | Where-Object { $_.command -like '*verify-check.mjs*' })
-if ($registered.Count -gt 0) {
-    # 登録済みなら、コマンドだけ現在のパスに揃える
-    foreach ($h in $registered) { $h.command = $command }
-    Write-Host '登録済み: Stop のコマンドを更新'
-} else {
-    $entry = [pscustomobject]@{ hooks = @([pscustomobject]@{ type = 'command'; command = $command; timeout = 10 }) }
-    $settings.hooks.Stop = @($settings.hooks.Stop) + $entry
-    Write-Host '登録: Stop hook を追加'
-}
+$kept = @(foreach ($entry in $settings.hooks.$event) {
+    $others = @($entry.hooks | Where-Object {
+        $shellForm = $_.command -match '^node\s+"(?:[^"]*[\\/])?verify-check\.mjs"(?:\s|$)'
+        $execForm = $_.command -eq 'node' -and @($_.args)[0] -match '(?:^|[\\/])verify-check\.mjs$'
+        -not ($_.type -eq 'command' -and ($shellForm -or $execForm))
+    })
+    if ($others.Count -eq 0 -and $entry.hooks.Count -gt 0) { continue }
+    $entry.hooks = $others
+    $entry
+})
+$entry = [pscustomobject]@{ hooks = @($hook) }
+$settings.hooks.$event = $kept + $entry
 
 if (Test-Path -LiteralPath $settingsFile) {
-    $backup = "$settingsFile.backup.$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+    $backup = "$settingsFile.backup.$(Get-Date -Format 'yyyyMMdd-HHmmss.fffffff')"
     Copy-Item -LiteralPath $settingsFile -Destination $backup
     Write-Host "バックアップ: $backup"
 }
