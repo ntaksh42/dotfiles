@@ -143,8 +143,9 @@ def check_sheet(html: str):
             concl = visible_len(title.group(1)) - visible_len(state_text)
         if not is_detail and total > REPORT_PROSE_LIMIT:
             warns.append(f'本文の文章が {total} 字 (目安 {REPORT_PROSE_LIMIT} 字以内)。説明は図のラベルへ移すか、項目を絞る。判断や行動に要る項目は畳まない')
-        # 項目の行 (details.item) は見出しが常に見えていて、畳むのは対応と根拠だけなので数えない
-        folded = sum(visible_len(t) for t in re.findall(r'<details\b(?![^>]*class=["\']item\b)[^>]*>(.*?)</details>', live, flags=re.DOTALL))
+        # 項目の根拠・対応と、図と同じ内容を伝える文章は付録の分量に含めない
+        folded = sum(visible_len(t) for t in re.findall(
+            r'<details\b(?![^>]*class=["\'](?:item|sequence-description)\b)[^>]*>(.*?)</details>', live, flags=re.DOTALL))
         if not is_detail and folded > total:
             warns.append(f'畳みの中 ({folded} 字) が本文 ({total} 字) より長い。読み手が判断や行動に使う項目が <details> に入っていないか見直す')
         if concl > REPORT_CONCL_LIMIT:

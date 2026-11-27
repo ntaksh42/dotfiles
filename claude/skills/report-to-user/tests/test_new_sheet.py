@@ -235,6 +235,65 @@ class NewSheetTest(unittest.TestCase):
         self.assertIn('<tspan', page)
         self.assertNotIn('>)</tspan>', page)
 
+    def test_short_comparison_stays_compact_and_has_complete_text_alternative(self):
+        src = ('# 対応不要 | x\n```flow\n# 保存時\n'
+               '期待: 保存を押す -> !1件できる\n実際: 保存を押す -> !同じ記事が2件できる\n```\n')
+        page = ns.build(src, 'R')
+        self.assertRegex(page, r'<svg viewBox="0 0 (?:[1-3][0-9]{2}) [0-9]+"')
+        self.assertIn('aria-label="保存時。期待、保存を押す → 1件できる。実際、保存を押す → 同じ記事が2件できる"', page)
+
+    def test_sequence_fence_renders_lanes_notes_and_optional_controls(self):
+        diagram = ('画面 | サーバー\n画面 -> サーバー | 保存を依頼 | 1件保存\n'
+                   'サーバー -x 画面 | 応答が届かない\n'
+                   '!画面 -> サーバー | 再試行 | & <script> を含む注釈\n')
+        src = ('# 対応不要 | 保存の例\n```sequence\n@steps\n' + diagram + '```\n'
+               '## 切り替えの無い図\n```sequence\n' + diagram + '```\n')
+        page = ns.build(src, 'R')
+        main = page.split('</main>')[0]
+        self.assertEqual(main.count('class="figure sequence-figure"'), 2)
+        self.assertEqual(main.count('class="sequence-lane"'), 4)
+        self.assertEqual(main.count('stroke-dasharray="5 4"'), 2)
+        self.assertEqual(main.count('class="sequence-step key"'), 2)
+        self.assertEqual(main.count('class="sequence-controls"'), 1)
+        self.assertIn('data-step-target="" aria-pressed="true">全体', main)
+        self.assertIn('data-step-target="3" aria-pressed="false">再試行', main)
+        self.assertIn('&amp; &lt;script&gt; を含む注釈', main)
+        self.assertNotIn('<script>', main)
+
+    def test_sequence_fence_rejects_unknown_actors_and_missing_labels(self):
+        header = '# 対応不要 | x\n```sequence\n'
+        for invalid in ('画面 | 画面\n画面 -> 画面 | 保存',
+                        '画面 | サーバー\n利用者 -> 画面 | 保存',
+                        '画面 | サーバー\n画面 -> サーバー | '):
+            with self.subTest(invalid=invalid), self.assertRaises(ns.InputError):
+                ns.build(header + invalid + '\n```\n', 'R')
+
+    def test_sequence_wraps_identifiers_with_no_spaces(self):
+        actor = 'AzureDevOpsPullRequestStatusSynchronizer'
+        path = '/api/v1/PullRequestSynchronizationStatus'
+        note = 'refreshTokenExpirationTimestamp'
+        src = ('# 対応不要 | x\n```sequence\n'
+               f'画面 | {actor} | キャッシュ\n画面 -> {actor} | {path} | {note}\n```\n')
+        page = ns.build(src, 'R')
+        svg, alternative = page.split('<svg', 1)[1].split('</svg>', 1)
+        alternative = alternative.split('</details>', 1)[0]
+        for name in (actor, path, note):
+            self.assertIn(name, alternative)
+            self.assertNotIn(name, svg)
+        self.assertGreaterEqual(svg.count('<tspan'), 6)
+
+    def test_sequence_text_alternative_preserves_order_and_is_not_appendix(self):
+        src = ('# 対応不要 | x\n```sequence\n画面 | サーバー\n'
+               '画面 -> サーバー | 保存を依頼 | 記事を保存\n'
+               '!サーバー -x 画面 | 応答 | タイムアウト\n```\n')
+        page = ns.build(src, 'R')
+        self.assertIn('<figure class="figure sequence-figure">', page)
+        self.assertIn('<summary>やり取りを文章で読む</summary>', page)
+        self.assertIn('<ol><li><b>画面 → サーバー</b> 保存を依頼<br>記事を保存</li>'
+                      '<li><b>サーバー → 画面（不達）</b> 応答<br>タイムアウト</li></ol>', page)
+        errors, warnings, _, _ = ns.load_checker().check_sheet(page)
+        self.assertEqual((errors, warnings), ([], []))
+
     def test_bars_fence_scales_to_max_and_marks_key(self):
         page = ns.build('# 対応不要 | x\n```bars\n今 | 158 回\n!案 | 79 回\n```\n', 'R')
         widths = [int(w) for w in re.findall(r'class="bar" x="\d+" y="\d+" width="(\d+)"', page)]

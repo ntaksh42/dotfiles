@@ -149,10 +149,10 @@ def clean_svg(svg: str) -> str:
 def fence_html(lang: str, code: str, figure_wrap=True) -> str:
     if lang in FIG.RENDER:
         try:
-            svg = FIG.RENDER[lang](code)
+            figure = FIG.RENDER[lang](code)
         except ValueError as e:
             raise InputError(str(e)) from None
-        return f'<div class="figure">{svg}</div>' if figure_wrap else svg
+        return f'<div class="figure">{figure}</div>' if figure_wrap and lang != 'sequence' else figure
     if lang == 'svg':
         svg = clean_svg(code)
         return f'<div class="figure">{svg}</div>' if figure_wrap else svg
@@ -748,6 +748,19 @@ SHEET_JS = """<script>
       var b = document.createElement('button'); b.type = 'button'; b.className = 'copy act-copy'; b.textContent = '依頼をコピー';
       b.addEventListener('click', function () { copy(it.getAttribute('data-act'), b); });
       (it.querySelector('.more') || it).appendChild(b);
+    });
+    document.querySelectorAll('.sequence-controls').forEach(function (controls) {
+      var figure = controls.closest('.sequence-figure');
+      var buttons = controls.querySelectorAll('button');
+      var steps = figure.querySelectorAll('.sequence-step');
+      controls.hidden = false;
+      buttons.forEach(function (button) {
+        button.addEventListener('click', function () {
+          var target = button.dataset.stepTarget;
+          buttons.forEach(function (b) { b.setAttribute('aria-pressed', String(b === button)); });
+          steps.forEach(function (step) { step.classList.toggle('sequence-quiet', !!target && step.dataset.step !== target); });
+        });
+      });
     });
     // 印刷・PDF では畳みをすべて開き、印刷が済んだら元に戻す。印刷前の通知が続いても、最初の状態だけを覚える
     var closed = null;
