@@ -1154,11 +1154,17 @@ try {
         Set-Content -LiteralPath (Join-Path $agents 'alpha\SKILL.md') -Value 'skill alpha'
         @{ Agents = $agents; Claude = $claude }
     }
-    Test-Case 'Sync skills: does nothing when the shared directory does not exist' {
+    Test-Case 'Sync skills: creates the shared directory and junction on a fresh profile' {
         $base = New-Scratch
+        $agents = Join-Path $base 'agents-skills'
         $claude = Join-Path $base 'claude-skills'
-        Sync-DevToolSkills -AgentsSkillsDir (Join-Path $base 'absent') -ClaudeSkillsDir $claude
-        -not (Test-Path -LiteralPath $claude)
+        try {
+            Sync-DevToolSkills -AgentsSkillsDir $agents -ClaudeSkillsDir $claude 6>$null
+            Set-Content -LiteralPath (Join-Path $claude '.dotfiles-skills-tree') -Value 'test-tree'
+            (Get-Item -LiteralPath $claude).LinkType -eq 'Junction' -and
+            (Get-Content -LiteralPath (Join-Path $agents '.dotfiles-skills-tree')) -ceq 'test-tree'
+        }
+        finally { if ((Get-Item -LiteralPath $claude -ErrorAction SilentlyContinue).LinkType) { [IO.Directory]::Delete($claude) } }
     }
     Test-Case 'Sync skills: links the whole directory and exposes subsequently added skills' {
         $f = New-SkillsFixture

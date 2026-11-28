@@ -396,7 +396,6 @@ function Sync-DevToolSkills {
         if ([IO.Path]::GetFullPath($claude.Target) -eq $AgentsSkillsDir) { return }
         throw "Skills directory points elsewhere: $ClaudeSkillsDir"
     }
-    if (-not $agents -and -not $claude) { return }
     if (($agents -and (-not $agents.PSIsContainer -or $agents.LinkType)) -or
         ($claude -and -not $claude.PSIsContainer)) {
         throw 'Skills source paths must be ordinary directories.'
@@ -442,6 +441,9 @@ function Sync-DevToolSkills {
                     $moves.Add(@($entry.FullName, $destination))
                 }
             }
+        }
+        elseif (-not $agents) {
+            New-Item -ItemType Directory -Path $AgentsSkillsDir | Out-Null
         }
         New-Item -ItemType Directory -Path (Split-Path -Parent $ClaudeSkillsDir) -Force | Out-Null
         # Junctions work on Windows without Developer Mode or administrator rights.
