@@ -1,65 +1,117 @@
-﻿# Claude Code dotfiles installer for Windows
-# Usage: .\install.ps1
-# skills・hooks は Install-DevTools が ~/.claude/skills と ~/.claude/hooks へ置く。Mod は claude/mods/ の plugin として導入する。
-# 共通ルールを Claude Code と Codex へ、settings.json を Claude Code へ配置する。
+# Claude Code dotfiles installer for Windows
+# Use -Check to preview permission changes, or -PermissionsOnly to apply only those changes.
 
-param()
+param(
+    [switch]$Check,
+    [switch]$PermissionsOnly,
+    [string]$ClaudeDir = $(if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $env:USERPROFILE '.claude' })
+)
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = 'Stop'
 
-# Paths
-$ScriptDir       = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ClaudeDir       = Join-Path $env:USERPROFILE ".claude"
-$TemplateFile    = Join-Path $ScriptDir "settings.template.json"
-
-Write-Host "Claude Code dotfiles installer" -ForegroundColor Cyan
-Write-Host "==============================" -ForegroundColor Cyan
-Write-Host ""
-
-# Create .claude directory if not exists
-if (-not (Test-Path $ClaudeDir)) {
-    Write-Host "Creating $ClaudeDir ..." -ForegroundColor Yellow
-    New-Item -ItemType Directory -Path $ClaudeDir | Out-Null
+function Read-SettingsObject([string]$Json, [string]$Path) {
+    $options = @{ InputObject = $Json; ErrorAction = 'Stop' }
+    if ($PSVersionTable.PSVersion -ge [version]'7.5') { $options.DateKind = 'String' }
+    if (-not $Json.TrimStart().StartsWith('{')) { throw "Expected a JSON object in $Path" }
+    ConvertFrom-Json @options
 }
 
-# Backup existing settings.json
-$SettingsFile = Join-Path $ClaudeDir "settings.json"
-if (Test-Path $SettingsFile) {
-    $BackupFile = Join-Path $ClaudeDir "settings.json.backup.$(Get-Date -Format 'yyyyMMdd-HHmmss')"
-    Write-Host "Backing up existing settings.json to $BackupFile" -ForegroundColor Yellow
-    Copy-Item $SettingsFile $BackupFile
+function Merge-Settings($Current, $Template) {
+    foreach ($property in $Template.PSObject.Properties) {
+        $name = $property.Name
+        $value = $property.Value
+        $existing = $Current.PSObject.Properties[$name]
+        if ($null -eq $existing) {
+            $Current | Add-Member -NotePropertyName $name -NotePropertyValue $value
+        }
+        elseif ($existing.Value -is [pscustomobject] -and $value -is [pscustomobject]) {
+            Merge-Settings $existing.Value $value
+        }
+        else {
+            $existing.Value = $value
+        }
+    }
 }
 
-# Install shared global instructions for both agents.
-& (Join-Path $ScriptDir '..\tools\Install-AgentInstructions.ps1') -ClaudeDir $ClaudeDir
-
-# Set ENABLE_TOOL_SEARCH environment variable if not exists
-$envName = "ENABLE_TOOL_SEARCH"
-$currentValue = [Environment]::GetEnvironmentVariable($envName, "User")
-if (-not $currentValue) {
-    Write-Host "Setting $envName environment variable..." -ForegroundColor Green
-    [Environment]::SetEnvironmentVariable($envName, "true", "User")
-    $env:ENABLE_TOOL_SEARCH = "true"
-    Write-Host "  - $envName = true (User scope)" -ForegroundColor Gray
-} else {
-    Write-Host "$envName already set: $currentValue" -ForegroundColor Gray
+function Show-PermissionChanges($Current, $Target) {
+    $changed = $false
+    if ($Current.defaultMode -cne $Target.defaultMode) {
+        Write-Host "  permissions.defaultMode: [$($Current.defaultMode)] -> [$($Target.defaultMode)]"
+        $changed = $true
+    }
+    foreach ($name in 'allow', 'ask', 'deny') {
+        $before = @($Current.$name | Where-Object { $null -ne $_ })
+        $after = @($Target.$name)
+        if ((ConvertTo-Json -InputObject $Current.$name -Compress) -ceq (ConvertTo-Json -InputObject $Target.$name -Compress)) { continue }
+        $changed = $true
+        $removed = @($before | Where-Object { $_ -cnotin $after })
+        $added = @($after | Where-Object { $_ -cnotin $before })
+        Write-Host "  permissions.${name}:"
+        $removed | ForEach-Object { Write-Host "    - $_" }
+        $added | ForEach-Object { Write-Host "    + $_" }
+        if ($removed.Count + $added.Count -eq 0) { Write-Host '    List representation or order changes.' }
+    }
+    if (-not $changed) { Write-Host '  Permissions are up to date.' }
 }
 
-# Generate settings.json from template
-Write-Host "Generating settings.json..." -ForegroundColor Green
-$template = Get-Content $TemplateFile -Raw -Encoding UTF8
-# マーケットプレイスは Install-DevTools が GitHub の main の ZIP を展開するフォルダ
-# （devtools.ps1 の Get-DevToolMarketplaceDir と同じ場所）。
-# JSON テキストへの埋め込みなのでバックスラッシュを1段だけエスケープする
-$marketplaceDirEscaped = (Join-Path $env:LOCALAPPDATA 'dotfiles\marketplaces\dotfiles-mods') -replace '\\', '\\'
-$settings = $template -replace '\{\{MARKETPLACE_DIR\}\}', $marketplaceDirEscaped
-$null = $settings | ConvertFrom-Json
+$settingsFile = Join-Path $ClaudeDir 'settings.json'
+$templateFile = Join-Path $PSScriptRoot 'settings.template.json'
+$template = Read-SettingsObject ([IO.File]::ReadAllText($templateFile)) $templateFile
+$existingJson = if (Test-Path -LiteralPath $settingsFile) { [IO.File]::ReadAllText($settingsFile) }
+$settings = if ($null -eq $existingJson) { [pscustomobject]@{} } else { Read-SettingsObject $existingJson $settingsFile }
+if ($null -ne $settings.permissions -and $settings.permissions -isnot [pscustomobject]) {
+    throw "Expected a JSON object for permissions in $settingsFile"
+}
 
-# PS 5.1 の -Encoding UTF8 は BOM を付けるため、BOM なし UTF-8 を明示して書き出す
-[System.IO.File]::WriteAllText($SettingsFile, $settings, (New-Object System.Text.UTF8Encoding $false))
-Write-Host "  - $SettingsFile" -ForegroundColor Gray
+Write-Host "Claude Code permissions in $settingsFile"
+Show-PermissionChanges $settings.permissions $template.permissions
+if ($Check) { return }
 
-Write-Host ""
-Write-Host "Installation complete!" -ForegroundColor Green
-Write-Host "Run Install-DevTools to install the skills, hooks, and the mods plugin." -ForegroundColor Yellow
-Write-Host "Note: Restart Claude Code for changes to take effect." -ForegroundColor Yellow
+if ($PermissionsOnly) {
+    $template = [pscustomobject]@{ permissions = $template.permissions }
+}
+else {
+    $template.extraKnownMarketplaces.'dotfiles-mods'.source.path = Join-Path $env:LOCALAPPDATA 'dotfiles\marketplaces\dotfiles-mods'
+}
+
+$previous = ConvertTo-Json -InputObject $settings -Depth 100 -Compress -WarningAction Stop
+Merge-Settings $settings $template
+$updated = ConvertTo-Json -InputObject $settings -Depth 100 -Compress -WarningAction Stop
+if ($previous -cne $updated) {
+    New-Item -ItemType Directory -Path $ClaudeDir -Force | Out-Null
+    $id = [guid]::NewGuid().ToString('N')
+    $stagedFile = "$settingsFile.tmp.$id"
+    try {
+        $prettyJson = ConvertTo-Json -InputObject $settings -Depth 100 -WarningAction Stop
+        [IO.File]::WriteAllText($stagedFile, $prettyJson + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
+        if ($null -eq $existingJson) {
+            [IO.File]::Move($stagedFile, $settingsFile)
+        }
+        else {
+            if ([IO.File]::ReadAllText($settingsFile) -cne $existingJson) {
+                throw "Settings changed while preparing the update. Run the installer again: $settingsFile"
+            }
+            $backupFile = "$settingsFile.backup.$id"
+            [IO.File]::Replace($stagedFile, $settingsFile, $backupFile)
+            Write-Host "Backed up: $backupFile"
+        }
+        Write-Host "Updated: $settingsFile"
+    }
+    finally {
+        if (Test-Path -LiteralPath $stagedFile) { Remove-Item -LiteralPath $stagedFile }
+    }
+}
+
+if ($PermissionsOnly) { return }
+
+& (Join-Path $PSScriptRoot '..\tools\Install-AgentInstructions.ps1') -ClaudeDir $ClaudeDir
+
+$envName = 'ENABLE_TOOL_SEARCH'
+if (-not [Environment]::GetEnvironmentVariable($envName, 'User')) {
+    [Environment]::SetEnvironmentVariable($envName, 'true', 'User')
+    $env:ENABLE_TOOL_SEARCH = 'true'
+    Write-Host "$envName configured at user scope."
+}
+
+Write-Host 'Run Install-DevTools to install the skills, hooks, and the mods plugin.'
+Write-Host 'Restart Claude Code for settings changes to take effect.'

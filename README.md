@@ -149,7 +149,14 @@ powershell.exe -ExecutionPolicy Bypass -File claude\install.ps1
 
 インストーラが行うこと：
 - `claude/CLAUDE.global.md` を `~/.claude/CLAUDE.md` と `~/.codex/AGENTS.md` にコピー
-- `settings.template.json` からパスを解決して `~/.claude/settings.json` を生成
+- `settings.template.json` の項目を `~/.claude/settings.json` に反映し、既存の hooks などテンプレートにない項目は保持
+
+既存環境で権限だけを更新する場合は、`-Check` で差分を確認してから `-PermissionsOnly` で適用します。テンプレートにある権限リストは置き換え、変更前の設定はバックアップします。
+
+```powershell
+pwsh -NoProfile -File claude/install.ps1 -Check
+pwsh -NoProfile -File claude/install.ps1 -PermissionsOnly
+```
 
 共通ルールだけを配置・更新する場合は次を実行します。内容が異なる既存ファイルは
 `.backup.<ID>` に退避し、同じ内容なら変更しません。Codex の配置先は `CODEX_HOME` が設定されていればそれに従います。

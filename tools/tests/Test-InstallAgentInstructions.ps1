@@ -2,6 +2,7 @@
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $installer = Join-Path $repo 'tools\Install-AgentInstructions.ps1'
+$claudeInstaller = Join-Path $repo 'claude\install.ps1'
 $source = Join-Path $repo 'claude\CLAUDE.global.md'
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ('dotfiles-instructions-test-' + [guid]::NewGuid().ToString('N'))
 . (Join-Path $repo 'app-settings\pwsh\tests\TestHarness.ps1')
@@ -51,6 +52,73 @@ try {
         $messages = @(& $installer -ClaudeDir $claudeDir -CodexDir $codexDir 3>&1)
         @($messages | Where-Object { $_ -is [System.Management.Automation.WarningRecord] }).Count -eq 1 -and
         (Get-Content -LiteralPath $override -Raw) -ceq 'override rules'
+    }
+
+    $settingsFile = Join-Path $claudeDir 'settings.json'
+    @'
+{
+  "permissions": {
+    "defaultMode": "default",
+    "allow": ["Bash(git clean:*)"],
+    "additionalDirectories": ["E:/work"],
+    "disableBypassPermissionsMode": "disable"
+  },
+  "hooks": { "Stop": [{ "hooks": [{ "type": "command", "command": "example-hook" }] }] },
+  "enabledPlugins": { "other@example": true },
+  "env": { "EXAMPLE": "keep" }
+}
+'@ | Set-Content -LiteralPath $settingsFile -Encoding utf8
+    $settingsHash = (Get-FileHash -LiteralPath $settingsFile).Hash
+
+    Test-Case 'Permission preview identifies changes without writing settings or backups' {
+        $messages = (& $claudeInstaller -Check -ClaudeDir $claudeDir 6>&1) -join "`n"
+        $messages.Contains('permissions.defaultMode: [default] -> [auto]') -and
+        $messages.Contains('- Bash(git clean:*)') -and
+        $messages.Contains('+ Bash(git clean:*)') -and
+        (Get-FileHash -LiteralPath $settingsFile).Hash -eq $settingsHash -and
+        @(Get-ChildItem -LiteralPath $claudeDir -Filter 'settings.json.backup.*').Count -eq 0
+    }
+
+    Test-Case 'Permission update follows the template and preserves unrelated settings' {
+        & $claudeInstaller -PermissionsOnly -ClaudeDir $claudeDir 6>$null
+        $after = Get-Content -LiteralPath $settingsFile -Raw | ConvertFrom-Json
+        $beforeBackup = @(Get-ChildItem -LiteralPath $claudeDir -Filter 'settings.json.backup.*')
+        $after.permissions.defaultMode -ceq 'auto' -and
+        $after.permissions.ask -ccontains 'Bash(git clean:*)' -and
+        $after.permissions.allow -cnotcontains 'Bash(git clean:*)' -and
+        $after.permissions.additionalDirectories[0] -ceq 'E:/work' -and
+        $after.permissions.disableBypassPermissionsMode -ceq 'disable' -and
+        $after.hooks.Stop[0].hooks[0].command -ceq 'example-hook' -and
+        $after.enabledPlugins.'other@example' -eq $true -and
+        $after.env.EXAMPLE -ceq 'keep' -and
+        $null -eq $after.model -and
+        $beforeBackup.Count -eq 1 -and
+        (Get-FileHash -LiteralPath $beforeBackup[0].FullName).Hash -eq $settingsHash
+    }
+
+    Test-Case 'An identical permission update leaves the settings file and backup alone' {
+        $time = (Get-Item -LiteralPath $settingsFile).LastWriteTimeUtc
+        & $claudeInstaller -PermissionsOnly -ClaudeDir $claudeDir 6>$null
+        (Get-Item -LiteralPath $settingsFile).LastWriteTimeUtc -eq $time -and
+        @(Get-ChildItem -LiteralPath $claudeDir -Filter 'settings.json.backup.*').Count -eq 1
+    }
+
+    Test-Case 'Permission preview leaves a new profile unopened' {
+        $newProfile = Join-Path $scratch 'unused profile'
+        & $claudeInstaller -Check -ClaudeDir $newProfile 6>$null
+        -not (Test-Path -LiteralPath $newProfile)
+    }
+
+    Test-Case 'Invalid settings abort a permission update without replacing the file' {
+        Set-Content -LiteralPath $settingsFile -Value '{ malformed' -NoNewline
+        try {
+            & $claudeInstaller -PermissionsOnly -ClaudeDir $claudeDir 6>$null
+            $false
+        }
+        catch {
+            (Get-Content -LiteralPath $settingsFile -Raw) -ceq '{ malformed' -and
+            @(Get-ChildItem -LiteralPath $claudeDir -Filter 'settings.json.backup.*').Count -eq 1
+        }
     }
 }
 finally {
