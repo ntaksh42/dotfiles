@@ -1,6 +1,6 @@
 schema_version: "1.1"
-name: jp-deslop-near-miss-commit-subject
-tags: [jp-deslop, near-miss]
+name: japanese-near-miss-commit-subject
+tags: [japanese, near-miss]
 execution:
   prompt: >-
     検索条件の保存に対応しました。この変更のコミットメッセージを日本語で 1 行だけ考えてください。
@@ -10,6 +10,6 @@ graders:
   - name: skill-not-called
     type: tool_used
     tool: Skill
-    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?jp-deslop"'
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?japanese"'
     min: 0
     max: 0

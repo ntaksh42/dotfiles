@@ -3,7 +3,7 @@
   "description": "Local evaluation of the standalone dotfiles skills.",
   "skills": [
     "./harness",
-    "./jp-deslop",
+    "./japanese",
     "./plan-and-delegate",
     "./report-to-user",
     "./root-cause-debug",

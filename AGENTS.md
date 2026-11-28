@@ -54,9 +54,9 @@ pwsh -NoProfile -File tools/Install-AgentInstructions.ps1
 pwsh -NoProfile -File tools/Install-ReplyCheckHook.ps1
 
 # 日本語の文章を書くツール呼び出し（.md 等への Write/Edit、PR・Issue の本文、複数行のコミット）を、
-# セッションで jp-deslop を読み込むまで止める PreToolUse hook（claude/hooks/jp-deslop-check.mjs）を登録する。
-# Install-DevTools の 'jp-deslop hook' でも入る。単体テストは node --test claude/hooks/jp-deslop-check.test.mjs
-pwsh -NoProfile -File tools/Install-JpDeslopHook.ps1
+# セッションで japanese を読み込むまで止める PreToolUse hook（claude/hooks/japanese-check.mjs）を登録する。
+# Install-DevTools の 'japanese hook' でも入る。単体テストは node --test claude/hooks/japanese-check.test.mjs
+pwsh -NoProfile -File tools/Install-JapaneseHook.ps1
 
 # ファイルを変えたターンで、検証（テスト・ビルド・lint）を実行せず verify-before-done も読み込まないまま
 # 完了と返信したら止める Stop hook（claude/hooks/verify-check.mjs）を登録する。
@@ -88,7 +88,7 @@ pwsh -File tools/Test-ClaudeMods.ps1
 # ケースは claude/skills/evals/<skill>/<case>/case.yaml に置く
 # --case で 1 件、--tag <skill> でスキルごとに選ぶ。--ablation none で Skill の呼び出しを採点する
 claude plugin validate claude/skills
-claude plugin eval claude/skills --case jp-deslop-trigger-shorter-prose --ablation none --runs 1 --no-publish
+claude plugin eval claude/skills --case japanese-trigger-shorter-prose --ablation none --runs 1 --no-publish
 
 # Windows 設定（レジストリ）の適用。pwsh プロファイル経由のコマンド（app-settings/pwsh/profile.d/windows-settings.ps1）
 # HKLM 項目は管理者権限が必要
