@@ -49,21 +49,21 @@ test('Codex Stop detects edits and verification in the current turn', () => {
 })
 
 test('Codex PreToolUse checks added Japanese text in each document patch', () => {
-  const result = decideCodex('jp-deslop-check', patch, rollout(prompt))
+  const result = decideCodex('japanese-check', patch, rollout(prompt))
   assert.equal(result.hookSpecificOutput.hookEventName, 'PreToolUse')
   assert.equal(result.hookSpecificOutput.permissionDecision, 'deny')
-  assert.match(result.hookSpecificOutput.permissionDecisionReason, /jp-deslop の SKILL\.md/)
-  assert.equal(decideCodex('jp-deslop-check', patch, rollout(shell('cat /skills/jp-deslop/SKILL.md'), prompt)), undefined)
-  assert.equal(decideCodex('jp-deslop-check', { ...patch, agent_id: 'child' }, rollout(prompt)), undefined)
+  assert.match(result.hookSpecificOutput.permissionDecisionReason, /japanese の SKILL\.md/)
+  assert.equal(decideCodex('japanese-check', patch, rollout(shell('cat /skills/japanese/SKILL.md'), prompt)), undefined)
+  assert.equal(decideCodex('japanese-check', { ...patch, agent_id: 'child' }, rollout(prompt)), undefined)
   for (const command of [
     patch.tool_input.command.replace('notes.txt', 'notes.js'),
     patch.tool_input.command.replace('-old text\n+手順を追加します。', '-手順を追加します。\n+new text'),
   ]) {
-    assert.equal(decideCodex('jp-deslop-check', { ...patch, tool_input: { command } }, rollout(prompt)), undefined)
+    assert.equal(decideCodex('japanese-check', { ...patch, tool_input: { command } }, rollout(prompt)), undefined)
   }
 })
 
 test('Codex PreToolUse accepts Bash tool input for Japanese issue text', () => {
   const input = { ...patch, tool_name: 'Bash', tool_input: { command: 'gh issue edit 10 --body "手順を追加します。"' } }
-  assert.equal(decideCodex('jp-deslop-check', input, rollout(prompt)).hookSpecificOutput.permissionDecision, 'deny')
+  assert.equal(decideCodex('japanese-check', input, rollout(prompt)).hookSpecificOutput.permissionDecision, 'deny')
 })

@@ -1,7 +1,7 @@
-// 実行: node --test claude/hooks/jp-deslop-check.test.mjs
+// 実行: node --test claude/hooks/japanese-check.test.mjs
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { decide, isMultilineCommit, loadedSkill, needsSkill } from './jp-deslop-check.mjs'
+import { decide, isMultilineCommit, loadedSkill, needsSkill } from './japanese-check.mjs'
 
 const user = text => JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text }] } })
 const skillCall = name => JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', name: 'Skill', input: { skill: name } }] } })
@@ -13,15 +13,15 @@ test('日本語の .md への Write は、未読なら止める', () => {
   assert.equal(decide(writeMd, user('README を書いて')).hookSpecificOutput.permissionDecision, 'deny')
 })
 
-test('Skill で読み込んだ後と /jp-deslop の後は通す', () => {
-  assert.equal(decide(writeMd, [user('書いて'), skillCall('jp-deslop')].join('\n')), undefined)
-  assert.equal(decide(writeMd, [user('書いて'), skillCall('dotfiles:jp-deslop')].join('\n')), undefined)
-  assert.equal(decide(writeMd, slash('jp-deslop')), undefined)
+test('Skill で読み込んだ後と /japanese の後は通す', () => {
+  assert.equal(decide(writeMd, [user('書いて'), skillCall('japanese')].join('\n')), undefined)
+  assert.equal(decide(writeMd, [user('書いて'), skillCall('dotfiles:japanese')].join('\n')), undefined)
+  assert.equal(decide(writeMd, slash('japanese')), undefined)
 })
 
 test('別のスキルを読んでいても止める', () => {
   assert.ok(decide(writeMd, skillCall('report-to-user')))
-  assert.equal(loadedSkill([user('jp-deslop を使って')]), false)
+  assert.equal(loadedSkill([user('japanese を使って')]), false)
 })
 
 test('対象外のファイルや英語だけの文章は通す', () => {
@@ -54,10 +54,10 @@ test('isMultilineCommit は git commit より前の改行を数えない', () =>
 test('サブエージェント・無効化・transcript なしは通す', () => {
   assert.equal(decide({ ...writeMd, agent_id: 'a1' }, ''), undefined)
   assert.equal(decide(writeMd, undefined), undefined)
-  process.env.JP_DESLOP_CHECK = 'off'
+  process.env.JAPANESE_CHECK = 'off'
   try {
     assert.equal(decide(writeMd, ''), undefined)
   } finally {
-    delete process.env.JP_DESLOP_CHECK
+    delete process.env.JAPANESE_CHECK
   }
 })

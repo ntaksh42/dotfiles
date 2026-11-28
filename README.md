@@ -29,7 +29,7 @@ Git の短縮名は `app-settings/git/.gitconfig` の `[alias]` に寄せてあ�
 `git-help` は両方をまとめて一覧表示します。
 
 検証は `pwsh -NoProfile -File app-settings/pwsh/tests/Invoke-AllTests.ps1` で全テストファイルを一括実行します（個別実行は各 `Test-*.ps1`）。
-main への push と PR では、GitHub Actions（`.github/workflows/test.yml`）が同じテストと jp-deslop のテストを実行します。
+main への push と PR では、GitHub Actions（`.github/workflows/test.yml`）が同じテストと japanese のテストを実行します。
 
 ## 一部の端末だけに入れるアプリ
 

@@ -1,16 +1,16 @@
-// PreToolUse hook: 日本語の文章を書くツール呼び出しを、このセッションで jp-deslop を読み込むまで止める。
-// plugin や mod に依存しない単体スクリプト。~/.claude/settings.json の PreToolUse に登録して使う（tools/Install-JpDeslopHook.ps1）。
-// 対象は jp-deslop の description と同じ範囲に絞る:
+// PreToolUse hook: 日本語の文章を書くツール呼び出しを、このセッションで japanese を読み込むまで止める。
+// plugin や mod に依存しない単体スクリプト。~/.claude/settings.json の PreToolUse に登録して使う（tools/Install-JapaneseHook.ps1）。
+// 対象は japanese の description と同じ範囲に絞る:
 //   - Write / Edit / MultiEdit で、文書の拡張子（.md など）のファイルに仮名を含む文章を書く
 //   - Bash / PowerShell で、仮名を含む PR・Issue・Work Item の本文や、複数行のコミットメッセージを書く
 // コードのファイル（コメント）、1 行のコミットメッセージ、HTML（report-to-user のシート）は対象にしない。
 // 一度読み込めばセッションの終わりまで通す。サブエージェントの呼び出しは止めない。
-// 環境変数 JP_DESLOP_CHECK=off で無効にできる。失敗したときは何もしない（hook で作業を止めない）。
+// 環境変数 JAPANESE_CHECK=off で無効にできる。失敗したときは何もしない（hook で作業を止めない）。
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const SKILL_NAME = 'jp-deslop'
+const SKILL_NAME = 'japanese'
 const KANA = /[ぁ-ゖァ-ヺ]/
 const DOC_EXT = /\.(md|mdx|markdown|txt|rst|adoc)$/i
 // 本文を書く CLI。gh の pr/issue の create・edit・comment・review、az の repos pr と boards work-item
@@ -29,7 +29,7 @@ export function isMultilineCommit(command) {
   return /\n/.test(c.slice(c.search(/\bgit\s+commit\b/)))
 }
 
-// このツール呼び出しが jp-deslop の対象か
+// このツール呼び出しが japanese の対象か
 export function needsSkill(toolName, toolInput) {
   const input = toolInput ?? {}
   const path = String(input.file_path ?? '')
@@ -51,7 +51,7 @@ export function needsSkill(toolName, toolInput) {
   }
 }
 
-// このセッションで jp-deslop を読み込んだか（Skill ツールの呼び出しか、/jp-deslop の入力）
+// このセッションで japanese を読み込んだか（Skill ツールの呼び出しか、/japanese の入力）
 export function loadedSkill(transcriptLines) {
   for (const l of transcriptLines) {
     if (!l.includes(SKILL_NAME)) continue
@@ -72,7 +72,7 @@ export function loadedSkill(transcriptLines) {
 }
 
 export function decide(input, transcriptText) {
-  if (process.env.JP_DESLOP_CHECK === 'off') return undefined
+  if (process.env.JAPANESE_CHECK === 'off') return undefined
   if (input.agent_id !== undefined) return undefined
   if (!needsSkill(input.tool_name, input.tool_input)) return undefined
   if (transcriptText === undefined) return undefined

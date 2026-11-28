@@ -114,7 +114,7 @@ function Approve-DotfilesCodexHooks {
     }
 }
 
-$files = @('codex-check.mjs', 'reply-check.mjs', 'verify-check.mjs', 'jp-deslop-check.mjs')
+$files = @('codex-check.mjs', 'reply-check.mjs', 'verify-check.mjs', 'japanese-check.mjs')
 $contents = [ordered]@{}
 foreach ($file in $files) {
     $source = Join-Path $PSScriptRoot "../claude/hooks/$file"
@@ -137,10 +137,10 @@ $before = ConvertTo-Json -InputObject $config -Depth 100
 
 $registrations = [ordered]@{
     Stop = @{ Checks = @('reply-check', 'verify-check') }
-    PreToolUse = @{ Checks = @('jp-deslop-check'); Matcher = '^(apply_patch|Bash|Edit|Write)$' }
+    PreToolUse = @{ Checks = @('japanese-check'); Matcher = '^(apply_patch|Bash|Edit|Write)$' }
 }
 $commandPrefix = 'node "' + $runnerPath + '" '
-$managedCommand = '^' + [regex]::Escape($commandPrefix) + '(?:reply-check|verify-check|jp-deslop-check)(?:\s|$)'
+$managedCommand = '^' + [regex]::Escape($commandPrefix) + '(?:reply-check|verify-check|japanese-check|jp-deslop-check)(?:\s|$)'
 foreach ($event in $registrations.Keys) {
     $group = [ordered]@{
         hooks = @(foreach ($check in $registrations[$event].Checks) {
@@ -170,6 +170,10 @@ foreach ($file in $files) {
         [IO.File]::WriteAllText($target, $contents[$file], $utf8)
     }
 }
+
+# 旧名（スキル名の変更前）の hook ファイルを取り除く。登録は $managedCommand が旧名も含めて置き換える
+$legacyHook = Join-Path $hooksDir 'jp-deslop-check.mjs'
+if (Test-Path -LiteralPath $legacyHook) { Remove-Item -LiteralPath $legacyHook -Force }
 
 $json = ConvertTo-Json -InputObject $config -Depth 100
 if ($json -cne $before) {

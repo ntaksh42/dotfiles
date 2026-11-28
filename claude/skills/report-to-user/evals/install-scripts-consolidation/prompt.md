@@ -5,4 +5,4 @@ timeout_seconds: 900
 allowed_tools: [Read, Glob, Grep, Skill, Write, Edit, Bash]
 ---
 
-tools/ の Install-ReplyCheckHook.ps1、Install-JpDeslopHook.ps1、Install-LiteHooks.ps1 の重複を調べて、共通化するなら私が何を決めればいいか教えて
+tools/ の Install-ReplyCheckHook.ps1、Install-JapaneseHook.ps1、Install-LiteHooks.ps1 の重複を調べて、共通化するなら私が何を決めればいいか教えて

@@ -59,10 +59,10 @@ test('Git 状態を返し、status は先頭 20 行までにする', t => {
 test('transcript の Skill 呼び出しを重複なく返し、壊れた行は飛ばす', t => {
   const cwd = workspace(t)
   const transcript = join(cwd, 'transcript.jsonl')
-  writeFileSync(transcript, [skill('jp-deslop'), '{', skill('team:check'), skill('jp-deslop')].join('\n'))
+  writeFileSync(transcript, [skill('japanese'), '{', skill('team:check'), skill('japanese')].join('\n'))
   const context = run({ cwd, transcript_path: transcript })
   assert.match(context, /再度読み込めます/)
-  assert.deepEqual(context.split('\n').slice(-2), ['jp-deslop', 'team:check'])
+  assert.deepEqual(context.split('\n').slice(-2), ['japanese', 'team:check'])
   assert.doesNotMatch(context, /Git/)
   assert.equal(run({ cwd, transcript_path: transcript, source: 'startup' }), undefined)
 })

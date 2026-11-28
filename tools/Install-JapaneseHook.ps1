@@ -1,16 +1,17 @@
-# claude/hooks/jp-deslop-check.mjs を ~/.claude/hooks/ へ置き、~/.claude/settings.json の PreToolUse hook に登録する。
-# 既存の hooks は残し、jp-deslop-check.mjs の登録を exec form に揃える。
-# 使い方: pwsh -NoProfile -File tools/Install-JpDeslopHook.ps1 [-ClaudeDir <path>]
+# claude/hooks/japanese-check.mjs を ~/.claude/hooks/ へ置き、~/.claude/settings.json の PreToolUse hook に登録する。
+# 既存の hooks は残し、japanese-check.mjs の登録を exec form に揃える。
+# 旧名 jp-deslop-check.mjs（スキル名の変更前）の登録とファイルは取り除く。
+# 使い方: pwsh -NoProfile -File tools/Install-JapaneseHook.ps1 [-ClaudeDir <path>]
 param(
     [string]$ClaudeDir = (Join-Path $env:USERPROFILE '.claude')
 )
 
 $ErrorActionPreference = 'Stop'
 
-$source = Join-Path $PSScriptRoot '..\claude\hooks\jp-deslop-check.mjs'
-$remote = 'https://raw.githubusercontent.com/ntaksh42/dotfiles/main/claude/hooks/jp-deslop-check.mjs'
+$source = Join-Path $PSScriptRoot '..\claude\hooks\japanese-check.mjs'
+$remote = 'https://raw.githubusercontent.com/ntaksh42/dotfiles/main/claude/hooks/japanese-check.mjs'
 $hooksDir = Join-Path $ClaudeDir 'hooks'
-$target = Join-Path $hooksDir 'jp-deslop-check.mjs'
+$target = Join-Path $hooksDir 'japanese-check.mjs'
 $settingsFile = Join-Path $ClaudeDir 'settings.json'
 $matcher = 'Write|Edit|MultiEdit|Bash|PowerShell'
 
@@ -25,6 +26,13 @@ if (Test-Path -LiteralPath $source) {
     [System.IO.File]::WriteAllText($target, $content, (New-Object System.Text.UTF8Encoding $false))
 }
 Write-Host "配置: $target"
+
+# 旧名の hook が残ると、存在しないスキル jp-deslop の読み込みを待って書き込みを止め続ける
+$legacy = Join-Path $hooksDir 'jp-deslop-check.mjs'
+if (Test-Path -LiteralPath $legacy) {
+    Remove-Item -LiteralPath $legacy -Force
+    Write-Host "削除: $legacy"
+}
 
 $hookPath = $target -replace '\\', '/'
 $hook = [pscustomobject]@{ type = 'command'; command = 'node'; args = @($hookPath); timeout = 10; onFailure = 'continue' }
@@ -45,8 +53,8 @@ if (-not $settings.hooks.PSObject.Properties[$event]) {
 
 $kept = @(foreach ($entry in $settings.hooks.$event) {
     $others = @($entry.hooks | Where-Object {
-        $shellForm = $_.command -match '^node\s+"(?:[^"]*[\\/])?jp-deslop-check\.mjs"(?:\s|$)'
-        $execForm = $_.command -eq 'node' -and @($_.args)[0] -match '(?:^|[\\/])jp-deslop-check\.mjs$'
+        $shellForm = $_.command -match '^node\s+"(?:[^"]*[\\/])?(?:japanese|jp-deslop)-check\.mjs"(?:\s|$)'
+        $execForm = $_.command -eq 'node' -and @($_.args)[0] -match '(?:^|[\\/])(?:japanese|jp-deslop)-check\.mjs$'
         -not ($_.type -eq 'command' -and ($shellForm -or $execForm))
     })
     if ($others.Count -eq 0 -and $entry.hooks.Count -gt 0) { continue }
@@ -66,4 +74,4 @@ $json = $settings | ConvertTo-Json -Depth 32
 $null = $json | ConvertFrom-Json
 [System.IO.File]::WriteAllText($settingsFile, $json, (New-Object System.Text.UTF8Encoding $false))
 Write-Host "更新: $settingsFile"
-Write-Host 'Claude Code を再起動すると反映される。無効にするときは環境変数 JP_DESLOP_CHECK=off。'
+Write-Host 'Claude Code を再起動すると反映される。無効にするときは環境変数 JAPANESE_CHECK=off。'

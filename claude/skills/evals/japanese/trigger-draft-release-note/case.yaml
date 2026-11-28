@@ -1,6 +1,6 @@
 schema_version: "1.1"
-name: jp-deslop-trigger-draft-release-note
-tags: [jp-deslop, should-trigger]
+name: japanese-trigger-draft-release-note
+tags: [japanese, should-trigger]
 execution:
   prompt: >-
     CHANGELOG に載せる日本語の説明を考えてください。以前は検索条件が画面を閉じるたびに消えていましたが、今回から次に開いたときも残ります。
@@ -10,5 +10,5 @@ graders:
   - name: skill-called
     type: tool_used
     tool: Skill
-    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?jp-deslop"'
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?japanese"'
     min: 1

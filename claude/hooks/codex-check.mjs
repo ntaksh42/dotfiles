@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { decide as checkReply } from './reply-check.mjs'
 import { decide as checkVerification } from './verify-check.mjs'
-import { decide as checkJapanese, needsSkill } from './jp-deslop-check.mjs'
+import { decide as checkJapanese, needsSkill } from './japanese-check.mjs'
 
 function parseJson(text) {
   try {
@@ -28,7 +28,7 @@ function patchEdits(command) {
   return edits
 }
 
-const skillRead = /\b(?:Get-Content|cat|type|sed|head|more|bat|rg)\b[^\n;]*?[\\/]((?:report-to-user|verify-before-done|jp-deslop))[\\/]SKILL\.md\b/ig
+const skillRead = /\b(?:Get-Content|cat|type|sed|head|more|bat|rg)\b[^\n;]*?[\\/]((?:report-to-user|verify-before-done|japanese))[\\/]SKILL\.md\b/ig
 
 function toolUse(name, input) {
   return { type: 'tool_use', name, input }
@@ -75,7 +75,7 @@ export function decideCodex(check, input, transcriptText) {
       return result
     }
   }
-  if (input.hook_event_name === 'PreToolUse' && check === 'jp-deslop-check') {
+  if (input.hook_event_name === 'PreToolUse' && check === 'japanese-check') {
     const requests = input.tool_name === 'apply_patch'
       ? patchEdits(input.tool_input?.command).map(tool_input => ({ ...input, tool_name: 'Edit', tool_input }))
       : [input]
@@ -85,8 +85,8 @@ export function decideCodex(check, input, transcriptText) {
     if (result) {
       const output = result.hookSpecificOutput
       output.permissionDecisionReason = output.permissionDecisionReason.replace(
-        'Skill ツールで jp-deslop を読み込んでください',
-        'jp-deslop の SKILL.md を開いてください')
+        'Skill ツールで japanese を読み込んでください',
+        'japanese の SKILL.md を開いてください')
     }
     return result
   }
